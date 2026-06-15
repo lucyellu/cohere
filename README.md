@@ -53,6 +53,7 @@ Open `http://localhost:5173`. The Vite dev server is exposed on the LAN
 | **Songstats** | 🟢 live (returns 200) | none — auth via `apikey` header |
 | **YouTube** | 🟢 live | API enabled. **Quota: 10k units/day, search = 100 → ~100 searches/day. Cache hard.** Plain API key — no OAuth redirect URI needed. |
 | **JamBase** | 🟢 live | Base `https://api.data.jambase.com/v3`, **Bearer token auth** (not `?apikey=`). Route resolves artist name → exact id → events so searches skip tribute acts. Trial data is jam-band-heavy (Dave Matthews Band, Phish tour live; pop acts may show 0 shows). |
+| **Pinterest** | 🟢 live (keyless) | Style-seed extraction via public Open Graph tags (no API key/OAuth — the official API can't do open search anyway). Paste a Pin/board/image URL in the ✨ BYOC vault → its image seeds Gemini image-to-image. |
 | **Gemini (BYOC)** | 🟠 key valid, API disabled | Enable "Generative Language API" for GCP project `356818595469`. Until then, scene synthesis returns an SVG placeholder; flips to real AI images once enabled+toggled, or when a viewer pastes a working Gemini key in the ✨ BYOC vault. |
 | Cyanite / LALAL.AI / ElevenLabs | ⚪ no key | Mock-only until keys added to `.env` |
 

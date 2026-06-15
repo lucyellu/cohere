@@ -129,6 +129,50 @@ router.get('/songstats/search', async (req, res) => {
   res.status(result.ok ? 200 : 502).json(result);
 });
 
+// --- Pinterest: extract a style-seed image from a public Pin/board URL ----
+// Uses Open Graph meta tags (same as a link preview) — no API key or OAuth.
+const BROWSER_UA =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
+
+router.get('/pinterest/extract', async (req, res) => {
+  const url = String(req.query.url || '').trim();
+  if (!url) return res.status(400).json({ ok: false, error: 'url required' });
+
+  if (isMock('pinterest')) {
+    record('pinterest', { status: 200, latencyMs: 0, bytes: url.length, mode: 'mock', error: null });
+    return res.json({
+      ok: true,
+      mode: 'mock',
+      image: 'https://i.pinimg.com/736x/cb/ce/85/cbce8580e35f151f130054ffb8254390.jpg',
+      title: 'Music festival stage (mock seed)',
+      text: 'Futuristic outdoor festival stage, lasers and LED walls, dense crowd, neon lighting.',
+    });
+  }
+
+  // Direct image URL — use as-is, no scraping needed.
+  if (/\.(jpg|jpeg|png|webp|gif)(\?|$)/i.test(url) || /i\.pinimg\.com/.test(url)) {
+    record('pinterest', { status: 200, latencyMs: 0, bytes: url.length, mode: 'live', error: null });
+    return res.json({ ok: true, mode: 'live', image: url, title: '', text: '' });
+  }
+
+  const result = await callLive('pinterest', url, { headers: { 'User-Agent': BROWSER_UA } });
+  if (!result.ok || typeof result.data !== 'string') {
+    return res.status(502).json({ ok: false, error: `fetch failed (HTTP ${result.status})` });
+  }
+  const og = parseOg(result.data);
+  if (!og.image) return res.status(422).json({ ok: false, error: 'no image found at that URL' });
+  res.json({ ok: true, mode: 'live', image: og.image, title: og.title, text: [og.title, og.description].filter(Boolean).join('. ') });
+});
+
+function parseOg(html) {
+  const grab = (prop) => {
+    const re = new RegExp(`<meta[^>]+(?:property|name)=["']og:${prop}["'][^>]*>`, 'i');
+    const tag = html.match(re)?.[0] || '';
+    return tag.match(/content=["']([^"']+)["']/i)?.[1] || '';
+  };
+  return { image: grab('image'), title: grab('title'), description: grab('description') };
+}
+
 // --- Gemini (BYOC): synthesize a concert scene for a missing-footage song -
 // Order of resolution:
 //   1. a viewer-supplied key (x-byoc-key header) -> always a live call (their compute)
@@ -137,13 +181,27 @@ router.get('/songstats/search', async (req, res) => {
 router.post('/gemini/generate', express.json({ limit: '256kb' }), async (req, res) => {
   const prompt = String(req.body?.prompt || '');
   const label = String(req.body?.label || '');
+  const seedImageUrl = String(req.body?.seedImageUrl || '');
+  const seedText = String(req.body?.seedText || '');
   const byoc = (req.get('x-byoc-key') || '').trim();
 
   if (!prompt) return res.status(400).json({ ok: false, error: 'prompt required' });
 
   if (!byoc && isMock('gemini')) {
     record('gemini', { status: 200, latencyMs: 0, bytes: prompt.length, mode: 'mock', error: null });
-    return res.json({ ok: true, mode: 'mock', image: placeholderScene(label) });
+    // Before Gemini is live, show the Pinterest seed itself as the scene (if any).
+    return res.json({
+      ok: true,
+      mode: seedImageUrl ? 'seed' : 'mock',
+      image: seedImageUrl || placeholderScene(label),
+    });
+  }
+
+  const fullPrompt = seedText ? `${prompt} Match this visual style: ${seedText}` : prompt;
+  const parts = [{ text: fullPrompt }];
+  if (seedImageUrl) {
+    const seed = await fetchImageBase64(seedImageUrl);
+    if (seed) parts.push({ inlineData: seed }); // image-to-image style reference
   }
 
   const key = byoc || process.env.GEMINI_API_KEY;
@@ -152,7 +210,7 @@ router.post('/gemini/generate', express.json({ limit: '256kb' }), async (req, re
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
+      contents: [{ parts }],
       generationConfig: { responseModalities: ['IMAGE'] },
     }),
   });
@@ -164,13 +222,26 @@ router.post('/gemini/generate', express.json({ limit: '256kb' }), async (req, re
     return res.status(502).json({ ok: false, mode, error: msg, image: placeholderScene(label) });
   }
 
-  const parts = result.data?.candidates?.[0]?.content?.parts || [];
-  const img = parts.find((p) => p.inlineData?.data);
+  const respParts = result.data?.candidates?.[0]?.content?.parts || [];
+  const img = respParts.find((p) => p.inlineData?.data);
   if (!img) {
     return res.status(502).json({ ok: false, mode, error: 'no image in response', image: placeholderScene(label) });
   }
   res.json({ ok: true, mode, image: `data:${img.inlineData.mimeType || 'image/png'};base64,${img.inlineData.data}` });
 });
+
+// Fetch a remote image and base64-encode it for Gemini image-to-image input.
+async function fetchImageBase64(imgUrl) {
+  try {
+    const r = await fetch(imgUrl, { headers: { 'User-Agent': BROWSER_UA } });
+    if (!r.ok) return null;
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.length > 4_000_000) return null; // cap at 4MB
+    return { mimeType: r.headers.get('content-type') || 'image/jpeg', data: buf.toString('base64') };
+  } catch {
+    return null;
+  }
+}
 
 // SVG placeholder "scene" so the BYOC flow is demoable before the API is live.
 function placeholderScene(label) {

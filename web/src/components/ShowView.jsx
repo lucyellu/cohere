@@ -236,7 +236,13 @@ function SynthStage({ gap, state, onSynthesize, onOpenByoc }) {
 
 function SynthScene({ state }) {
   const badge =
-    state.mode === 'byoc' ? 'AI · your compute' : state.mode === 'live' ? 'AI · gateway' : 'placeholder';
+    state.mode === 'byoc'
+      ? 'AI · your compute'
+      : state.mode === 'live'
+        ? 'AI · gateway'
+        : state.mode === 'seed'
+          ? 'Pinterest seed'
+          : 'placeholder';
   return (
     <div className="relative h-full w-full">
       <img src={state.image} alt="synthesized concert scene" className="h-full w-full object-cover" />

@@ -35,6 +35,13 @@ export const SERVICES = {
     live: true,
     description: 'Streaming & chart analytics',
   },
+  pinterest: {
+    label: 'Pinterest',
+    category: 'media',
+    keyless: true, // public Open Graph data — no API key/OAuth needed
+    live: true,
+    description: 'Style-seed images from public Pin/board URLs',
+  },
   gemini: {
     label: 'Gemini (BYOC)',
     category: 'ai',
@@ -72,7 +79,9 @@ export const SERVICE_IDS = Object.keys(SERVICES);
 
 export function hasKey(id) {
   const svc = SERVICES[id];
-  return Boolean(svc && process.env[svc.envKey] && process.env[svc.envKey].trim());
+  if (!svc) return false;
+  if (svc.keyless) return true; // no credentials required (e.g. public OG data)
+  return Boolean(process.env[svc.envKey] && process.env[svc.envKey].trim());
 }
 
 // Per-service runtime override of mock/live mode (set from the monitor panel).

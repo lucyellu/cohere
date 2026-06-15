@@ -21,6 +21,7 @@ const PROBES = {
   jambase: '/api/jambase/events?artist=Coldplay',
   youtube: '/api/youtube/search?q=coldplay%20live',
   songstats: '/api/songstats/search?q=coldplay',
+  pinterest: '/api/pinterest/extract?url=https://www.pinterest.com/pin/concert-stage-design-stage-set-design-stage-lighting-design--59039445095226117/',
   cyanite: '/api/cyanite/ping',
   lalalai: '/api/lalalai/ping',
   elevenlabs: '/api/elevenlabs/ping',
@@ -51,14 +52,23 @@ export async function getLyrics(track, artist) {
   return res.json();
 }
 
+// Extract a style-seed image + description from a public Pinterest/image URL.
+export async function extractPin(url) {
+  const res = await fetch(`/api/pinterest/extract?url=${encodeURIComponent(url)}`);
+  return res.json();
+}
+
 // BYOC scene synthesis. Sends the prompt to the gateway; if the viewer has
 // stored their own Gemini key, it rides along as x-byoc-key for a live call.
+// A stored Pinterest style-seed (image + text) is blended in when present.
 export async function synthesizeScene(prompt, label) {
   const byoc = localStorage.getItem('reverb_byoc_gemini') || '';
+  const seedImageUrl = localStorage.getItem('reverb_seed_image') || '';
+  const seedText = localStorage.getItem('reverb_seed_text') || '';
   const res = await fetch('/api/gemini/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(byoc ? { 'x-byoc-key': byoc } : {}) },
-    body: JSON.stringify({ prompt, label }),
+    body: JSON.stringify({ prompt, label, seedImageUrl, seedText }),
   });
   return res.json();
 }
