@@ -3,8 +3,8 @@ import { fetchTour, sortStops, SORTS, fmtCapacity, fmtDate } from '../tour.js';
 import TourGlobe from './TourGlobe.jsx';
 
 export default function TourView({ onEnterShow }) {
-  const [artist, setArtist] = useState('Coldplay');
-  const [query, setQuery] = useState('Coldplay');
+  const [artist, setArtist] = useState('Dave Matthews Band');
+  const [query, setQuery] = useState('Dave Matthews Band');
   const [stops, setStops] = useState([]);
   const [mode, setMode] = useState(null);
   const [sortKey, setSortKey] = useState('date');
@@ -32,8 +32,8 @@ export default function TourView({ onEnterShow }) {
   }
 
   useEffect(() => {
-    // Start on the curated demo tour (has setlists); searches go live.
-    loadDemo();
+    // Open on a real, currently-touring artist so nothing fake shows by default.
+    load('Dave Matthews Band', 'live');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -67,7 +67,7 @@ export default function TourView({ onEnterShow }) {
         <button
           onClick={loadDemo}
           className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-zinc-400 hover:text-zinc-200"
-          title="Curated demo tour with setlists"
+          title="Sample placeholder tour with hand-written setlists — illustrative dates, not real"
         >
           Demo tour
         </button>
@@ -90,6 +90,13 @@ export default function TourView({ onEnterShow }) {
           {stops.length} stops · {fmtCapacity(totalCap)} total capacity
         </span>
       </div>
+
+      {mode === 'mock' && (
+        <div className="mb-3 rounded-lg border border-amber-400/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-200/80">
+          Sample demo data — illustrative dates &amp; setlists, <span className="font-semibold">not a real tour</span>. Search any
+          artist above for their live JamBase dates.
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
         {/* Globe */}
@@ -195,7 +202,7 @@ function ModeBadge({ mode }) {
         live ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'
       }`}
     >
-      {live ? 'LIVE · JamBase' : 'Demo tour (mock)'}
+      {live ? 'LIVE · JamBase' : 'Demo · sample data'}
     </span>
   );
 }
