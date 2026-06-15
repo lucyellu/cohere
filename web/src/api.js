@@ -50,3 +50,15 @@ export async function getLyrics(track, artist) {
   );
   return res.json();
 }
+
+// BYOC scene synthesis. Sends the prompt to the gateway; if the viewer has
+// stored their own Gemini key, it rides along as x-byoc-key for a live call.
+export async function synthesizeScene(prompt, label) {
+  const byoc = localStorage.getItem('reverb_byoc_gemini') || '';
+  const res = await fetch('/api/gemini/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(byoc ? { 'x-byoc-key': byoc } : {}) },
+    body: JSON.stringify({ prompt, label }),
+  });
+  return res.json();
+}

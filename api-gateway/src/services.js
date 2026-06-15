@@ -35,6 +35,16 @@ export const SERVICES = {
     live: true,
     description: 'Streaming & chart analytics',
   },
+  gemini: {
+    label: 'Gemini (BYOC)',
+    category: 'ai',
+    envKey: 'GEMINI_API_KEY',
+    live: true,
+    // Default to placeholder scenes; flips live once the Generative Language
+    // API is enabled and toggled, or when a viewer supplies their own key.
+    preferMock: true,
+    description: 'AI scene synthesis for missing footage',
+  },
   cyanite: {
     label: 'Cyanite',
     category: 'ai',

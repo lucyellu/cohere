@@ -3,7 +3,7 @@
 
 import express from 'express';
 import { SERVICES, SERVICE_IDS, hasKey, isMock, getOverride, setOverride } from './services.js';
-import { snapshot } from './usage.js';
+import { snapshot, record } from './usage.js';
 import { callLive, serveMock } from './proxy.js';
 
 const router = express.Router();
@@ -128,6 +128,71 @@ router.get('/songstats/search', async (req, res) => {
   );
   res.status(result.ok ? 200 : 502).json(result);
 });
+
+// --- Gemini (BYOC): synthesize a concert scene for a missing-footage song -
+// Order of resolution:
+//   1. a viewer-supplied key (x-byoc-key header) -> always a live call (their compute)
+//   2. else if gemini is in mock mode -> a placeholder scene (works offline)
+//   3. else -> live call with the gateway's own key
+router.post('/gemini/generate', express.json({ limit: '256kb' }), async (req, res) => {
+  const prompt = String(req.body?.prompt || '');
+  const label = String(req.body?.label || '');
+  const byoc = (req.get('x-byoc-key') || '').trim();
+
+  if (!prompt) return res.status(400).json({ ok: false, error: 'prompt required' });
+
+  if (!byoc && isMock('gemini')) {
+    record('gemini', { status: 200, latencyMs: 0, bytes: prompt.length, mode: 'mock', error: null });
+    return res.json({ ok: true, mode: 'mock', image: placeholderScene(label) });
+  }
+
+  const key = byoc || process.env.GEMINI_API_KEY;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${key}`;
+  const result = await callLive('gemini', url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { responseModalities: ['IMAGE'] },
+    }),
+  });
+
+  const mode = byoc ? 'byoc' : 'live';
+  if (!result.ok) {
+    const msg = result.data?.error?.message || `HTTP ${result.status}`;
+    // Degrade gracefully: still return a placeholder so the UI shows something.
+    return res.status(502).json({ ok: false, mode, error: msg, image: placeholderScene(label) });
+  }
+
+  const parts = result.data?.candidates?.[0]?.content?.parts || [];
+  const img = parts.find((p) => p.inlineData?.data);
+  if (!img) {
+    return res.status(502).json({ ok: false, mode, error: 'no image in response', image: placeholderScene(label) });
+  }
+  res.json({ ok: true, mode, image: `data:${img.inlineData.mimeType || 'image/png'};base64,${img.inlineData.data}` });
+});
+
+// SVG placeholder "scene" so the BYOC flow is demoable before the API is live.
+function placeholderScene(label) {
+  const safe = (label || 'Synthesized scene').replace(/[<&>]/g, '').slice(0, 48);
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='1280' height='720'>
+    <defs>
+      <linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>
+        <stop offset='0' stop-color='#3b0764'/><stop offset='0.55' stop-color='#1e1b4b'/><stop offset='1' stop-color='#020617'/>
+      </linearGradient>
+      <radialGradient id='spot' cx='0.5' cy='0.3' r='0.55'>
+        <stop offset='0' stop-color='#a78bfa' stop-opacity='0.55'/><stop offset='1' stop-color='#a78bfa' stop-opacity='0'/>
+      </radialGradient>
+    </defs>
+    <rect width='1280' height='720' fill='url(#g)'/>
+    <rect width='1280' height='720' fill='url(#spot)'/>
+    <rect y='560' width='1280' height='160' fill='#000' opacity='0.45'/>
+    <text x='640' y='350' text-anchor='middle' fill='#e9d5ff' font-family='sans-serif' font-size='44' font-weight='700'>${safe}</text>
+    <text x='640' y='400' text-anchor='middle' fill='#a1a1aa' font-family='sans-serif' font-size='21'>synthesized scene · placeholder</text>
+    <text x='640' y='436' text-anchor='middle' fill='#71717a' font-family='sans-serif' font-size='15'>enable the Gemini API or add a BYOC key for real AI generation</text>
+  </svg>`;
+  return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+}
 
 // --- Stub services (mock only until keys arrive) -------------------------
 for (const id of ['cyanite', 'lalalai', 'elevenlabs']) {

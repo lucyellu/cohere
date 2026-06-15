@@ -1,22 +1,40 @@
 import { useEffect, useRef, useState } from 'react';
-import { youtubeSearch, getLyrics } from '../api.js';
+import { youtubeSearch, getLyrics, synthesizeScene } from '../api.js';
 import { fmtDate, fmtCapacity } from '../tour.js';
 
 // The Show: relive one concert. Per setlist song we pull real fan clips
 // (YouTube) as multi-angle footage + real lyrics (Musixmatch). Songs nobody
 // filmed get the BYOC "synthesize" path (wired in the next phase).
 
-export default function ShowView({ show, onBack }) {
+export default function ShowView({ show, onBack, onOpenByoc }) {
   const [activeSong, setActiveSong] = useState(show?.setlist?.[0] || null);
   const [angle, setAngle] = useState(0);
   const [clips, setClips] = useState({}); // song -> [videos] | 'none'
   const [lyrics, setLyrics] = useState({}); // song -> text | 'none'
+  const [synth, setSynth] = useState({}); // song -> { loading, image, mode, error }
+  const [synthView, setSynthView] = useState(false); // show AI scene instead of video
   const [loading, setLoading] = useState(false);
   const cache = useRef({ clips: {}, lyrics: {} });
+
+  async function synthesize(song) {
+    setSynth((s) => ({ ...s, [song]: { loading: true } }));
+    const lyr = lyrics[song] && lyrics[song] !== 'none' ? lyrics[song] : '';
+    const mood = lyr.split('\n').filter(Boolean).slice(0, 6).join(' ').slice(0, 240);
+    const prompt =
+      `Cinematic wide concert photograph of ${show.artist} performing "${song}" live at ${show.venue}, ` +
+      `${show.city}. Dramatic stage lighting, lasers, crowd silhouettes with phone lights, atmospheric haze, ` +
+      `emotional and epic. Mood from the lyrics: ${mood}. No text, no watermark.`;
+    const res = await synthesizeScene(prompt, song).catch(() => null);
+    setSynth((s) => ({
+      ...s,
+      [song]: { loading: false, image: res?.image || null, mode: res?.mode, error: res?.error || null },
+    }));
+  }
 
   async function selectSong(song) {
     setActiveSong(song);
     setAngle(0);
+    setSynthView(false);
     if (cache.current.clips[song] !== undefined) {
       setClips((c) => ({ ...c, [song]: cache.current.clips[song] }));
       setLyrics((l) => ({ ...l, [song]: cache.current.lyrics[song] }));
@@ -45,7 +63,14 @@ export default function ShowView({ show, onBack }) {
   if (!show) return null;
   const songClips = clips[activeSong];
   const hasFootage = Array.isArray(songClips) && songClips.length > 0;
+  const showSynth = synthView || songClips === 'none';
   const current = hasFootage ? songClips[Math.min(angle, songClips.length - 1)] : null;
+
+  function openSynth() {
+    setSynthView(true);
+    const st = synth[activeSong];
+    if (!st?.image && !st?.loading) synthesize(activeSong);
+  }
 
   return (
     <div>
@@ -105,6 +130,13 @@ export default function ShowView({ show, onBack }) {
           <div className="aspect-video w-full overflow-hidden rounded-2xl border border-white/10 bg-black">
             {loading ? (
               <div className="flex h-full items-center justify-center text-sm text-zinc-500">Finding footage…</div>
+            ) : showSynth ? (
+              <SynthStage
+                gap={songClips === 'none'}
+                state={synth[activeSong]}
+                onSynthesize={() => synthesize(activeSong)}
+                onOpenByoc={onOpenByoc}
+              />
             ) : current ? (
               <iframe
                 key={current.id.videoId}
@@ -114,8 +146,6 @@ export default function ShowView({ show, onBack }) {
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
               />
-            ) : songClips === 'none' ? (
-              <GapPanel song={activeSong} />
             ) : (
               <div className="flex h-full items-center justify-center text-sm text-zinc-500">
                 Select a song to begin.
@@ -123,21 +153,33 @@ export default function ShowView({ show, onBack }) {
             )}
           </div>
 
-          {/* Angle switcher (multi-angle crowd footage) */}
-          {hasFootage && songClips.length > 1 && (
+          {/* Angle switcher: crowd footage angles + the AI scene (always available) */}
+          {(hasFootage || songClips === 'none') && (
             <div className="mt-2 flex flex-wrap gap-2">
-              {songClips.map((v, i) => (
-                <button
-                  key={v.id.videoId}
-                  onClick={() => setAngle(i)}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                    i === angle ? 'bg-indigo-500 text-white' : 'bg-white/5 text-zinc-400 hover:bg-white/10'
-                  }`}
-                  title={v.snippet.title}
-                >
-                  Angle {i + 1} · {v.snippet.channelTitle.slice(0, 18)}
-                </button>
-              ))}
+              {hasFootage &&
+                songClips.map((v, i) => (
+                  <button
+                    key={v.id.videoId}
+                    onClick={() => {
+                      setSynthView(false);
+                      setAngle(i);
+                    }}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                      !showSynth && i === angle ? 'bg-indigo-500 text-white' : 'bg-white/5 text-zinc-400 hover:bg-white/10'
+                    }`}
+                    title={v.snippet.title}
+                  >
+                    Angle {i + 1} · {v.snippet.channelTitle.slice(0, 16)}
+                  </button>
+                ))}
+              <button
+                onClick={openSynth}
+                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                  showSynth ? 'bg-fuchsia-500 text-white' : 'bg-fuchsia-500/10 text-fuchsia-300 hover:bg-fuchsia-500/20'
+                }`}
+              >
+                ✨ AI scene
+              </button>
             </div>
           )}
 
@@ -160,21 +202,52 @@ export default function ShowView({ show, onBack }) {
   );
 }
 
-function GapPanel({ song }) {
+function SynthStage({ gap, state, onSynthesize, onOpenByoc }) {
+  if (state?.loading) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-zinc-400">
+        <div className="animate-pulse text-3xl">✨</div>
+        Synthesizing scene…
+      </div>
+    );
+  }
+  if (state?.image) return <SynthScene state={state} />;
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
       <div className="text-3xl">✨</div>
-      <p className="text-sm text-zinc-300">No crowd footage found for "{song}".</p>
+      <p className="text-sm text-zinc-300">
+        {gap ? 'No crowd footage found for this song.' : 'Reimagine this performance with AI.'}
+      </p>
       <p className="max-w-sm text-xs text-zinc-600">
-        This is where BYOC comes in — bring your own compute to synthesize the missing performance from the
-        song's lyrics &amp; mood. (Generation wires up next.)
+        Bring your own compute to synthesize the scene from the song's lyrics &amp; mood.
       </p>
       <button
-        disabled
-        className="cursor-not-allowed rounded-xl bg-indigo-500/40 px-4 py-2 text-sm font-semibold text-white/70"
+        onClick={onSynthesize}
+        className="rounded-xl bg-gradient-to-r from-indigo-500 to-fuchsia-500 px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
       >
         Synthesize performance →
       </button>
+      <button onClick={onOpenByoc} className="text-[11px] text-zinc-500 hover:text-zinc-300">
+        add a Gemini key for real AI generation →
+      </button>
+    </div>
+  );
+}
+
+function SynthScene({ state }) {
+  const badge =
+    state.mode === 'byoc' ? 'AI · your compute' : state.mode === 'live' ? 'AI · gateway' : 'placeholder';
+  return (
+    <div className="relative h-full w-full">
+      <img src={state.image} alt="synthesized concert scene" className="h-full w-full object-cover" />
+      <span className="absolute left-3 top-3 rounded-md bg-black/60 px-2 py-1 text-[11px] font-medium text-fuchsia-200">
+        ✨ {badge}
+      </span>
+      {state.error && (
+        <span className="absolute bottom-3 left-3 right-3 truncate rounded-md bg-red-500/20 px-2 py-1 text-[11px] text-red-200">
+          {state.error}
+        </span>
+      )}
     </div>
   );
 }
