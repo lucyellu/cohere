@@ -1,7 +1,11 @@
 # Reverb — Status & Handoff
 
 > Living doc for cross-session continuity. Update it as things change.
-> Last updated: 2026-06-15 (afternoon). Hackathon: **Musicathon 2026, June 15–21**.
+> Last updated: 2026-06-15 (evening). Hackathon: **Musicathon 2026, June 15–21**.
+>
+> **Current state in one line:** Globe + Show + BYOC all working. 6 services live
+> (Musixmatch, Songstats, YouTube, JamBase, Pinterest, setlist.fm). Only open item:
+> **enable the Gemini API** to turn AI-scene placeholders into real images.
 
 ## What Reverb is
 
@@ -67,7 +71,7 @@ per service. Effective mode: no key → forced mock; else a runtime toggle (Dev 
 | **JamBase** | 🟢 live | Base `api.data.jambase.com/v3`, **Bearer** auth. Route resolves artist name→exact id→events (skips tribute acts). **The globe searches live by default** (`?source=live`); the **"Demo tour" button** loads the curated Coldplay mock (`?source=mock`, has setlists). Live shows have no setlist → Show page falls back to the artist's top tracks. Lots of real artists work (Madison Beer, Olivia Rodrigo, Dave Matthews Band, Phish…); some pop acts return 0. |
 | **Pinterest** | 🟢 live (keyless) | Style-seed via public Open Graph tags. No API/OAuth/scraper. |
 | **Gemini (BYOC)** | 🟠 **needs enabling** | Key valid but **"Generative Language API" is disabled** on GCP project `356818595469`. Until enabled, synth returns a placeholder (or the Pinterest seed image). |
-| **setlist.fm** | ⚪ **needs key** | Integrated & ready. Real setlists via `x-api-key` header, base `api.setlist.fm/rest/1.0`. Apply (instant, free): https://www.setlist.fm/settings/api → put it in `.env` as `SETLISTFM_API_KEY`. Show page tries: curated setlist → setlist.fm (exact date, else most recent past show = "what they've been playing") → top tracks. Note: JamBase dates are *upcoming*, so exact matches are rare; the recent-setlist path is the useful one. |
+| **setlist.fm** | 🟢 live | Real setlists via `x-api-key` header, base `api.setlist.fm/rest/1.0`. Show page tries: curated setlist → setlist.fm (exact date, else most recent past show = "what they've been playing") → top tracks. JamBase dates are *upcoming* so exact matches are rare; the recent-setlist path is the useful one (verified: DMB upcoming show → returns their June 13 setlist, 21 songs). |
 | Cyanite / LALAL.AI / ElevenLabs | ⚪ no key | mock-only; not yet integrated. |
 
 ### Open action items (user-side)
@@ -78,6 +82,7 @@ per service. Effective mode: no key → forced mock; else a runtime toggle (Dev 
 - API gateway + monitor (mock/live toggle, usage, health) — the "Dev" tab.
 - Tour Globe: react-globe.gl, capacity-scaled venue points, chronological route arcs, click-to-focus, artist search, sortable stops (date / capacity / venue / city), per-stop setlist.
 - Show page: per-song multi-angle YouTube fan footage + Musixmatch lyrics; "✨ AI scene" available on every song.
+- Real setlists via setlist.fm (exact date → most recent past show → top tracks fallback), with honest labeling.
 - BYOC: gateway-proxied Gemini image synthesis; key vault in localStorage; Standard vs Crowd-Powered badge.
 - Pinterest style-seed: extract image+description from a public URL → image-to-image seed for Gemini; shows the seed image as the scene until Gemini is live.
 
@@ -93,7 +98,7 @@ per service. Effective mode: no key → forced mock; else a runtime toggle (Dev 
 - The `node --watch` gateway auto-restarts on save; a syntax error keeps it down until fixed.
 
 ## Next steps / backlog
-- Enable Gemini → verify real image-to-image with a Pinterest seed.
+- **Enable Gemini** (Generative Language API on the GCP project) → verify real image-to-image with a Pinterest seed. This is the one thing standing between placeholder scenes and real AI.
 - Wire **Cyanite** mood/energy tags into the synth prompt (needs a Cyanite key; GraphQL + audio/Spotify id).
 - "More compute = more fidelity" framing: multiple frames / higher res when a BYOC key is present (and pitch the collective-compute vision; true cross-viewer pooling = realtime backend, a stretch).
 - Polish: loading/empty states, mobile layout pass on the Show page, a demo "tour of the night" autoplay.
