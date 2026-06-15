@@ -28,7 +28,7 @@ export const SERVICES = {
     label: 'Songstats',
     category: 'data',
     envKey: 'SONGSTATS_API_KEY',
-    live: false,
+    live: true,
     description: 'Streaming & chart analytics',
   },
   cyanite: {

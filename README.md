@@ -9,11 +9,17 @@ synthesize the missing performance.
 Hackathon runs **June 15–21, 2026**. Partners: Musixmatch, LALAL.AI, ElevenLabs,
 Songstats, Cyanite, JamBase, N8N, Replit.
 
-## This repo so far: the API Control Room
+## This repo so far
 
-A central **gateway** proxies every partner API (keys stay server-side) and a
-**monitor panel** shows live status, usage, and a per-service mock⇄live toggle.
-Mock-first: the UI never blocks on missing keys or quota.
+Two tabs in the web app:
+
+- **🌍 Tour Globe** — search an artist, see their tour plotted on a 3D globe
+  (`react-globe.gl`). Points scale/color by venue capacity; arcs trace the
+  chronological route. Sortable stop list (date, capacity/biggest, venue A–Z,
+  city A–Z) with per-stop setlist. Runs on mock JamBase data until a valid key.
+- **🎛️ API Control Room** — a central **gateway** proxies every partner API
+  (keys stay server-side); a **monitor panel** shows live status, usage, and a
+  per-service mock⇄live toggle. Mock-first: the UI never blocks on missing keys.
 
 ```
 musicathon/
@@ -43,10 +49,13 @@ Open `http://localhost:5173`. The Vite dev server is exposed on the LAN
 
 | Service | Status | Action needed |
 |---|---|---|
-| **Musixmatch** | 🔴 `401` on all endpoints | Key not authorized — check Musicathon Discord/docs for the Pro base URL or activate the key |
-| **JamBase** | 🔴 `api_key_invalid` | Trial key rejected — re-grab from the JamBase Data dashboard |
+| **Musixmatch** | 🟢 live (Pro key, returns 200) | none — apikey query param; the Pro "password" is portal login only |
+| **Songstats** | 🟢 live (returns 200) | none — auth via `apikey` header |
 | **YouTube** | 🟠 key valid, API disabled | Enable "YouTube Data API v3" for GCP project `356818595469`, then toggle live in the panel. **Quota: 10k units/day, search = 100 → ~100 searches/day. Cache hard.** |
-| Songstats / Cyanite / LALAL.AI / ElevenLabs | ⚪ no key | Mock-only until keys added to `.env` |
+| **JamBase** | 🔴 `api_key_invalid` | Trial key rejected — re-grab from the JamBase Data dashboard. Tour globe runs on mock data until then. |
+| Cyanite / LALAL.AI / ElevenLabs | ⚪ no key | Mock-only until keys added to `.env` |
+
+> Note: the key first given as "Musixmatch" was actually the **Songstats** key — that mislabel caused the early 401s. Now corrected.
 
 Add a key to `api-gateway/.env`, restart, and the "Go live" toggle unlocks for
 that service. Services with no key are locked to mock data.

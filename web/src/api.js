@@ -20,7 +20,7 @@ const PROBES = {
   musixmatch: '/api/musixmatch/search?q=coldplay',
   jambase: '/api/jambase/events?artist=Coldplay',
   youtube: '/api/youtube/search?q=coldplay%20live',
-  songstats: '/api/songstats/ping',
+  songstats: '/api/songstats/search?q=coldplay',
   cyanite: '/api/cyanite/ping',
   lalalai: '/api/lalalai/ping',
   elevenlabs: '/api/elevenlabs/ping',

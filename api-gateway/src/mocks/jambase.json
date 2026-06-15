@@ -1,6 +1,6 @@
 {
   "success": true,
-  "pagination": { "page": 1, "perPage": 3, "totalItems": 3 },
+  "pagination": { "page": 1, "perPage": 8, "totalItems": 8 },
   "events": [
     {
       "identifier": "jambase:11540021",
@@ -10,33 +10,101 @@
       "location": {
         "name": "BC Place",
         "address": { "addressLocality": "Vancouver", "addressRegion": "BC", "addressCountry": "CA" },
-        "geo": { "latitude": 49.2768, "longitude": -123.1119 }
+        "geo": { "latitude": 49.2768, "longitude": -123.1119 },
+        "maximumAttendeeCapacity": 54500
       },
       "setlist": ["Higher Power", "Adventure of a Lifetime", "Yellow", "The Scientist", "Viva la Vida", "Fix You"]
     },
     {
       "identifier": "jambase:11540022",
       "name": "Coldplay — Music of the Spheres World Tour",
-      "startDate": "2026-06-17",
+      "startDate": "2026-06-18",
       "performer": [{ "name": "Coldplay", "identifier": "jambase:345" }],
       "location": {
         "name": "Lumen Field",
         "address": { "addressLocality": "Seattle", "addressRegion": "WA", "addressCountry": "US" },
-        "geo": { "latitude": 47.5952, "longitude": -122.3316 }
+        "geo": { "latitude": 47.5952, "longitude": -122.3316 },
+        "maximumAttendeeCapacity": 68740
       },
       "setlist": ["Higher Power", "Yellow", "Paradise", "Clocks", "Fix You"]
     },
     {
       "identifier": "jambase:11540023",
       "name": "Coldplay — Music of the Spheres World Tour",
-      "startDate": "2026-06-20",
+      "startDate": "2026-06-22",
       "performer": [{ "name": "Coldplay", "identifier": "jambase:345" }],
       "location": {
         "name": "Levi's Stadium",
         "address": { "addressLocality": "Santa Clara", "addressRegion": "CA", "addressCountry": "US" },
-        "geo": { "latitude": 37.403, "longitude": -121.9697 }
+        "geo": { "latitude": 37.403, "longitude": -121.9697 },
+        "maximumAttendeeCapacity": 68500
       },
       "setlist": ["Higher Power", "Adventure of a Lifetime", "The Scientist", "Viva la Vida", "A Sky Full of Stars"]
+    },
+    {
+      "identifier": "jambase:11540024",
+      "name": "Coldplay — Music of the Spheres World Tour",
+      "startDate": "2026-06-27",
+      "performer": [{ "name": "Coldplay", "identifier": "jambase:345" }],
+      "location": {
+        "name": "Rose Bowl",
+        "address": { "addressLocality": "Pasadena", "addressRegion": "CA", "addressCountry": "US" },
+        "geo": { "latitude": 34.1613, "longitude": -118.1676 },
+        "maximumAttendeeCapacity": 92542
+      },
+      "setlist": ["Higher Power", "Yellow", "Charlie Brown", "The Scientist", "Viva la Vida", "A Sky Full of Stars", "Fix You"]
+    },
+    {
+      "identifier": "jambase:11540025",
+      "name": "Coldplay — Music of the Spheres World Tour",
+      "startDate": "2026-07-12",
+      "performer": [{ "name": "Coldplay", "identifier": "jambase:345" }],
+      "location": {
+        "name": "Wembley Stadium",
+        "address": { "addressLocality": "London", "addressRegion": "England", "addressCountry": "GB" },
+        "geo": { "latitude": 51.556, "longitude": -0.2796 },
+        "maximumAttendeeCapacity": 90000
+      },
+      "setlist": ["Higher Power", "Adventure of a Lifetime", "Paradise", "The Scientist", "Viva la Vida", "Something Just Like This", "Fix You", "A Sky Full of Stars"]
+    },
+    {
+      "identifier": "jambase:11540026",
+      "name": "Coldplay — Music of the Spheres World Tour",
+      "startDate": "2026-07-19",
+      "performer": [{ "name": "Coldplay", "identifier": "jambase:345" }],
+      "location": {
+        "name": "Stade de France",
+        "address": { "addressLocality": "Saint-Denis", "addressRegion": "Ile-de-France", "addressCountry": "FR" },
+        "geo": { "latitude": 48.9244, "longitude": 2.3601 },
+        "maximumAttendeeCapacity": 80698
+      },
+      "setlist": ["Higher Power", "Yellow", "Clocks", "The Scientist", "Viva la Vida", "Fix You"]
+    },
+    {
+      "identifier": "jambase:11540027",
+      "name": "Coldplay — Music of the Spheres World Tour",
+      "startDate": "2026-08-03",
+      "performer": [{ "name": "Coldplay", "identifier": "jambase:345" }],
+      "location": {
+        "name": "Estadio River Plate",
+        "address": { "addressLocality": "Buenos Aires", "addressRegion": "CABA", "addressCountry": "AR" },
+        "geo": { "latitude": -34.5453, "longitude": -58.4498 },
+        "maximumAttendeeCapacity": 70074
+      },
+      "setlist": ["Higher Power", "Adventure of a Lifetime", "Yellow", "Paradise", "Viva la Vida", "A Sky Full of Stars"]
+    },
+    {
+      "identifier": "jambase:11540028",
+      "name": "Coldplay — Music of the Spheres World Tour",
+      "startDate": "2026-08-15",
+      "performer": [{ "name": "Coldplay", "identifier": "jambase:345" }],
+      "location": {
+        "name": "Tokyo Dome",
+        "address": { "addressLocality": "Tokyo", "addressRegion": "Tokyo", "addressCountry": "JP" },
+        "geo": { "latitude": 35.7056, "longitude": 139.7519 },
+        "maximumAttendeeCapacity": 55000
+      },
+      "setlist": ["Higher Power", "Yellow", "The Scientist", "Clocks", "Viva la Vida", "Fix You"]
     }
   ],
   "_mock": true

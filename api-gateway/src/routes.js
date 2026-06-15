@@ -84,8 +84,19 @@ router.get('/youtube/search', async (req, res) => {
   res.status(result.ok ? 200 : 502).json(result);
 });
 
+// --- Songstats: artist search / streaming analytics ----------------------
+router.get('/songstats/search', async (req, res) => {
+  const q = req.query.q || 'coldplay';
+  const result = await resolve(
+    'songstats',
+    () => `https://api.songstats.com/enterprise/v1/artists/search?q=${encodeURIComponent(q)}&limit=5`,
+    { headers: { apikey: process.env.SONGSTATS_API_KEY, Accept: 'application/json' } }
+  );
+  res.status(result.ok ? 200 : 502).json(result);
+});
+
 // --- Stub services (mock only until keys arrive) -------------------------
-for (const id of ['songstats', 'cyanite', 'lalalai', 'elevenlabs']) {
+for (const id of ['cyanite', 'lalalai', 'elevenlabs']) {
   router.get(`/${id}/ping`, async (_req, res) => {
     const result = await serveMock(id);
     res.json(result);
