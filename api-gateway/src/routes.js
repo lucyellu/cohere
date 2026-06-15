@@ -61,6 +61,19 @@ router.get('/musixmatch/search', async (req, res) => {
   res.status(result.ok ? 200 : 502).json(result);
 });
 
+// --- Musixmatch: lyrics for a specific track -----------------------------
+router.get('/musixmatch/lyrics', async (req, res) => {
+  const { track, artist } = req.query;
+  const result = await resolve('musixmatch', () => {
+    const key = process.env.MUSIXMATCH_API_KEY;
+    const p = new URLSearchParams({ apikey: key });
+    if (track) p.set('q_track', track);
+    if (artist) p.set('q_artist', artist);
+    return `https://api.musixmatch.com/ws/1.1/matcher.lyrics.get?${p.toString()}`;
+  });
+  res.status(result.ok ? 200 : 502).json(result);
+});
+
 // --- JamBase Data v3: tour events by artist or region --------------------
 // Base host is api.data.jambase.com; auth is a Bearer token (NOT a query key).
 // A bare `artistName` filter matches tribute acts too, so when an artist is

@@ -1,20 +1,32 @@
 import { useState } from 'react';
-import ControlRoom from './components/ControlRoom.jsx';
 import TourView from './components/TourView.jsx';
+import ShowView from './components/ShowView.jsx';
+import ControlRoom from './components/ControlRoom.jsx';
 
 const TABS = [
-  { id: 'tour', label: '🌍 Tour Globe' },
-  { id: 'control', label: '🎛️ API Control Room' },
+  { id: 'globe', label: '🌍 Globe' },
+  { id: 'show', label: '🎤 Show' },
+  { id: 'dev', label: '🎛️ Dev' },
 ];
 
 export default function App() {
-  const [tab, setTab] = useState('tour');
+  const [tab, setTab] = useState('globe');
+  const [show, setShow] = useState(null);
+
+  function enterShow(stop) {
+    setShow(stop);
+    setTab('show');
+  }
 
   return (
     <div className="mx-auto min-h-full max-w-6xl px-4 py-8 text-zinc-100">
       <header className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">Musicathon 2026</h1>
-        <p className="mt-1 text-sm text-zinc-500">Concert tour archive · partner gateway &amp; diagnostics</p>
+        <div className="flex items-baseline gap-3">
+          <h1 className="text-2xl font-bold tracking-tight">
+            <span className="bg-gradient-to-r from-indigo-400 to-fuchsia-400 bg-clip-text text-transparent">Reverb</span>
+          </h1>
+          <p className="text-sm text-zinc-500">Relive any tour — crowd footage, lyrics &amp; AI-filled gaps</p>
+        </div>
 
         <nav className="mt-4 inline-flex rounded-xl border border-white/10 bg-white/5 p-1">
           {TABS.map((t) => (
@@ -31,7 +43,19 @@ export default function App() {
         </nav>
       </header>
 
-      {tab === 'tour' ? <TourView /> : <ControlRoom />}
+      {tab === 'globe' && <TourView onEnterShow={enterShow} />}
+      {tab === 'show' &&
+        (show ? (
+          <ShowView show={show} onBack={() => setTab('globe')} />
+        ) : (
+          <div className="flex h-80 flex-col items-center justify-center gap-3 rounded-2xl border border-white/10 bg-black/40 text-center text-sm text-zinc-500">
+            <span>No show selected yet.</span>
+            <button onClick={() => setTab('globe')} className="rounded-lg bg-indigo-500 px-4 py-2 font-semibold text-white">
+              Pick one from the Globe →
+            </button>
+          </div>
+        ))}
+      {tab === 'dev' && <ControlRoom />}
     </div>
   );
 }

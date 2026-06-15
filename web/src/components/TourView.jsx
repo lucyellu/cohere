@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { fetchTour, sortStops, SORTS, fmtCapacity, fmtDate } from '../tour.js';
 import TourGlobe from './TourGlobe.jsx';
 
-export default function TourView() {
+export default function TourView({ onEnterShow }) {
   const [artist, setArtist] = useState('Coldplay');
   const [query, setQuery] = useState('Coldplay');
   const [stops, setStops] = useState([]);
@@ -141,8 +141,18 @@ export default function TourView() {
           {/* Selected setlist */}
           {selected && (
             <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
-              <h4 className="text-sm font-semibold text-zinc-100">{selected.venue} — setlist</h4>
-              <p className="text-xs text-zinc-500">{fmtDate(selected.date)} · {selected.city}</p>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h4 className="text-sm font-semibold text-zinc-100">{selected.venue} — setlist</h4>
+                  <p className="text-xs text-zinc-500">{fmtDate(selected.date)} · {selected.city}</p>
+                </div>
+                <button
+                  onClick={() => onEnterShow?.(selected)}
+                  className="shrink-0 rounded-lg bg-gradient-to-r from-indigo-500 to-fuchsia-500 px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
+                >
+                  ▶ Enter show
+                </button>
+              </div>
               {selected.setlist.length ? (
                 <ol className="mt-2 space-y-1 text-sm text-zinc-300">
                   {selected.setlist.map((song, i) => (

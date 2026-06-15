@@ -15,6 +15,10 @@ export const SERVICES = {
     category: 'data',
     envKey: 'JAMBASE_API_KEY',
     live: true,
+    // Default to mock: the curated mock tour includes setlists (which the live
+    // JamBase Data API doesn't return) and gives the globe a clean world tour.
+    // Still fully toggleable to live from the Control Room.
+    preferMock: true,
     description: 'Tour dates, venues (lat/long), setlists',
   },
   youtube: {
@@ -72,8 +76,9 @@ export function setOverride(id, useMock) {
 // Effective mode for a service. A service with no key is ALWAYS forced to mock,
 // regardless of toggles — you can't go live without credentials.
 export function isMock(id) {
-  if (!hasKey(id)) return true;
-  if (overrides[id] !== null) return overrides[id];
+  if (!hasKey(id)) return true; // no credentials -> always mock
+  if (overrides[id] !== null) return overrides[id]; // runtime toggle wins
+  if (SERVICES[id].preferMock) return true; // service prefers mock by default
   return String(process.env.USE_MOCK_DATA).toLowerCase() !== 'false';
 }
 

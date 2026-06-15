@@ -36,3 +36,17 @@ export async function probe(id) {
 export async function probeAll() {
   await Promise.all(Object.keys(PROBES).map((id) => probe(id).catch(() => null)));
 }
+
+// --- Show-page data ------------------------------------------------------
+
+export async function youtubeSearch(q) {
+  const res = await fetch(`/api/youtube/search?q=${encodeURIComponent(q)}`);
+  return res.json();
+}
+
+export async function getLyrics(track, artist) {
+  const res = await fetch(
+    `/api/musixmatch/lyrics?track=${encodeURIComponent(track)}&artist=${encodeURIComponent(artist)}`
+  );
+  return res.json();
+}
