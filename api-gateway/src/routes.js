@@ -61,16 +61,37 @@ router.get('/musixmatch/search', async (req, res) => {
   res.status(result.ok ? 200 : 502).json(result);
 });
 
-// --- JamBase: tour events by artist or region ----------------------------
+// --- JamBase Data v3: tour events by artist or region --------------------
+// Base host is api.data.jambase.com; auth is a Bearer token (NOT a query key).
+// A bare `artistName` filter matches tribute acts too, so when an artist is
+// given we first resolve the exact artist -> its identifier, then query events
+// by id for clean single-artist results.
+const JB_BASE = 'https://api.data.jambase.com/v3';
+const jbAuth = () => ({
+  headers: { Authorization: `Bearer ${process.env.JAMBASE_API_KEY}`, Accept: 'application/json' },
+});
+
 router.get('/jambase/events', async (req, res) => {
   const { artist, geoStateIso } = req.query;
-  const result = await resolve('jambase', () => {
-    const key = process.env.JAMBASE_API_KEY;
-    const params = new URLSearchParams({ apikey: key });
-    if (artist) params.set('artistName', artist);
-    if (geoStateIso) params.set('geoStateIso', geoStateIso);
-    return `https://www.jambase.com/jb-api/v1/events?${params.toString()}`;
-  });
+
+  if (isMock('jambase')) return res.json(await serveMock('jambase'));
+
+  // Step 1: resolve artist name -> identifier (prefer an exact, case-insensitive match).
+  let artistId = null;
+  if (artist) {
+    const lookup = await callLive('jambase', `${JB_BASE}/artists?artistName=${encodeURIComponent(artist)}&perPage=10`, jbAuth());
+    const arts = lookup.data?.artists || [];
+    const exact = arts.find((a) => a.name?.toLowerCase() === artist.toLowerCase());
+    artistId = (exact || arts[0])?.identifier || null;
+  }
+
+  // Step 2: events, by resolved id when possible, else fall back to loose name search.
+  const params = new URLSearchParams({ perPage: '30' });
+  if (artistId) params.set('artistId', artistId);
+  else if (artist) params.set('artistName', artist);
+  if (geoStateIso) params.set('geoStateIso', geoStateIso);
+
+  const result = await callLive('jambase', `${JB_BASE}/events?${params.toString()}`, jbAuth());
   res.status(result.ok ? 200 : 502).json(result);
 });
 

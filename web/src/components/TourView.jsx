@@ -83,8 +83,25 @@ export default function TourView() {
           {stops.length ? (
             <TourGlobe stops={stops} selectedId={selectedId} onSelect={setSelectedId} />
           ) : (
-            <div className="flex h-96 items-center justify-center rounded-2xl border border-white/10 bg-black/40 text-sm text-zinc-500">
-              {loading ? 'Loading tour…' : 'No mappable stops found for this artist.'}
+            <div className="flex h-96 flex-col items-center justify-center gap-2 rounded-2xl border border-white/10 bg-black/40 px-6 text-center text-sm text-zinc-500">
+              {loading ? (
+                'Loading tour…'
+              ) : (
+                <>
+                  <span>No upcoming shows found for this artist.</span>
+                  {mode === 'live' && (
+                    <span className="text-xs text-zinc-600">
+                      They may not be touring right now. The JamBase trial is jam-band-heavy — try{' '}
+                      <button onClick={() => { setQuery('Dave Matthews Band'); setArtist('Dave Matthews Band'); load('Dave Matthews Band'); }} className="text-indigo-400 hover:underline">
+                        Dave Matthews Band
+                      </button>{' '}or{' '}
+                      <button onClick={() => { setQuery('Phish'); setArtist('Phish'); load('Phish'); }} className="text-indigo-400 hover:underline">
+                        Phish
+                      </button>.
+                    </span>
+                  )}
+                </>
+              )}
             </div>
           )}
           <p className="mt-2 text-center text-[11px] text-zinc-600">

@@ -22,8 +22,9 @@ function normalize(events) {
         artist: e.performer?.[0]?.name || 'Unknown',
         venue: loc.name || 'Unknown venue',
         city: addr.addressLocality || '',
-        region: addr.addressRegion || '',
-        country: addr.addressCountry || '',
+        // JamBase v3 returns region/country as objects ({name, identifier}); mocks use strings.
+        region: txt(addr.addressRegion),
+        country: txt(addr.addressCountry),
         lat,
         lng,
         date: e.startDate || '',
@@ -39,6 +40,13 @@ function toNum(v) {
   if (v == null || v === '') return null;
   const n = Number(v);
   return Number.isNaN(n) ? null : n;
+}
+
+// Read a value that may be a plain string or a schema.org object ({name, identifier}).
+function txt(v) {
+  if (!v) return '';
+  if (typeof v === 'string') return v;
+  return v.name || v.identifier || '';
 }
 
 export const SORTS = {
@@ -67,7 +75,8 @@ export function fmtCapacity(n) {
 
 export function fmtDate(iso) {
   if (!iso) return '';
-  const d = new Date(iso + 'T00:00:00');
+  // JamBase v3 dates include a time ("2026-06-20T21:00:00"); mocks are date-only.
+  const d = new Date(iso.length <= 10 ? iso + 'T00:00:00' : iso);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }

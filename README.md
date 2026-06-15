@@ -51,11 +51,11 @@ Open `http://localhost:5173`. The Vite dev server is exposed on the LAN
 |---|---|---|
 | **Musixmatch** | 🟢 live (Pro key, returns 200) | none — apikey query param; the Pro "password" is portal login only |
 | **Songstats** | 🟢 live (returns 200) | none — auth via `apikey` header |
-| **YouTube** | 🟠 key valid, API disabled | Enable "YouTube Data API v3" for GCP project `356818595469`, then toggle live in the panel. **Quota: 10k units/day, search = 100 → ~100 searches/day. Cache hard.** |
-| **JamBase** | 🔴 `api_key_invalid` | Trial key rejected — re-grab from the JamBase Data dashboard. Tour globe runs on mock data until then. |
+| **YouTube** | 🟢 live | API enabled. **Quota: 10k units/day, search = 100 → ~100 searches/day. Cache hard.** Plain API key — no OAuth redirect URI needed. |
+| **JamBase** | 🟢 live | Base `https://api.data.jambase.com/v3`, **Bearer token auth** (not `?apikey=`). Route resolves artist name → exact id → events so searches skip tribute acts. Trial data is jam-band-heavy (Dave Matthews Band, Phish tour live; pop acts may show 0 shows). |
 | Cyanite / LALAL.AI / ElevenLabs | ⚪ no key | Mock-only until keys added to `.env` |
 
-> Note: the key first given as "Musixmatch" was actually the **Songstats** key — that mislabel caused the early 401s. Now corrected.
+> Notes: the key first given as "Musixmatch" was actually the **Songstats** key (that mislabel caused the early 401s). And JamBase Data uses a different host + Bearer auth than the legacy `jambase.com/jb-api` endpoint — that's why the trial key looked "invalid" at first.
 
 Add a key to `api-gateway/.env`, restart, and the "Go live" toggle unlocks for
 that service. Services with no key are locked to mock data.
