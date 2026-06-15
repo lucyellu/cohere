@@ -144,6 +144,57 @@ router.get('/songstats/search', async (req, res) => {
   res.status(result.ok ? 200 : 502).json(result);
 });
 
+// --- setlist.fm: real setlist for a show (or the artist's most recent) ----
+// JamBase shows are upcoming (no setlist yet), so if there's no exact-date
+// match we return the most recent PAST setlist = "what they've been playing".
+router.get('/setlistfm/setlist', async (req, res) => {
+  const { artist, date } = req.query;
+
+  if (isMock('setlistfm')) {
+    // No key yet -> return empty so the Show page falls back to top tracks
+    // (rather than showing a fake setlist for a real artist).
+    record('setlistfm', { status: 200, latencyMs: 0, bytes: 0, mode: 'mock', error: null });
+    return res.json({ ok: true, mode: 'mock', songs: [], exact: false });
+  }
+
+  const result = await callLive(
+    'setlistfm',
+    `https://api.setlist.fm/rest/1.0/search/setlists?artistName=${encodeURIComponent(artist || '')}&p=1`,
+    { headers: { 'x-api-key': process.env.SETLISTFM_API_KEY, Accept: 'application/json' } }
+  );
+  if (!result.ok) {
+    return res.status(502).json({ ok: false, mode: 'live', error: `HTTP ${result.status}`, songs: [] });
+  }
+
+  const setlists = (result.data?.setlist || []).filter((s) => extractSetlistSongs(s).length);
+  const want = isoToDmy(String(date || '').slice(0, 10)); // 2026-06-23 -> 23-06-2026
+  const exactMatch = setlists.find((s) => s.eventDate === want);
+  const chosen = exactMatch || setlists[0];
+  if (!chosen) return res.json({ ok: true, mode: 'live', songs: [], exact: false });
+
+  res.json({
+    ok: true,
+    mode: 'live',
+    exact: Boolean(exactMatch),
+    songs: extractSetlistSongs(chosen),
+    source: {
+      date: chosen.eventDate,
+      venue: chosen.venue?.name || '',
+      city: chosen.venue?.city?.name || '',
+      tour: chosen.tour?.name || '',
+    },
+  });
+});
+
+function extractSetlistSongs(s) {
+  return (s?.sets?.set || []).flatMap((set) => (set.song || []).map((x) => x.name)).filter(Boolean);
+}
+
+function isoToDmy(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
+}
+
 // --- Pinterest: extract a style-seed image from a public Pin/board URL ----
 // Uses Open Graph meta tags (same as a link preview) — no API key or OAuth.
 const BROWSER_UA =

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { youtubeSearch, getLyrics, synthesizeScene, getTopTracks } from '../api.js';
+import { youtubeSearch, getLyrics, synthesizeScene, getTopTracks, getSetlist } from '../api.js';
 import { fmtDate, fmtCapacity } from '../tour.js';
 
 // The Show: relive one concert. Per setlist song we pull real fan clips
@@ -10,6 +10,7 @@ export default function ShowView({ show, onBack, onOpenByoc }) {
   const [activeSong, setActiveSong] = useState(show?.setlist?.[0] || null);
   const [songs, setSongs] = useState(show?.setlist || []);
   const [songsKind, setSongsKind] = useState(show?.setlist?.length ? 'setlist' : 'loading');
+  const [setlistSrc, setSetlistSrc] = useState(null); // setlist.fm source meta
   const [angle, setAngle] = useState(0);
   const [clips, setClips] = useState({}); // song -> [videos] | 'none'
   const [lyrics, setLyrics] = useState({}); // song -> text | 'none'
@@ -60,14 +61,25 @@ export default function ShowView({ show, onBack, onOpenByoc }) {
   useEffect(() => {
     let cancelled = false;
     async function setup() {
+      // 1. Curated demo tour already carries a setlist.
       if (show?.setlist?.length) {
         setSongs(show.setlist);
         setSongsKind('setlist');
         selectSong(show.setlist[0]);
         return;
       }
-      // Live JamBase shows have no setlist — fall back to the artist's top tracks.
       setSongsKind('loading');
+      // 2. Real setlist via setlist.fm (exact date, else most recent past show).
+      const sf = await getSetlist(show.artist, show.date).catch(() => null);
+      if (cancelled) return;
+      if (sf?.songs?.length) {
+        setSongs(sf.songs);
+        setSongsKind(sf.exact ? 'setlist' : 'recent');
+        setSetlistSrc(sf.source || null);
+        selectSong(sf.songs[0]);
+        return;
+      }
+      // 3. Fall back to the artist's top tracks.
       const tracks = await getTopTracks(show.artist).catch(() => []);
       if (cancelled) return;
       setSongs(tracks);
@@ -115,10 +127,16 @@ export default function ShowView({ show, onBack, onOpenByoc }) {
         {/* Setlist */}
         <aside className="lg:col-span-2">
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-            {songsKind === 'toptracks' ? 'Popular songs' : 'Setlist'}
+            {songsKind === 'toptracks' ? 'Popular songs' : songsKind === 'recent' ? 'Recent setlist' : 'Setlist'}
           </h3>
+          {songsKind === 'recent' && (
+            <p className="mb-2 text-[11px] text-zinc-600">
+              What they've been playing — from their {setlistSrc?.date || 'last'} show
+              {setlistSrc?.venue ? ` at ${setlistSrc.venue}` : ''} (via setlist.fm).
+            </p>
+          )}
           {songsKind === 'toptracks' && (
-            <p className="mb-2 text-[11px] text-zinc-600">No official setlist on record — showing this artist's top tracks.</p>
+            <p className="mb-2 text-[11px] text-zinc-600">No setlist on record — showing this artist's top tracks.</p>
           )}
           {songs.length ? (
             <ol className="space-y-1.5">

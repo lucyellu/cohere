@@ -40,6 +40,13 @@ export const SERVICES = {
     live: true,
     description: 'Style-seed images from public Pin/board URLs',
   },
+  setlistfm: {
+    label: 'setlist.fm',
+    category: 'data',
+    envKey: 'SETLISTFM_API_KEY',
+    live: true,
+    description: 'Real setlists (what was actually played)',
+  },
   gemini: {
     label: 'Gemini (BYOC)',
     category: 'ai',

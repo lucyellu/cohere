@@ -45,6 +45,15 @@ export async function youtubeSearch(q) {
   return res.json();
 }
 
+// Real setlist for a show via setlist.fm (exact-date match, else the artist's
+// most recent past setlist). Returns { songs, exact, source } or empty.
+export async function getSetlist(artist, date) {
+  const res = await fetch(
+    `/api/setlistfm/setlist?artist=${encodeURIComponent(artist)}&date=${encodeURIComponent(date || '')}`
+  );
+  return res.json().catch(() => null);
+}
+
 // An artist's top tracks — used as a setlist fallback for live shows (JamBase
 // Data doesn't return setlists). Filters to the artist and dedupes by name.
 export async function getTopTracks(artist) {

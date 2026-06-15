@@ -67,6 +67,7 @@ per service. Effective mode: no key → forced mock; else a runtime toggle (Dev 
 | **JamBase** | 🟢 live | Base `api.data.jambase.com/v3`, **Bearer** auth. Route resolves artist name→exact id→events (skips tribute acts). **The globe searches live by default** (`?source=live`); the **"Demo tour" button** loads the curated Coldplay mock (`?source=mock`, has setlists). Live shows have no setlist → Show page falls back to the artist's top tracks. Lots of real artists work (Madison Beer, Olivia Rodrigo, Dave Matthews Band, Phish…); some pop acts return 0. |
 | **Pinterest** | 🟢 live (keyless) | Style-seed via public Open Graph tags. No API/OAuth/scraper. |
 | **Gemini (BYOC)** | 🟠 **needs enabling** | Key valid but **"Generative Language API" is disabled** on GCP project `356818595469`. Until enabled, synth returns a placeholder (or the Pinterest seed image). |
+| **setlist.fm** | ⚪ **needs key** | Integrated & ready. Real setlists via `x-api-key` header, base `api.setlist.fm/rest/1.0`. Apply (instant, free): https://www.setlist.fm/settings/api → put it in `.env` as `SETLISTFM_API_KEY`. Show page tries: curated setlist → setlist.fm (exact date, else most recent past show = "what they've been playing") → top tracks. Note: JamBase dates are *upcoming*, so exact matches are rare; the recent-setlist path is the useful one. |
 | Cyanite / LALAL.AI / ElevenLabs | ⚪ no key | mock-only; not yet integrated. |
 
 ### Open action items (user-side)
