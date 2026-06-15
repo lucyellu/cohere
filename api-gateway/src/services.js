@@ -15,10 +15,8 @@ export const SERVICES = {
     category: 'data',
     envKey: 'JAMBASE_API_KEY',
     live: true,
-    // Default to mock: the curated mock tour includes setlists (which the live
-    // JamBase Data API doesn't return) and gives the globe a clean world tour.
-    // Still fully toggleable to live from the Control Room.
-    preferMock: true,
+    // The globe picks mock vs live per request via ?source= (curated demo tour
+    // vs real search), so no service-level preferMock here.
     description: 'Tour dates, venues (lat/long), setlists',
   },
   youtube: {

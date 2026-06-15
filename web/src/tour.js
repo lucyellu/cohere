@@ -1,8 +1,9 @@
 // Tour data layer: fetch JamBase events through the gateway and normalize the
 // raw (mock or live) payload into flat "stops" the globe and list can render.
 
-export async function fetchTour(artist) {
-  const res = await fetch(`/api/jambase/events?artist=${encodeURIComponent(artist)}`);
+// source: 'live' = real JamBase search, 'mock' = curated demo tour.
+export async function fetchTour(artist, source = 'live') {
+  const res = await fetch(`/api/jambase/events?artist=${encodeURIComponent(artist)}&source=${source}`);
   const payload = await res.json();
   const events = payload?.data?.events || [];
   return { stops: normalize(events), mode: payload?.mode, ok: payload?.ok };

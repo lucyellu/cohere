@@ -64,7 +64,7 @@ per service. Effective mode: no key → forced mock; else a runtime toggle (Dev 
 | **Musixmatch Pro** | 🟢 live | apikey query param. The "password" is portal login only. `track.search`, `matcher.lyrics.get`. |
 | **Songstats** | 🟢 live | auth via `apikey` **header**. |
 | **YouTube** | 🟢 live | plain API key (no OAuth redirect needed). **Quota ~100 searches/day** — results cached client-side. |
-| **JamBase** | 🟢 live, but **defaults to mock** | Base `api.data.jambase.com/v3`, **Bearer** auth. Route resolves artist name→exact id→events (skips tribute acts). Live data is jam-band-heavy (Dave Matthews Band, Phish work; Coldplay/Billie Eilish = 0 shows). `preferMock` keeps the globe on the curated 8-stop Coldplay tour **with setlists** (live JamBase has no setlists). |
+| **JamBase** | 🟢 live | Base `api.data.jambase.com/v3`, **Bearer** auth. Route resolves artist name→exact id→events (skips tribute acts). **The globe searches live by default** (`?source=live`); the **"Demo tour" button** loads the curated Coldplay mock (`?source=mock`, has setlists). Live shows have no setlist → Show page falls back to the artist's top tracks. Lots of real artists work (Madison Beer, Olivia Rodrigo, Dave Matthews Band, Phish…); some pop acts return 0. |
 | **Pinterest** | 🟢 live (keyless) | Style-seed via public Open Graph tags. No API/OAuth/scraper. |
 | **Gemini (BYOC)** | 🟠 **needs enabling** | Key valid but **"Generative Language API" is disabled** on GCP project `356818595469`. Until enabled, synth returns a placeholder (or the Pinterest seed image). |
 | Cyanite / LALAL.AI / ElevenLabs | ⚪ no key | mock-only; not yet integrated. |
@@ -86,7 +86,8 @@ per service. Effective mode: no key → forced mock; else a runtime toggle (Dev 
   (The real `npm run dev` is fine — this only bit manual test servers.)
 - **Google APIs are per-API enablement**, not per-key — YouTube and Gemini each needed enabling on the same project. An API key never needs an OAuth redirect URI.
 - **JamBase has two products:** legacy `jambase.com/jb-api` (query key) vs **JamBase Data** `api.data.jambase.com/v3` (Bearer). The `jbd_` key is the latter.
-- **Don't default JamBase to live for the globe** — live lacks setlists; the curated mock tour is the better demo.
+- **JamBase live has no setlists** — the globe uses a per-request `?source=` param (live search vs curated mock demo), and the Show page falls back to Musixmatch top tracks when a live show has no setlist. Real setlists would need setlist.fm (not yet integrated).
+- **Mock mode ignores query params** — early confusion: searching any artist returned the same canned Coldplay fixture because JamBase was in mock mode. Mock serves a fixed file; only live respects the artist.
 - **gemini route:** avoid duplicate `const` names (hit a "parts already declared" crash once).
 - The `node --watch` gateway auto-restarts on save; a syntax error keeps it down until fixed.
 

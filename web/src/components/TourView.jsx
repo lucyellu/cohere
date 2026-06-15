@@ -11,10 +11,10 @@ export default function TourView({ onEnterShow }) {
   const [selectedId, setSelectedId] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  async function load(name) {
+  async function load(name, source = 'live') {
     setLoading(true);
     try {
-      const { stops, mode } = await fetchTour(name);
+      const { stops, mode } = await fetchTour(name, source);
       setStops(stops);
       setMode(mode);
       setSelectedId(stops.length ? stops[0].id : null);
@@ -25,8 +25,15 @@ export default function TourView({ onEnterShow }) {
     }
   }
 
+  function loadDemo() {
+    setArtist('Coldplay');
+    setQuery('Coldplay');
+    load('Coldplay', 'mock');
+  }
+
   useEffect(() => {
-    load(artist);
+    // Start on the curated demo tour (has setlists); searches go live.
+    loadDemo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -38,7 +45,7 @@ export default function TourView({ onEnterShow }) {
     e.preventDefault();
     if (query.trim()) {
       setArtist(query.trim());
-      load(query.trim());
+      load(query.trim(), 'live'); // real JamBase search
     }
   }
 
@@ -50,13 +57,20 @@ export default function TourView({ onEnterShow }) {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Artist…"
-            className="w-44 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-indigo-400 focus:outline-none"
+            placeholder="Search any artist…"
+            className="w-48 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-indigo-400 focus:outline-none"
           />
           <button className="rounded-lg bg-indigo-500/90 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-400">
             {loading ? '…' : 'Map tour'}
           </button>
         </form>
+        <button
+          onClick={loadDemo}
+          className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-zinc-400 hover:text-zinc-200"
+          title="Curated demo tour with setlists"
+        >
+          Demo tour
+        </button>
 
         <label className="flex items-center gap-2 text-sm text-zinc-400">
           Sort by
@@ -181,7 +195,7 @@ function ModeBadge({ mode }) {
         live ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'
       }`}
     >
-      {live ? 'LIVE · JamBase' : 'MOCK data'}
+      {live ? 'LIVE · JamBase' : 'Demo tour (mock)'}
     </span>
   );
 }

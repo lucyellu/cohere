@@ -45,6 +45,26 @@ export async function youtubeSearch(q) {
   return res.json();
 }
 
+// An artist's top tracks — used as a setlist fallback for live shows (JamBase
+// Data doesn't return setlists). Filters to the artist and dedupes by name.
+export async function getTopTracks(artist) {
+  const res = await fetch(`/api/musixmatch/top?artist=${encodeURIComponent(artist)}`);
+  const d = await res.json().catch(() => null);
+  const list = d?.data?.message?.body?.track_list || [];
+  const wanted = artist.toLowerCase();
+  const seen = new Set();
+  const out = [];
+  for (const item of list) {
+    const t = item.track || {};
+    const name = t.track_name;
+    if (!name || seen.has(name.toLowerCase())) continue;
+    if (t.artist_name && !t.artist_name.toLowerCase().includes(wanted)) continue;
+    seen.add(name.toLowerCase());
+    out.push(name);
+  }
+  return out.slice(0, 10);
+}
+
 export async function getLyrics(track, artist) {
   const res = await fetch(
     `/api/musixmatch/lyrics?track=${encodeURIComponent(track)}&artist=${encodeURIComponent(artist)}`

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { youtubeSearch, getLyrics, synthesizeScene } from '../api.js';
+import { youtubeSearch, getLyrics, synthesizeScene, getTopTracks } from '../api.js';
 import { fmtDate, fmtCapacity } from '../tour.js';
 
 // The Show: relive one concert. Per setlist song we pull real fan clips
@@ -8,6 +8,8 @@ import { fmtDate, fmtCapacity } from '../tour.js';
 
 export default function ShowView({ show, onBack, onOpenByoc }) {
   const [activeSong, setActiveSong] = useState(show?.setlist?.[0] || null);
+  const [songs, setSongs] = useState(show?.setlist || []);
+  const [songsKind, setSongsKind] = useState(show?.setlist?.length ? 'setlist' : 'loading');
   const [angle, setAngle] = useState(0);
   const [clips, setClips] = useState({}); // song -> [videos] | 'none'
   const [lyrics, setLyrics] = useState({}); // song -> text | 'none'
@@ -56,7 +58,26 @@ export default function ShowView({ show, onBack, onOpenByoc }) {
   }
 
   useEffect(() => {
-    if (activeSong) selectSong(activeSong);
+    let cancelled = false;
+    async function setup() {
+      if (show?.setlist?.length) {
+        setSongs(show.setlist);
+        setSongsKind('setlist');
+        selectSong(show.setlist[0]);
+        return;
+      }
+      // Live JamBase shows have no setlist — fall back to the artist's top tracks.
+      setSongsKind('loading');
+      const tracks = await getTopTracks(show.artist).catch(() => []);
+      if (cancelled) return;
+      setSongs(tracks);
+      setSongsKind(tracks.length ? 'toptracks' : 'empty');
+      if (tracks.length) selectSong(tracks[0]);
+    }
+    setup();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show?.id]);
 
@@ -93,10 +114,15 @@ export default function ShowView({ show, onBack, onOpenByoc }) {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
         {/* Setlist */}
         <aside className="lg:col-span-2">
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Setlist</h3>
-          {show.setlist?.length ? (
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+            {songsKind === 'toptracks' ? 'Popular songs' : 'Setlist'}
+          </h3>
+          {songsKind === 'toptracks' && (
+            <p className="mb-2 text-[11px] text-zinc-600">No official setlist on record — showing this artist's top tracks.</p>
+          )}
+          {songs.length ? (
             <ol className="space-y-1.5">
-              {show.setlist.map((song, i) => {
+              {songs.map((song, i) => {
                 const c = clips[song];
                 const state = c === undefined ? '' : c === 'none' ? 'gap' : 'footage';
                 return (
@@ -120,7 +146,7 @@ export default function ShowView({ show, onBack, onOpenByoc }) {
             </ol>
           ) : (
             <p className="text-sm text-zinc-600">
-              No setlist for this stop. (Live JamBase Data omits setlists — the curated tour includes them.)
+              {songsKind === 'loading' ? 'Loading songs…' : 'No songs found for this artist.'}
             </p>
           )}
         </aside>

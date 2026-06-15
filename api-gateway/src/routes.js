@@ -61,6 +61,18 @@ router.get('/musixmatch/search', async (req, res) => {
   res.status(result.ok ? 200 : 502).json(result);
 });
 
+// --- Musixmatch: an artist's top tracks (setlist fallback for live shows) -
+router.get('/musixmatch/top', async (req, res) => {
+  const artist = req.query.artist || '';
+  const result = await resolve('musixmatch', () => {
+    const key = process.env.MUSIXMATCH_API_KEY;
+    const p = new URLSearchParams({ apikey: key, s_track_rating: 'desc', page_size: '15' });
+    if (artist) p.set('q_artist', artist);
+    return `https://api.musixmatch.com/ws/1.1/track.search?${p.toString()}`;
+  });
+  res.status(result.ok ? 200 : 502).json(result);
+});
+
 // --- Musixmatch: lyrics for a specific track -----------------------------
 router.get('/musixmatch/lyrics', async (req, res) => {
   const { track, artist } = req.query;
@@ -85,9 +97,12 @@ const jbAuth = () => ({
 });
 
 router.get('/jambase/events', async (req, res) => {
-  const { artist, geoStateIso } = req.query;
+  const { artist, geoStateIso, source } = req.query;
 
-  if (isMock('jambase')) return res.json(await serveMock('jambase'));
+  // `source` lets the client pick per request: 'mock' = curated demo tour,
+  // 'live' = real JamBase. Otherwise fall back to the service's toggle state.
+  const useMock = source === 'mock' || (source !== 'live' && isMock('jambase'));
+  if (useMock) return res.json(await serveMock('jambase'));
 
   // Step 1: resolve artist name -> identifier (prefer an exact, case-insensitive match).
   let artistId = null;
