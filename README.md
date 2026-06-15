@@ -1,4 +1,6 @@
-# Musicathon 2026 — Concert Tour Archive (BYOC)
+# Reverb — Concert Tour Archive (BYOC)
+
+> **New session? Read [STATUS.md](STATUS.md)** — the living handoff doc: current state, API key status, what's next, and gotchas.
 
 **Concept ("Archive Filler"):** a map-based wrapper that follows an artist's tour
 across a 3D globe. Click a venue → see that night's setlist (JamBase) matched to
