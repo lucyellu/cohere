@@ -1,0 +1,18 @@
+{
+  "data": {
+    "track": {
+      "id": "mock-cyanite-yellow",
+      "title": "Yellow",
+      "audioAnalysisV6": {
+        "result": {
+          "mood": { "happy": 0.71, "uplifting": 0.83, "melancholic": 0.34, "aggressive": 0.05 },
+          "energyLevel": "medium",
+          "bpm": 89,
+          "genre": ["pop", "alternative rock"],
+          "valence": 0.62
+        }
+      }
+    }
+  },
+  "_mock": true
+}

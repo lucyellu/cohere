@@ -1,0 +1,10 @@
+{
+  "result": "success",
+  "artist": { "name": "Coldplay", "songstats_artist_id": "mock123" },
+  "stats": {
+    "spotify": { "monthly_listeners": 61420338, "followers": 49120004 },
+    "apple_music": { "playlist_reach": 18203991 },
+    "shazam": { "total_shazams": 92834012 }
+  },
+  "_mock": true
+}

@@ -1,0 +1,13 @@
+{
+  "status": "success",
+  "task": {
+    "id": "mock-task-001",
+    "state": "success",
+    "split": {
+      "stem": "vocals",
+      "vocals_url": "https://mock.lalal.ai/stems/yellow_vocals.wav",
+      "instrumental_url": "https://mock.lalal.ai/stems/yellow_instrumental.wav"
+    }
+  },
+  "_mock": true
+}

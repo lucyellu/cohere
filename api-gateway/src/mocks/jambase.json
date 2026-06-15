@@ -1,0 +1,43 @@
+{
+  "success": true,
+  "pagination": { "page": 1, "perPage": 3, "totalItems": 3 },
+  "events": [
+    {
+      "identifier": "jambase:11540021",
+      "name": "Coldplay — Music of the Spheres World Tour",
+      "startDate": "2026-06-14",
+      "performer": [{ "name": "Coldplay", "identifier": "jambase:345" }],
+      "location": {
+        "name": "BC Place",
+        "address": { "addressLocality": "Vancouver", "addressRegion": "BC", "addressCountry": "CA" },
+        "geo": { "latitude": 49.2768, "longitude": -123.1119 }
+      },
+      "setlist": ["Higher Power", "Adventure of a Lifetime", "Yellow", "The Scientist", "Viva la Vida", "Fix You"]
+    },
+    {
+      "identifier": "jambase:11540022",
+      "name": "Coldplay — Music of the Spheres World Tour",
+      "startDate": "2026-06-17",
+      "performer": [{ "name": "Coldplay", "identifier": "jambase:345" }],
+      "location": {
+        "name": "Lumen Field",
+        "address": { "addressLocality": "Seattle", "addressRegion": "WA", "addressCountry": "US" },
+        "geo": { "latitude": 47.5952, "longitude": -122.3316 }
+      },
+      "setlist": ["Higher Power", "Yellow", "Paradise", "Clocks", "Fix You"]
+    },
+    {
+      "identifier": "jambase:11540023",
+      "name": "Coldplay — Music of the Spheres World Tour",
+      "startDate": "2026-06-20",
+      "performer": [{ "name": "Coldplay", "identifier": "jambase:345" }],
+      "location": {
+        "name": "Levi's Stadium",
+        "address": { "addressLocality": "Santa Clara", "addressRegion": "CA", "addressCountry": "US" },
+        "geo": { "latitude": 37.403, "longitude": -121.9697 }
+      },
+      "setlist": ["Higher Power", "Adventure of a Lifetime", "The Scientist", "Viva la Vida", "A Sky Full of Stars"]
+    }
+  ],
+  "_mock": true
+}

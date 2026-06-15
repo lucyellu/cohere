@@ -1,0 +1,8 @@
+{
+  "voices": [
+    { "voice_id": "mock-narrator", "name": "Concert Narrator", "category": "premade" },
+    { "voice_id": "mock-dj", "name": "Radio DJ", "category": "premade" }
+  ],
+  "_note": "Live ElevenLabs returns audio bytes; this mock stands in for the voices list / readiness check.",
+  "_mock": true
+}

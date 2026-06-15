@@ -1,0 +1,15 @@
+{
+  "name": "musicathon",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Musicathon 2026 — concert tour archive with BYOC generation. Central API gateway + monitor.",
+  "scripts": {
+    "dev": "concurrently -n gateway,web -c cyan,magenta \"npm:dev:gateway\" \"npm:dev:web\"",
+    "dev:gateway": "npm --prefix api-gateway run dev",
+    "dev:web": "npm --prefix web run dev",
+    "install:all": "npm install && npm --prefix api-gateway install && npm --prefix web install"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
