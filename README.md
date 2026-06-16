@@ -19,9 +19,14 @@ Two tabs in the web app:
   (`react-globe.gl`). Points scale/color by venue capacity; arcs trace the
   chronological route. Sortable stop list (date, capacity/biggest, venue A–Z,
   city A–Z) with per-stop setlist. Runs on mock JamBase data until a valid key.
-- **🎛️ API Control Room** — a central **gateway** proxies every partner API
-  (keys stay server-side); a **monitor panel** shows live status, usage, and a
-  per-service mock⇄live toggle. Mock-first: the UI never blocks on missing keys.
+- **🎤 Show** — relive one concert: per setlist song, real multi-angle fan
+  footage (YouTube) + real lyrics (Musixmatch). Songs nobody filmed get an
+  **✨ AI scene** — synthesized from the lyrics/mood. Real images work out of the
+  box via free FLUX (Pollinations); pick the image model and optionally enrich the
+  prompt with a free LLM in the ✨ vault.
+- **🎛️ API Control Room** (Dev tab) — a central **gateway** proxies every partner
+  and AI API (keys stay server-side); a **monitor panel** shows live status, usage,
+  and a per-service mock⇄live toggle. Mock-first: the UI never blocks on missing keys.
 
 ```
 musicathon/
@@ -53,10 +58,13 @@ Open `http://localhost:5173`. The Vite dev server is exposed on the LAN
 |---|---|---|
 | **Musixmatch** | 🟢 live (Pro key, returns 200) | none — apikey query param; the Pro "password" is portal login only |
 | **Songstats** | 🟢 live (returns 200) | none — auth via `apikey` header |
-| **YouTube** | 🟢 live | API enabled. **Quota: 10k units/day, search = 100 → ~100 searches/day. Cache hard.** Plain API key — no OAuth redirect URI needed. |
+| **YouTube** | 🟢 live | API enabled. **Quota: 10k units/day, search = 100 → ~100 searches/day.** When exhausted it 403s; the Show page now shows an amber "quota reached" notice instead of a silent empty player. Cache hard before a live demo. Plain API key — no OAuth redirect URI needed. |
 | **JamBase** | 🟢 live | Base `https://api.data.jambase.com/v3`, **Bearer token auth** (not `?apikey=`). Route resolves artist name → exact id → events so searches skip tribute acts. Trial data is jam-band-heavy (Dave Matthews Band, Phish tour live; pop acts may show 0 shows). |
 | **Pinterest** | 🟢 live (keyless) | Style-seed extraction via public Open Graph tags (no API key/OAuth — the official API can't do open search anyway). Paste a Pin/board/image URL in the ✨ BYOC vault → its image seeds Gemini image-to-image. |
-| **Gemini (BYOC)** | 🟠 key valid, API disabled | Enable "Generative Language API" for GCP project `356818595469`. Until then, scene synthesis returns an SVG placeholder; flips to real AI images once enabled+toggled, or when a viewer pastes a working Gemini key in the ✨ BYOC vault. |
+| **Gemini (BYOC)** | 🟠 key valid, API disabled | Enable "Generative Language API" for GCP project `356818595469`. No longer a blocker — scene synthesis falls back to free FLUX (below). Gemini wins the cascade once enabled+toggled, or when a viewer pastes a working Gemini key in the ✨ vault. |
+| **Pollinations** | 🟢 live (keyless) | Free FLUX **image gen**, no key. The live fallback for "✨ AI scene" — real images with zero setup. |
+| **HuggingFace (FLUX)** | 🟠 no key | FLUX.1-schnell image gen via HF Inference. Optional quality upgrade — set `HF_TOKEN` in `.env` (free ~$0.10/mo credit). |
+| **Cerebras** / **Groq** | 🟢 live (free tier) | OpenAI-compatible **text gen** (lore, prompt enrichment). Keys from `L:\Projects\ai-free`. Powers the "Enrich + synthesize" button. |
 | Cyanite / LALAL.AI / ElevenLabs | ⚪ no key | Mock-only until keys added to `.env` |
 
 > Notes: the key first given as "Musixmatch" was actually the **Songstats** key (that mislabel caused the early 401s). And JamBase Data uses a different host + Bearer auth than the legacy `jambase.com/jb-api` endpoint — that's why the trial key looked "invalid" at first.

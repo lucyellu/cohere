@@ -38,20 +38,27 @@ musicathon/
 │   ├── .env            real keys (GITIGNORED — never commit)
 │   └── src/
 │       ├── services.js   service registry; mock/live logic (preferMock, keyless)
-│       ├── routes.js     /health, /config/mock, per-service routes, /gemini/generate, /pinterest/extract
-│       ├── proxy.js      callLive (records usage) + serveMock
+│       ├── routes.js     /health, /config/mock, /pinterest/extract,
+│       │                 image gen: /{gemini,pollinations,huggingface}/generate,
+│       │                 text gen: /{cerebras,groq}/generate, + /{svc}/probe
+│       ├── proxy.js      callLive (JSON, records usage) + serveMock
+│       │                 NB: image routes use a binary-safe fetch in routes.js,
+│       │                 not callLive (which parses text/JSON).
 │       ├── usage.js      in-memory per-service stats
-│       └── mocks/*.json  realistic payloads per service
+│       └── mocks/*.json  payloads per data service (cerebras/groq too;
+│                         image services mock inline via placeholderScene)
 └── web/          Vite + React + Tailwind v4 (:5173); Vite proxies /api -> :5001
     └── src/
         ├── App.jsx              shell + tabs + BYOC modal state
-        ├── api.js               gateway client
+        ├── api.js               gateway client (synthesizeScene cascade,
+        │                        generateImage, generateText, enrichPrompt)
         ├── tour.js              JamBase normalize + sort helpers
         └── components/
             ├── TourGlobe.jsx    react-globe.gl: capacity-scaled points + route arcs
             ├── TourView.jsx     globe + sortable stop list + setlist + "Enter show"
             ├── ShowView.jsx     the Show: fan-video player + lyrics + AI scene
-            ├── BYOCModal.jsx    Gemini key + Pinterest style-seed (localStorage)
+            │                    (Enrich+synthesize button, YouTube quota notice)
+            ├── BYOCModal.jsx    image-model picker + Gemini key + Pinterest seed
             ├── ControlRoom.jsx  API monitor panel (Dev tab)
             └── ServiceCard.jsx
 ```
@@ -100,14 +107,20 @@ per service. Effective mode: no key → forced mock; else a runtime toggle (Dev 
 - **JamBase live has no setlists** — the globe uses a per-request `?source=` param (live search vs curated mock demo), and the Show page falls back to Musixmatch top tracks when a live show has no setlist. Real setlists would need setlist.fm (not yet integrated).
 - **Mock mode ignores query params** — early confusion: searching any artist returned the same canned Coldplay fixture because JamBase was in mock mode. Mock serves a fixed file; only live respects the artist.
 - **gemini route:** avoid duplicate `const` names (hit a "parts already declared" crash once).
-- The `node --watch` gateway auto-restarts on save; a syntax error keeps it down until fixed.
+- The `node --watch` gateway auto-restarts on save; a syntax error keeps it down until fixed. It re-reads `.env` on a JS-triggered restart, but **does not watch `.env` itself** — after editing only `.env`, touch a JS file (or restart) to load new keys.
+- **Image APIs return raw bytes, not JSON** — Pollinations/HF can't go through `callLive` (it parses text/JSON). `routes.js` has `generateImageLive()` that fetches binary, validates `content-type: image/*`, and returns a base64 data URL (same shape as `/gemini/generate`).
+- **Reasoning LLMs (gpt-oss-120b) put output in `message.reasoning`, not `content`, until they finish thinking** — a low `max_tokens` returns empty `content` (finish_reason: length). The text routes default `max_tokens` high and `extractText` falls back to the `reasoning` field.
+- **YouTube quota is the real demo ceiling** — ~100 searches/day, one per song click. When exhausted it 403s and footage silently looked "missing"; the Show page now shows an amber notice. Footage search dropped the venue term (upcoming shows have no venue footage; crowd footage of the song from anywhere is the point).
+- **Pollinations is keyless** (no env key, `keyless:true`) and is the live fallback for AI scenes when Gemini is off — so real images work with zero setup.
 
 ## Next steps / backlog
-- **Enable Gemini** (Generative Language API on the GCP project) → verify real image-to-image with a Pinterest seed. This is the one thing standing between placeholder scenes and real AI.
+- **AI scenes already work for free** via Pollinations (keyless FLUX) — enabling Gemini is now a *quality upgrade*, not a blocker. Enable the Generative Language API on GCP project `356818595469` to verify real image-to-image with a Pinterest seed; Gemini wins the cascade when live.
+- **YouTube quota cache (recommended before a live demo):** persist search results to localStorage so re-viewing a song doesn't re-spend the ~100/day quota. Or raise the quota in the GCP console.
+- Optionally set `HF_TOKEN` in `api-gateway/.env` to light up FLUX.1-schnell (higher quality than Pollinations); free ~$0.10/mo credit.
+- Wire the free LLMs (Cerebras/Groq) into an ElevenLabs **"lore pack"** narration, or auto-enrich every synth prompt (the Enrich button does this on demand today).
 - Wire **Cyanite** mood/energy tags into the synth prompt (needs a Cyanite key; GraphQL + audio/Spotify id).
-- "More compute = more fidelity" framing: multiple frames / higher res when a BYOC key is present (and pitch the collective-compute vision; true cross-viewer pooling = realtime backend, a stretch).
-- Polish: loading/empty states, mobile layout pass on the Show page, a demo "tour of the night" autoplay.
-- Stretch from the brainstorm: ElevenLabs "lore pack" narration; AI cover/guest-vocal synthesis (legal/ethical caveats).
+- "More compute = more fidelity" framing: multiple frames / higher res when a BYOC key is present (pitch the collective-compute vision; true cross-viewer pooling = realtime backend, a stretch).
+- Polish: mobile layout pass on the Show page, a demo "tour of the night" autoplay.
 
 ## Links
 - Repo: https://github.com/lucyellu/musicathon
