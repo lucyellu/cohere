@@ -47,6 +47,13 @@ export const SERVICES = {
     live: true,
     description: 'Real setlists (what was actually played)',
   },
+  suno: {
+    label: 'Suno (6 accounts)',
+    category: 'library',
+    keyless: true, // credentials come from suno-dl/accounts.json, not an env key
+    live: true,
+    description: 'Unified music library across all 6 Suno accounts (live feed)',
+  },
   gemini: {
     label: 'Gemini (BYOC)',
     category: 'ai',

@@ -1,10 +1,14 @@
 Add-Type -AssemblyName System.Drawing
 
 $Dir       = $PSScriptRoot
-$IconPath  = Join-Path $Dir 'musicathon.ico'
+$IconPath  = Join-Path $Dir 'cohere.ico'
 $BatPath   = Join-Path $Dir 'launch-musicathon.bat'
-$LinkName  = 'Musicathon.lnk'
+$LinkName  = 'Cohere.lnk'
 $LinkPath  = Join-Path ([Environment]::GetFolderPath('Desktop')) $LinkName
+
+# Remove the old Reverb shortcut (the app was renamed to Cohere).
+$OldLink = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Reverb.lnk'
+if (Test-Path $OldLink) { Remove-Item $OldLink -Force -EA SilentlyContinue }
 
 # -- Draw 256x256 icon: equalizer bars (concert / audio dashboard) --
 $size = 256
@@ -22,23 +26,22 @@ $path.AddArc($bgRect.Right - $r*2, $bgRect.Bottom - $r*2, $r*2, $r*2, 0,   90)
 $path.AddArc($bgRect.X,            $bgRect.Bottom - $r*2, $r*2, $r*2, 90,  90)
 $path.CloseFigure()
 $g.FillPath((New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(255, 10, 10, 15))), $path)
-$g.DrawPath((New-Object System.Drawing.Pen ([System.Drawing.Color]::FromArgb(255, 99, 102, 241), 6)), $path)
+$g.DrawPath((New-Object System.Drawing.Pen ([System.Drawing.Color]::FromArgb(255, 244, 63, 94), 6)), $path)
 
-# Equalizer bars
-$indigo  = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(255, 99, 102, 241))
-$emerald = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(255, 52, 211, 153))
-$baseline = 192
-$barW = 22
-$gap  = 12
-$startX = 49
-$heights = @(70, 120, 90, 150, 100)
-for ($i = 0; $i -lt $heights.Length; $i++) {
-    $h = $heights[$i]
-    $x = $startX + $i * ($barW + $gap)
-    $y = $baseline - $h
-    $brush = if ($i -eq 3) { $emerald } else { $indigo }
-    $g.FillRectangle($brush, $x, $y, $barW, $h)
+# Concentric "in sync" rings — a shared pulse radiating from one point (Cohere).
+$rose    = [System.Drawing.Color]::FromArgb(255, 244, 63, 94)
+$fuchsia = [System.Drawing.Color]::FromArgb(255, 217, 70, 239)
+$cx = 128; $cy = 128
+$radii = @(34, 62, 90)
+for ($i = 0; $i -lt $radii.Length; $i++) {
+    $r2 = $radii[$i]
+    $alpha = [int](235 - $i * 60)
+    $col = [System.Drawing.Color]::FromArgb($alpha, $fuchsia.R, $fuchsia.G, $fuchsia.B)
+    $pen = New-Object System.Drawing.Pen $col, 9
+    $g.DrawEllipse($pen, ($cx - $r2), ($cy - $r2), ($r2 * 2), ($r2 * 2))
 }
+# Solid core dot.
+$g.FillEllipse((New-Object System.Drawing.SolidBrush $rose), ($cx - 16), ($cy - 16), 32, 32)
 
 $g.Dispose()
 
@@ -62,7 +65,7 @@ $lnk = $ws.CreateShortcut($LinkPath)
 $lnk.TargetPath       = $BatPath
 $lnk.WorkingDirectory = $Dir
 $lnk.IconLocation     = "$IconPath,0"
-$lnk.Description      = 'Launch the Musicathon dev stack (gateway + web) and open the dashboard'
+$lnk.Description      = 'Launch Cohere (gateway + web) — be in the crowd, from anywhere'
 $lnk.WindowStyle      = 7
 $lnk.Save()
 

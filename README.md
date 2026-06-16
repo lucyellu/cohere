@@ -1,12 +1,33 @@
-# Reverb — Concert Tour Archive (BYOC)
+# Cohere — be in the crowd, from anywhere
 
-> **New session? Read [STATUS.md](STATUS.md)** — the living handoff doc: current state, API key status, what's next, and gotchas.
+> **New session? Read [STATUS.md](STATUS.md)** — the living handoff doc: current state, API key status, what's next, and gotchas. Deploy steps: [DEPLOY.md](DEPLOY.md).
 
-**Concept ("Archive Filler"):** a map-based wrapper that follows an artist's tour
-across a 3D globe. Click a venue → see that night's setlist (JamBase) matched to
-lyrics (Musixmatch), with crowd-sourced fan videos (YouTube) synced per song. For
-songs nobody filmed, **Bring-Your-Own-Compute**: users paste their own AI keys to
-synthesize the missing performance.
+**Concept (the pivot, 2026-06-16):** Cohere turns a concert into a **shared
+synchronized clock**. Everyone locks to the same absolute (UTC) instant, so the
+50,000 people in the stadium and you on your couch are on the **same song at the
+same second**. Pick the featured live show (Post Malone @ Rogers Stadium, Toronto)
+or summon any artist → a synced Live Room with a satellite venue map, a live
+now-playing + setlist timeline, crowd **tap-to-sync** drift correction, and a fan
+footage wall (fresh YouTube uploads + livestreams + crowd-curated clips).
+
+**How the live timecode works** (no API streams "now playing", so 3 layers):
+1. **Predict** — start time + real setlist order (setlist.fm) + a duration model.
+2. **Correct** — attendees tap "they just started ___"; the median drift shifts
+   the whole timeline for everyone (late starts, banter, long outros).
+3. **Confirm** — fresh fan uploads + active livestreams of the actual event.
+
+The original **tour archive** (3D globe, per-song fan footage, lyrics, BYOC AI
+scenes) lives on under the **📼 Archive** tab.
+
+<details>
+<summary>Original concept — "Archive Filler" (Reverb)</summary>
+
+A map-based wrapper that follows an artist's tour across a 3D globe. Click a venue
+→ see that night's setlist (JamBase) matched to lyrics (Musixmatch), with
+crowd-sourced fan videos (YouTube) synced per song. For songs nobody filmed,
+**Bring-Your-Own-Compute**: users paste their own AI keys to synthesize the
+missing performance.
+</details>
 
 Hackathon runs **June 15–21, 2026**. Partners: Musixmatch, LALAL.AI, ElevenLabs,
 Songstats, Cyanite, JamBase, N8N, Replit.
@@ -24,6 +45,11 @@ Two tabs in the web app:
   **✨ AI scene** — synthesized from the lyrics/mood. Real images work out of the
   box via free FLUX (Pollinations); pick the image model and optionally enrich the
   prompt with a free LLM in the ✨ vault.
+- **🎵 Library** — a unified **6-account Suno library** (the gateway merges all
+  accounts' feeds live), with per-account filter chips, an inline audio player, a
+  **BYOC pool** status strip, and a **✨ Synthesize** tool (prompt → AI images via the
+  pool). Read-only + image gen only — see STATUS.md for what's stubbed (Meta gen,
+  video, Suno music generation all NOT built).
 - **🎛️ API Control Room** (Dev tab) — a central **gateway** proxies every partner
   and AI API (keys stay server-side); a **monitor panel** shows live status, usage,
   and a per-service mock⇄live toggle. Mock-first: the UI never blocks on missing keys.

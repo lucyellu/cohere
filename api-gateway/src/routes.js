@@ -5,8 +5,14 @@ import express from 'express';
 import { SERVICES, SERVICE_IDS, hasKey, isMock, getOverride, setOverride } from './services.js';
 import { snapshot, record } from './usage.js';
 import { callLive, serveMock } from './proxy.js';
+import { listAccounts, feedAll } from './suno.js';
+import * as pool from './genpool.js';
+import { synthesize } from './pipeline.js';
+import * as live from './live.js';
 
 const router = express.Router();
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // --- Health: config + live usage snapshot for the monitor panel ---------
 router.get('/health', (_req, res) => {
@@ -541,5 +547,234 @@ for (const id of ['cyanite', 'lalalai', 'elevenlabs']) {
     res.json(result);
   });
 }
+
+// --- Suno: unified multi-account library --------------------------------
+// Reads all 6 accounts from suno-dl/accounts.json and fans the live feed out
+// across them in parallel. Defaults to LIVE (creds are local & free); pass
+// ?source=mock to force the canned payload, or it falls back to mock on failure.
+
+// Auth status for every account — "see all accounts at once".
+router.get('/suno/accounts', async (_req, res) => {
+  try {
+    res.json({ ok: true, accounts: await listAccounts() });
+  } catch (e) {
+    res.status(502).json({ ok: false, error: e.message });
+  }
+});
+
+// Merged library feed across ALL accounts. ?page=N&pages=M&source=live|mock
+router.get('/suno/feed', async (req, res) => {
+  const page = parseInt(req.query.page, 10) || 0;
+  const pages = parseInt(req.query.pages, 10) || 1;
+  if (req.query.source === 'mock') return res.json(await serveMock('suno'));
+  try {
+    const result = await feedAll({ page, pages });
+    res.status(result.ok ? 200 : 502).json(result);
+  } catch (e) {
+    record('suno', { status: 0, latencyMs: 0, bytes: 0, mode: 'live', error: e.message });
+    res.status(502).json(await serveMock('suno').then((m) => ({ ...m.data, _liveError: e.message })));
+  }
+});
+
+// --- BYOC generation pool ------------------------------------------------
+// Fans join a show and contribute capacity; scene/generate picks the best
+// available provider with quota and always falls back to free Pollinations.
+
+// A fan joins a show (creates/refreshes their identity + show membership).
+router.post('/byoc/join', express.json(), (req, res) => {
+  const { userId, name, showId } = req.body || {};
+  if (!userId) return res.status(400).json({ error: 'userId required' });
+  res.json(pool.join(userId, name, showId));
+});
+
+// Contribute capacity. v1 wires Meta workers (browser extension) end-to-end;
+// the free Pollinations floor is always present. (Gemini/HF key pooling next.)
+router.post('/byoc/contribute', express.json(), (req, res) => {
+  const { userId, type = 'meta', name, capPerDay } = req.body || {};
+  if (!userId) return res.status(400).json({ error: 'userId required' });
+  if (type !== 'meta') {
+    return res.status(400).json({ error: `only 'meta' is wired in v1 (Gemini/HF key pooling is next)` });
+  }
+  res.json(pool.contribute(userId, { type, name, capPerDay }));
+});
+
+// Live pool status for a show — drives the "N fans contributing X gens" UI.
+router.get('/byoc/pool', (req, res) => {
+  res.json({ ok: true, ...pool.poolStatus(req.query.showId) });
+});
+
+// --- Meta worker relay (the Reverb extension running in a fan's browser) ---
+router.post('/byoc/worker/heartbeat', express.json(), (req, res) => {
+  const { userId } = req.body || {};
+  if (!userId) return res.status(400).json({ error: 'userId required' });
+  res.json({ ok: true, workers: pool.heartbeat(userId) });
+});
+
+// Extension long-poll: hands back the next job for this user, or 204 if none.
+router.get('/byoc/worker/poll', (req, res) => {
+  const userId = req.query.userId;
+  if (!userId) return res.status(400).json({ error: 'userId required' });
+  pool.heartbeat(userId);
+  const job = pool.claimJob(userId);
+  if (!job) return res.status(204).end();
+  res.json({ ok: true, job: { id: job.id, prompt: job.prompt } });
+});
+
+// Extension posts the generated image (or an error) back.
+router.post('/byoc/worker/result', express.json({ limit: '16mb' }), (req, res) => {
+  const { jobId, imageUrl, error } = req.body || {};
+  if (!jobId) return res.status(400).json({ error: 'jobId required' });
+  res.json(pool.completeJob(jobId, { imageUrl, error }));
+});
+
+// --- Unified scene generation with fallback chain ------------------------
+async function runProvider(p, prompt) {
+  if (p.type === 'pollinations') {
+    const seed = Date.now() % 100000;
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=576&nologo=true&model=flux&seed=${seed}`;
+    return { ok: true, imageUrl: url };
+  }
+  if (p.type === 'meta') {
+    const job = pool.enqueueMeta(p, prompt);
+    const deadline = Date.now() + 25000; // wait up to 25s for the fan's browser
+    while (Date.now() < deadline) {
+      await sleep(800);
+      const j = pool.getJob(job.id);
+      if (j.status === 'done') return { ok: true, imageUrl: j.result };
+      if (j.status === 'failed') return { ok: false, error: j.error };
+    }
+    return { ok: false, error: 'meta worker timeout (no browser fulfilled it)' };
+  }
+  return { ok: false, error: `unsupported provider: ${p.type}` };
+}
+
+router.post('/scene/generate', express.json(), async (req, res) => {
+  const { prompt, showId, preferType } = req.body || {};
+  if (!prompt) return res.status(400).json({ error: 'prompt required' });
+
+  const tried = [];
+  const exclude = [];
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const p = pool.pick(showId, { preferType, exclude });
+    if (!p) break;
+    tried.push(p.type);
+    const r = await runProvider(p, prompt);
+    if (r.ok) {
+      pool.recordUse(p.id);
+      return res.json({ ok: true, provider: p.type, owner: p.owner, imageUrl: r.imageUrl, tried });
+    }
+    exclude.push(p.id);
+  }
+  res.status(502).json({ ok: false, error: 'all providers failed', tried });
+});
+
+// --- Synthesize a missing performance (full pipeline) -------------------
+// YouTube/Music audio -> Suno seed (stub) -> AI visuals (pool) -> slideshow.
+router.post('/pipeline/synthesize', express.json(), async (req, res) => {
+  const { song, showId, youtubeUrl, audioUrl, imageCount, videoMode } = req.body || {};
+  try {
+    const result = await synthesize({ song, showId, youtubeUrl, audioUrl, imageCount, videoMode });
+    res.json(result);
+  } catch (e) {
+    res.status(502).json({ ok: false, error: e.message });
+  }
+});
+
+// ========================================================================
+// COHERE — live, synchronized "be there from anywhere" experience.
+// ========================================================================
+
+// Lightweight clock-sync endpoint: the client measures round-trip and computes
+// its offset from server time so a skewed laptop clock still locks on.
+router.get('/live/time', (_req, res) => {
+  res.json({ now: Date.now() });
+});
+
+// The featured show (Post Malone @ Rogers Stadium, Toronto) — always works.
+router.get('/live/featured', async (_req, res) => {
+  try {
+    res.json({ ok: true, event: await live.getFeatured() });
+  } catch (e) {
+    res.status(502).json({ ok: false, error: e.message });
+  }
+});
+
+// Full event snapshot (static timeline + live correction + crowd clips).
+// Polled by the room every few seconds for the shared corrected clock.
+router.get('/live/event/:id', (req, res) => {
+  const event = live.getEvent(req.params.id);
+  if (!event) return res.status(404).json({ ok: false, error: 'event not found' });
+  res.json({ ok: true, event });
+});
+
+// Turn any artist (optionally a real past date/venue) into a live/replay room.
+router.post('/live/resolve', express.json(), async (req, res) => {
+  try {
+    const event = await live.resolveEvent(req.body || {});
+    if (!event) return res.status(404).json({ ok: false, error: 'no setlist found for that artist' });
+    res.json({ ok: true, event });
+  } catch (e) {
+    res.status(400).json({ ok: false, error: e.message });
+  }
+});
+
+// Crowd beacon: an attendee taps "they just started song #idx". Server-stamped,
+// so no client clock is trusted. Median drift corrects the room for everyone.
+router.post('/live/beacon', express.json(), (req, res) => {
+  const { eventId, songIndex, userId } = req.body || {};
+  const out = live.addBeacon(eventId, { songIndex, userId });
+  if (!out) return res.status(404).json({ ok: false, error: 'event not found' });
+  res.status(out.ok ? 200 : 400).json(out);
+});
+
+// Crowd-curated fan-clip wall: submit a clip URL, or upvote one.
+router.post('/live/clip', express.json(), (req, res) => {
+  const { eventId, url, platform, title, userId } = req.body || {};
+  const out = live.addClip(eventId, { url, platform, title, userId });
+  if (!out) return res.status(404).json({ ok: false, error: 'event not found' });
+  res.status(out.ok ? 200 : 400).json(out);
+});
+
+router.post('/live/clip/vote', express.json(), (req, res) => {
+  const { eventId, clipId } = req.body || {};
+  const out = live.voteClip(eventId, clipId);
+  if (!out) return res.status(404).json({ ok: false, error: 'event not found' });
+  res.status(out.ok ? 200 : 400).json(out);
+});
+
+// Fan footage of the ACTUAL event: fresh uploads (publishedAfter + order=date)
+// and active livestreams (eventType=live) — not old concerts. Falls back to a
+// plain recency search when no live broadcasts exist.
+router.get('/live/youtube', async (req, res) => {
+  const q = String(req.query.q || '').trim() || 'concert';
+  const sinceIso = String(req.query.since || '').trim(); // RFC3339
+  const wantLive = String(req.query.live || '') === '1';
+
+  if (isMock('youtube')) {
+    return res.json(await serveMock('youtube'));
+  }
+  const key = process.env.YOUTUBE_API_KEY;
+  const base = (extra) =>
+    `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=8` +
+    `&q=${encodeURIComponent(q)}&order=date${extra}&key=${key}`;
+
+  // RFC3339 lower bound — default to the last 24h so we surface tonight's clips.
+  const since = sinceIso || new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+  const params = `&publishedAfter=${encodeURIComponent(since)}`;
+
+  const results = {};
+  // Active livestreams of the event (the true real-time window).
+  if (wantLive) {
+    const liveRes = await callLive('youtube', base('&eventType=live'));
+    results.live = (liveRes.data?.items || []).filter((i) => i?.id?.videoId);
+  }
+  const freshRes = await callLive('youtube', base(params));
+  results.fresh = (freshRes.data?.items || []).filter((i) => i?.id?.videoId);
+
+  const apiErr = freshRes.data?.error;
+  let error = null;
+  if (apiErr) error = /quota/i.test(apiErr.errors?.[0]?.reason || '') || apiErr.code === 403 ? 'quota' : 'api';
+  res.json({ ok: !error, ...results, error });
+});
 
 export default router;

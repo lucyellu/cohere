@@ -21,6 +21,7 @@ const PROBES = {
   jambase: '/api/jambase/events?artist=Coldplay',
   youtube: '/api/youtube/search?q=coldplay%20live',
   songstats: '/api/songstats/search?q=coldplay',
+  suno: '/api/suno/accounts',
   pinterest: '/api/pinterest/extract?url=https://www.pinterest.com/pin/concert-stage-design-stage-set-design-stage-lighting-design--59039445095226117/',
   pollinations: '/api/pollinations/probe',
   huggingface: '/api/huggingface/probe',
@@ -182,4 +183,37 @@ export async function synthesizeScene(prompt, label) {
   if (poll?.ok && poll.image && poll.mode === 'live') return { ...poll, mode: 'pollinations' };
 
   return gem || { ok: false, error: 'generation unavailable' };
+}
+
+// --- Suno: unified 6-account library -------------------------------------
+
+// Live auth status of all 6 Suno accounts.
+export async function sunoAccounts() {
+  const res = await fetch('/api/suno/accounts').catch(() => null);
+  return (await res?.json().catch(() => null)) || { ok: false, accounts: [] };
+}
+
+// Merged library feed across ALL accounts (newest first). page/pages per account.
+export async function sunoFeed({ page = 0, pages = 1 } = {}) {
+  const res = await fetch(`/api/suno/feed?page=${page}&pages=${pages}`).catch(() => null);
+  return (await res?.json().catch(() => null)) || { ok: false, clips: [], accounts: [] };
+}
+
+// --- BYOC pool -----------------------------------------------------------
+
+export async function byocPool(showId) {
+  const q = showId ? `?showId=${encodeURIComponent(showId)}` : '';
+  const res = await fetch(`/api/byoc/pool${q}`).catch(() => null);
+  return (await res?.json().catch(() => null)) || { ok: false };
+}
+
+// --- Synthesize a missing performance (pipeline) -------------------------
+
+export async function synthesizePerformance({ song, showId, imageCount = 4, videoMode = 'slideshow' }) {
+  const res = await fetch('/api/pipeline/synthesize', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ song, showId, imageCount, videoMode }),
+  }).catch(() => null);
+  return (await res?.json().catch(() => null)) || { ok: false, error: 'pipeline unreachable' };
 }

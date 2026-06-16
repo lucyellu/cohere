@@ -1,0 +1,29 @@
+# Netlify build for Cohere's web app (Vite SPA).
+# The web app is static; the gateway (Express, holds the secret partner keys)
+# must run somewhere reachable — see DEPLOY.md.
+
+[build]
+  base = "web"
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+  # Set VITE_GOOGLE_MAPS_KEY (and optionally VITE_SUPABASE_URL /
+  # VITE_SUPABASE_ANON_KEY) in Netlify → Site settings → Environment variables.
+  # Vite inlines VITE_-prefixed vars at build time.
+
+# Proxy API calls to the deployed gateway so the browser stays same-origin.
+# Replace the host below with your gateway URL (Render/Railway/Fly/tunnel).
+# Until then, /api/* requests will 404 and the Live room can't load.
+[[redirects]]
+  from = "/api/*"
+  to = "https://REPLACE-WITH-YOUR-GATEWAY-HOST/api/:splat"
+  status = 200
+  force = true
+
+# SPA fallback.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

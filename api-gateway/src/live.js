@@ -1,0 +1,322 @@
+// Cohere — the live engine.
+//
+// Cohere turns a concert into a SHARED SYNCHRONIZED CLOCK: everyone on earth
+// locks to the same absolute (UTC) instant, so the 50k people in the stadium and
+// the person watching from their bedroom are on the same song at the same moment.
+//
+// There is no API anywhere that streams "song currently playing at concert X",
+// so the timeline is built in three layers:
+//   1. PREDICT  — start time + setlist order (setlist.fm) + a duration model.
+//   2. CORRECT  — attendees tap "they just started ___"; we take the median drift
+//                 of recent beacons and shift the whole timeline (banter, late
+//                 starts, extended outros are exactly this residual error).
+//   3. CONFIRM  — fresh fan uploads / livestreams (handled in routes.js + the UI).
+//
+// State is in-memory (same pattern as genpool.js). Timeline math lives here;
+// the browser computes "what's playing now" from the timeline + a synced clock.
+
+import { record } from './usage.js';
+
+// --- Duration model ------------------------------------------------------
+// Studio length isn't returned cheaply per-song, and live differs anyway, so we
+// model an average performed-song length + a between-song gap (banter, walk,
+// intro). The crowd-tap correction erases the residual drift.
+const SONG_SEC = 235; // ~3:55 performed
+const GAP_SEC = 35; // between songs
+const OPENER_SEC = 0; // headliner offset baked into startUTC instead
+
+// Keep only beacons from the last 12 minutes when computing the correction —
+// drift is current, not cumulative-from-doors.
+const BEACON_WINDOW_MS = 12 * 60 * 1000;
+
+// ---- In-memory store ----------------------------------------------------
+const events = new Map(); // id -> event
+
+// ---- Timezone helpers (no API needed; Intl knows every IANA zone) -------
+// Offset (ms) of a tz at a given UTC instant. Standard formatToParts trick.
+function tzOffsetMs(tz, utcMs) {
+  const dtf = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz, hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  });
+  const m = {};
+  for (const p of dtf.formatToParts(new Date(utcMs))) m[p.type] = p.value;
+  const asIfUtc = Date.UTC(+m.year, +m.month - 1, +m.day, +(m.hour % 24), +m.minute, +m.second);
+  return asIfUtc - utcMs;
+}
+
+// Convert a wall-clock time IN a tz to a UTC epoch (ms).
+function zonedToUtc(tz, y, mo, d, h, mi) {
+  const guess = Date.UTC(y, mo - 1, d, h, mi);
+  return guess - tzOffsetMs(tz, guess);
+}
+
+// Today's Y/M/D as seen in a tz (so "tonight's show" is tonight at the venue).
+function todayInTz(tz, nowMs = Date.now()) {
+  const dtf = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' });
+  const [y, mo, d] = dtf.format(new Date(nowMs)).split('-').map(Number);
+  return { y, mo, d };
+}
+
+// ---- Timeline -----------------------------------------------------------
+// Compose per-song UTC start times from a start instant + duration model.
+function buildTimeline(songs, startUTC, durations) {
+  let t = startUTC + OPENER_SEC * 1000;
+  return songs.map((song, i) => {
+    const durSec = Math.round(durations?.[i] || SONG_SEC);
+    const startMs = t;
+    t += durSec * 1000 + GAP_SEC * 1000;
+    return { i, song, startMs, durSec };
+  });
+}
+
+// Total predicted show length (ms), for the map "ends ~" label.
+function showLengthMs(timeline) {
+  if (!timeline.length) return 0;
+  const last = timeline[timeline.length - 1];
+  return last.startMs + last.durSec * 1000 - timeline[0].startMs;
+}
+
+// ---- Crowd drift correction --------------------------------------------
+// A beacon = "song K just started" (we stamp it with server-receive time, so it
+// needs no client clock). correction = median(beaconTime - predictedStart[K]).
+function recomputeCorrection(ev) {
+  const now = Date.now();
+  const fresh = ev.beacons.filter((b) => now - b.ts < BEACON_WINDOW_MS);
+  if (!fresh.length) {
+    ev.correctionMs = 0;
+    ev.beaconCount = 0;
+    return;
+  }
+  // Real shows drift by minutes (late start, long banter), never hours — clamp
+  // out absurd taps so one stray/troll beacon can't yank the clock for everyone.
+  const MAX_DRIFT = 3 * 3600 * 1000;
+  const drifts = fresh
+    .map((b) => {
+      const slot = ev.timeline[b.songIndex];
+      return slot ? b.ts - slot.startMs : null;
+    })
+    .filter((x) => x != null && Math.abs(x) < MAX_DRIFT)
+    .sort((a, b) => a - b);
+  ev.correctionMs = drifts.length ? drifts[Math.floor(drifts.length / 2)] : 0;
+  ev.beaconCount = fresh.length;
+  // De-dupe contributors for the "N people syncing" label.
+  ev.beaconPeople = new Set(fresh.map((b) => b.userId)).size;
+}
+
+// ---- Public snapshot ----------------------------------------------------
+function snapshot(ev) {
+  return {
+    id: ev.id,
+    artist: ev.artist,
+    venue: ev.venue,
+    city: ev.city,
+    country: ev.country,
+    lat: ev.lat,
+    lng: ev.lng,
+    tz: ev.tz,
+    startUTC: ev.startUTC,
+    mode: ev.mode, // 'live' | 'replay'
+    songsSource: ev.songsSource, // 'setlistfm' | 'fallback'
+    setlistDate: ev.setlistDate || null,
+    timeline: ev.timeline,
+    showLengthMs: showLengthMs(ev.timeline),
+    correctionMs: ev.correctionMs || 0,
+    beaconCount: ev.beaconCount || 0,
+    beaconPeople: ev.beaconPeople || 0,
+    clips: [...ev.clips].sort((a, b) => b.votes - a.votes).slice(0, 24),
+    serverNow: Date.now(),
+  };
+}
+
+// ---- setlist.fm: real recent setlist ------------------------------------
+async function fetchSetlist(artist, date) {
+  const key = process.env.SETLISTFM_API_KEY;
+  if (!key || !key.trim()) return null;
+  const start = Date.now();
+  try {
+    const url = `https://api.setlist.fm/rest/1.0/search/setlists?artistName=${encodeURIComponent(artist)}&p=1`;
+    const r = await fetch(url, { headers: { 'x-api-key': key, Accept: 'application/json' } });
+    const data = await r.json().catch(() => ({}));
+    record('setlistfm', { status: r.status, latencyMs: Date.now() - start, bytes: 0, mode: 'live', error: r.ok ? null : `HTTP ${r.status}` });
+    if (!r.ok) return null;
+    const setlists = (data?.setlist || []).filter((s) => songsOf(s).length);
+    const want = isoToDmy(String(date || '').slice(0, 10));
+    const chosen = setlists.find((s) => s.eventDate === want) || setlists[0];
+    if (!chosen) return null;
+    return {
+      songs: songsOf(chosen),
+      date: chosen.eventDate,
+      venue: chosen.venue?.name || '',
+      city: chosen.venue?.city?.name || '',
+    };
+  } catch (e) {
+    record('setlistfm', { status: 0, latencyMs: Date.now() - start, bytes: 0, mode: 'live', error: e.message });
+    return null;
+  }
+}
+
+function songsOf(s) {
+  return (s?.sets?.set || []).flatMap((set) => (set.song || []).map((x) => x.name)).filter(Boolean);
+}
+function isoToDmy(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
+}
+
+// A real-ish Post Malone setlist so the featured show always works offline.
+const POSTMALONE_FALLBACK = [
+  'Wow.', 'Too Young', 'Better Now', 'I Fall Apart', 'Reputation', 'Goodbyes',
+  'Saint-Tropez', 'Otherside', 'Chemical', 'Cooped Up', 'Circles', 'Wrapped Around Your Finger',
+  'I Like You (A Happier Song)', 'White Iverson', 'Psycho', 'Congratulations', 'rockstar', 'Sunflower',
+];
+
+// ---- Event factory ------------------------------------------------------
+function makeEvent({ id, artist, venue, city, country, lat, lng, tz, startUTC, mode, songs, songsSource, setlistDate, durations }) {
+  const timeline = buildTimeline(songs, startUTC, durations);
+  const ev = {
+    id, artist, venue, city, country, lat, lng, tz, startUTC, mode,
+    songs, songsSource, setlistDate, timeline,
+    beacons: [], correctionMs: 0, beaconCount: 0, beaconPeople: 0,
+    clips: [],
+  };
+  events.set(id, ev);
+  return ev;
+}
+
+// ---- Featured show: Post Malone @ Rogers Stadium, Toronto ---------------
+// Rogers Stadium — Toronto's new (2025) open-air stadium at Downsview Park.
+const FEATURED = {
+  id: 'featured-postmalone-toronto',
+  artist: 'Post Malone',
+  venue: 'Rogers Stadium',
+  city: 'Toronto',
+  country: 'Canada',
+  lat: 43.7460,
+  lng: -79.4768,
+  tz: 'America/Toronto',
+};
+
+export async function getFeatured() {
+  let ev = events.get(FEATURED.id);
+  if (ev) return snapshot(ev);
+
+  // Tonight at the venue, doors-then-headliner ~9:00pm local.
+  const { y, mo, d } = todayInTz(FEATURED.tz);
+  const startUTC = zonedToUtc(FEATURED.tz, y, mo, d, 21, 0);
+
+  // Prefer a real recent Post Malone setlist; fall back to a baked one.
+  const sf = await fetchSetlist(FEATURED.artist).catch(() => null);
+  const songs = sf?.songs?.length ? sf.songs : POSTMALONE_FALLBACK;
+
+  ev = makeEvent({
+    ...FEATURED,
+    startUTC,
+    mode: 'live',
+    songs,
+    songsSource: sf?.songs?.length ? 'setlistfm' : 'fallback',
+    setlistDate: sf?.date || null,
+  });
+  return snapshot(ev);
+}
+
+// ---- Resolve an arbitrary artist into a live/replay event ---------------
+// `when`: 'live' uses tonight @ a generic time; 'replay' anchors to the real
+// past show's date. Venue/coords come from the caller (globe) when available.
+export async function resolveEvent({ artist, date, venue, city, country, lat, lng, tz, mode = 'live' }) {
+  if (!artist) throw new Error('artist required');
+  const zone = tz || 'America/New_York';
+  const sf = await fetchSetlist(artist, date).catch(() => null);
+  const songs = sf?.songs?.length ? sf.songs : [];
+  if (!songs.length) return null; // no setlist anywhere -> caller falls back to top tracks
+
+  let startUTC;
+  if (mode === 'replay' && (sf?.date || date)) {
+    const dmy = sf?.date || isoToDmy(String(date).slice(0, 10));
+    const [dd, mm, yy] = dmy.split('-').map(Number);
+    startUTC = zonedToUtc(zone, yy, mm, dd, 21, 0); // historical shows: assume 9pm local
+  } else {
+    const { y, mo, d } = todayInTz(zone);
+    startUTC = zonedToUtc(zone, y, mo, d, 21, 0);
+  }
+
+  const id = `ev-${slug(artist)}-${sf?.date || date || 'live'}`;
+  const ev = makeEvent({
+    id, artist,
+    venue: venue || sf?.venue || 'Venue',
+    city: city || sf?.city || '',
+    country: country || '',
+    lat: Number(lat) || null,
+    lng: Number(lng) || null,
+    tz: zone,
+    startUTC,
+    mode,
+    songs,
+    songsSource: 'setlistfm',
+    setlistDate: sf?.date || null,
+  });
+  return snapshot(ev);
+}
+
+function slug(s) {
+  return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
+}
+
+// ---- Room operations ----------------------------------------------------
+export function getEvent(id) {
+  const ev = events.get(id);
+  if (!ev) return null;
+  recomputeCorrection(ev);
+  return snapshot(ev);
+}
+
+export function addBeacon(id, { songIndex, userId }) {
+  const ev = events.get(id);
+  if (!ev) return null;
+  const idx = Number(songIndex);
+  if (!Number.isInteger(idx) || idx < 0 || idx >= ev.timeline.length) return { ok: false, error: 'bad songIndex' };
+  ev.beacons.push({ songIndex: idx, userId: userId || 'anon', ts: Date.now() });
+  recomputeCorrection(ev);
+  return { ok: true, correctionMs: ev.correctionMs, beaconPeople: ev.beaconPeople, beaconCount: ev.beaconCount };
+}
+
+export function addClip(id, { url, platform, title, userId }) {
+  const ev = events.get(id);
+  if (!ev) return null;
+  const clean = String(url || '').trim();
+  if (!/^https?:\/\//i.test(clean)) return { ok: false, error: 'valid url required' };
+  const existing = ev.clips.find((c) => c.url === clean);
+  if (existing) {
+    existing.votes += 1;
+    return { ok: true, clip: existing, deduped: true };
+  }
+  const clip = {
+    id: `clip-${ev.clips.length + 1}-${Date.now().toString(36)}`,
+    url: clean,
+    platform: platform || detectPlatform(clean),
+    title: String(title || '').slice(0, 140),
+    votes: 1,
+    by: userId || 'anon',
+    ts: Date.now(),
+  };
+  ev.clips.push(clip);
+  return { ok: true, clip };
+}
+
+export function voteClip(id, clipId) {
+  const ev = events.get(id);
+  if (!ev) return null;
+  const clip = ev.clips.find((c) => c.id === clipId);
+  if (!clip) return { ok: false, error: 'clip not found' };
+  clip.votes += 1;
+  return { ok: true, votes: clip.votes };
+}
+
+function detectPlatform(url) {
+  if (/youtu\.?be/i.test(url)) return 'youtube';
+  if (/tiktok\.com/i.test(url)) return 'tiktok';
+  if (/instagram\.com/i.test(url)) return 'instagram';
+  if (/(twitter|x)\.com/i.test(url)) return 'x';
+  return 'link';
+}
