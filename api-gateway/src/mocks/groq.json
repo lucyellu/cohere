@@ -1,0 +1,17 @@
+{
+  "id": "chatcmpl-mock-groq",
+  "object": "chat.completion",
+  "model": "llama-3.3-70b-versatile",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Neon haze, a single spotlight, the crowd hushed before the first chord — then everything ignites. (mock Groq text — add a key + go live for real free-tier generation)"
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": { "prompt_tokens": 22, "completion_tokens": 35, "total_tokens": 57 },
+  "_mock": true
+}

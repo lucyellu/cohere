@@ -57,6 +57,39 @@ export const SERVICES = {
     preferMock: true,
     description: 'AI scene synthesis for missing footage',
   },
+  pollinations: {
+    label: 'Pollinations',
+    category: 'ai',
+    keyless: true, // free FLUX image gen, no API key/OAuth needed
+    live: true,
+    description: 'Free keyless FLUX image generation',
+  },
+  huggingface: {
+    label: 'HuggingFace (FLUX)',
+    category: 'ai',
+    envKey: 'HF_TOKEN',
+    live: true,
+    // FLUX.1-schnell via HF Inference. Stays mock/no-key until HF_TOKEN is set.
+    description: 'FLUX.1-schnell image gen (HF Inference)',
+  },
+  cerebras: {
+    label: 'Cerebras',
+    category: 'ai',
+    envKey: 'CEREBRAS_API_KEY',
+    live: true,
+    // Free-tier, OpenAI-compatible text generation (gpt-oss-120b, GLM 4.7).
+    // Text only — no image generation. From the ai-free workbench.
+    description: 'Free-tier text generation (lore, prompts, summaries)',
+  },
+  groq: {
+    label: 'Groq',
+    category: 'ai',
+    envKey: 'GROQ_API_KEY',
+    live: true,
+    // Free-tier, OpenAI-compatible text generation (+ vision/OCR & whisper,
+    // not wired here). Text only — no image generation. From the ai-free workbench.
+    description: 'Free-tier text generation (lore, prompts, summaries)',
+  },
   cyanite: {
     label: 'Cyanite',
     category: 'ai',

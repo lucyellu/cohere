@@ -3,9 +3,10 @@
 > Living doc for cross-session continuity. Update it as things change.
 > Last updated: 2026-06-15 (evening). Hackathon: **Musicathon 2026, June 15–21**.
 >
-> **Current state in one line:** Globe + Show + BYOC all working. 6 services live
-> (Musixmatch, Songstats, YouTube, JamBase, Pinterest, setlist.fm). Only open item:
-> **enable the Gemini API** to turn AI-scene placeholders into real images.
+> **Current state in one line:** Globe + Show + BYOC all working. AI-scene synthesis
+> now makes **real images for free** via Pollinations (keyless FLUX) — Gemini is no
+> longer a blocker, just a quality upgrade. Live services: Musixmatch, Songstats,
+> YouTube, JamBase, Pinterest, setlist.fm, Pollinations, + free text gen (Cerebras, Groq).
 
 ## What Reverb is
 
@@ -72,6 +73,10 @@ per service. Effective mode: no key → forced mock; else a runtime toggle (Dev 
 | **Pinterest** | 🟢 live (keyless) | Style-seed via public Open Graph tags. No API/OAuth/scraper. |
 | **Gemini (BYOC)** | 🟠 **needs enabling** | Key valid but **"Generative Language API" is disabled** on GCP project `356818595469`. Until enabled, synth returns a placeholder (or the Pinterest seed image). |
 | **setlist.fm** | 🟢 live | Real setlists via `x-api-key` header, base `api.setlist.fm/rest/1.0`. Show page tries: curated setlist → setlist.fm (exact date, else most recent past show = "what they've been playing") → top tracks. JamBase dates are *upcoming* so exact matches are rare; the recent-setlist path is the useful one (verified: DMB upcoming show → returns their June 13 setlist, 21 songs). |
+| **Cerebras** (free) | 🟢 live | Free-tier, **text only** (no image gen). OpenAI-compatible `POST /v1/chat/completions`, Bearer auth. Key + defaults copied from `L:\Projects\ai-free`. Default model `gpt-oss-120b` — a **reasoning** model: it spends tokens thinking before emitting `content`, so the route defaults `max_tokens` to 1024 and falls back to the `reasoning` field if `content` is empty. Route: `POST /cerebras/generate {prompt}`. |
+| **Groq** (free) | 🟢 live | Free-tier, **text only** here (the key also has vision/OCR + whisper STT/TTS, not yet wired). OpenAI-compatible, Bearer auth. Default model `llama-3.3-70b-versatile`. Route: `POST /groq/generate {prompt}`. |
+| **Pollinations** (free) | 🟢 live (keyless) | Free FLUX **image generation**, no key. `GET image.pollinations.ai/prompt/{prompt}` → image bytes; the gateway returns a base64 data URL. **This is the live fallback for "✨ AI scene"** when Gemini is off, so the Show page now makes *real* images out of the box. Route: `POST /pollinations/generate {prompt}`. Ported from `L:\Projects\myspot`. |
+| **HuggingFace (FLUX)** | 🟠 no key | FLUX.1-schnell **image gen** via HF Inference (`router.huggingface.co/hf-inference/...`, Bearer `HF_TOKEN`). Wired + mockable but **needs a key** (myspot didn't have one either): free ~$0.10/mo credit at huggingface.co/settings/tokens. Route: `POST /huggingface/generate {prompt}`. |
 | Cyanite / LALAL.AI / ElevenLabs | ⚪ no key | mock-only; not yet integrated. |
 
 ### Open action items (user-side)

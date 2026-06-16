@@ -284,9 +284,11 @@ function SynthScene({ state }) {
       ? 'AI · your compute'
       : state.mode === 'live'
         ? 'AI · gateway'
-        : state.mode === 'seed'
-          ? 'Pinterest seed'
-          : 'placeholder';
+        : state.mode === 'pollinations'
+          ? 'AI · FLUX (free)'
+          : state.mode === 'seed'
+            ? 'Pinterest seed'
+            : 'placeholder';
   return (
     <div className="relative h-full w-full">
       <img src={state.image} alt="synthesized concert scene" className="h-full w-full object-cover" />

@@ -1,0 +1,17 @@
+{
+  "id": "chatcmpl-mock-cerebras",
+  "object": "chat.completion",
+  "model": "gpt-oss-120b",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Stadium lights bleed violet over a sea of raised phones; the bass drops and ten thousand voices become one. (mock Cerebras text — add a key + go live for real free-tier generation)"
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": { "prompt_tokens": 24, "completion_tokens": 38, "total_tokens": 62 },
+  "_mock": true
+}

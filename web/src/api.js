@@ -22,6 +22,10 @@ const PROBES = {
   youtube: '/api/youtube/search?q=coldplay%20live',
   songstats: '/api/songstats/search?q=coldplay',
   pinterest: '/api/pinterest/extract?url=https://www.pinterest.com/pin/concert-stage-design-stage-set-design-stage-lighting-design--59039445095226117/',
+  pollinations: '/api/pollinations/probe',
+  huggingface: '/api/huggingface/probe',
+  cerebras: '/api/cerebras/probe',
+  groq: '/api/groq/probe',
   cyanite: '/api/cyanite/ping',
   lalalai: '/api/lalalai/ping',
   elevenlabs: '/api/elevenlabs/ping',
@@ -87,17 +91,55 @@ export async function extractPin(url) {
   return res.json();
 }
 
-// BYOC scene synthesis. Sends the prompt to the gateway; if the viewer has
-// stored their own Gemini key, it rides along as x-byoc-key for a live call.
-// A stored Pinterest style-seed (image + text) is blended in when present.
+// Free-tier text generation via Cerebras or Groq (OpenAI-compatible LLMs).
+// provider: 'cerebras' | 'groq'. Returns { ok, text, model, mode }. Useful for
+// lore-pack narration, enriching the BYOC image prompt, or song blurbs.
+export async function generateText(provider, prompt, opts = {}) {
+  const res = await fetch(`/api/${provider}/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt, ...opts }),
+  });
+  return res.json();
+}
+
+// Free image generation. provider: 'pollinations' (keyless FLUX) | 'huggingface'
+// (FLUX.1-schnell). Returns { ok, image: 'data:...', model, mode }.
+export async function generateImage(provider, prompt, opts = {}) {
+  const res = await fetch(`/api/${provider}/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt, ...opts }),
+  });
+  return res.json();
+}
+
+// BYOC scene synthesis. Resolution order:
+//   1. Gemini — uses the viewer's stored key (x-byoc-key, "their compute") or
+//      the gateway key. A stored Pinterest style-seed is blended in when present.
+//   2. If Gemini isn't truly live (disabled → placeholder/seed) or errors, fall
+//      back to Pollinations (free, keyless FLUX) so we still get a REAL image.
+//   3. If that fails too, return whatever Gemini gave (placeholder/seed).
 export async function synthesizeScene(prompt, label) {
   const byoc = localStorage.getItem('reverb_byoc_gemini') || '';
   const seedImageUrl = localStorage.getItem('reverb_seed_image') || '';
   const seedText = localStorage.getItem('reverb_seed_text') || '';
-  const res = await fetch('/api/gemini/generate', {
+
+  const gem = await fetch('/api/gemini/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(byoc ? { 'x-byoc-key': byoc } : {}) },
     body: JSON.stringify({ prompt, label, seedImageUrl, seedText }),
-  });
-  return res.json();
+  })
+    .then((r) => r.json())
+    .catch(() => null);
+
+  // A real Gemini render (the viewer's compute or the gateway key) wins.
+  if (gem?.ok && gem.image && (gem.mode === 'byoc' || gem.mode === 'live')) return gem;
+
+  // Otherwise generate a real image for free via Pollinations FLUX.
+  const fullPrompt = seedText ? `${prompt} Visual style reference: ${seedText}` : prompt;
+  const poll = await generateImage('pollinations', fullPrompt, { label }).catch(() => null);
+  if (poll?.ok && poll.image && poll.mode === 'live') return { ...poll, mode: 'pollinations' };
+
+  return gem || { ok: false, error: 'generation unavailable' };
 }

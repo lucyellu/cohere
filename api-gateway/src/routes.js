@@ -331,6 +331,209 @@ function placeholderScene(label) {
   return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
 }
 
+// --- Image generation (Pollinations FLUX keyless + HuggingFace FLUX) ------
+// Image APIs return raw image BYTES, not JSON, so they can't use callLive
+// (which parses text/JSON). This helper fetches binary, validates it's an
+// image, records usage, and returns a base64 data URL — the same shape the
+// Show page already consumes from /gemini/generate.
+async function generateImageLive(id, url, options = {}) {
+  const start = Date.now();
+  try {
+    const r = await fetch(url, options);
+    const buf = Buffer.from(await r.arrayBuffer());
+    const latencyMs = Date.now() - start;
+    const ct = (r.headers.get('content-type') || '').split(';')[0];
+    if (!r.ok) {
+      const snippet = buf.toString('utf8').slice(0, 200);
+      record(id, { status: r.status, latencyMs, bytes: buf.length, mode: 'live', error: `HTTP ${r.status}` });
+      return { ok: false, status: r.status, error: `HTTP ${r.status}: ${snippet}` };
+    }
+    if (!ct.startsWith('image/') || buf.length < 1024) {
+      record(id, { status: 502, latencyMs, bytes: buf.length, mode: 'live', error: 'non-image response' });
+      return { ok: false, status: 502, error: `non-image response (ct=${ct}, bytes=${buf.length})` };
+    }
+    record(id, { status: r.status, latencyMs, bytes: buf.length, mode: 'live', error: null });
+    return { ok: true, status: r.status, bytes: buf.length, image: `data:${ct};base64,${buf.toString('base64')}` };
+  } catch (err) {
+    record(id, { status: 0, latencyMs: Date.now() - start, bytes: 0, mode: 'live', error: err.message });
+    return { ok: false, status: 0, error: err.message };
+  }
+}
+
+// Pollinations — free, keyless FLUX text-to-image (GET, prompt in the path).
+router.post('/pollinations/generate', express.json({ limit: '64kb' }), async (req, res) => {
+  const prompt = String(req.body?.prompt || '').trim();
+  const label = String(req.body?.label || '');
+  if (!prompt) return res.status(400).json({ ok: false, error: 'prompt required' });
+
+  if (isMock('pollinations')) {
+    record('pollinations', { status: 200, latencyMs: 0, bytes: prompt.length, mode: 'mock', error: null });
+    return res.json({ ok: true, mode: 'mock', model: 'mock', image: placeholderScene(label || 'Pollinations FLUX') });
+  }
+
+  const model = req.body?.model ? String(req.body.model) : 'flux';
+  const width = Number(req.body?.width) || 1024;
+  const height = Number(req.body?.height) || 1024;
+  const encoded = encodeURIComponent(prompt.slice(0, 1900));
+  const seed = Date.now() % 1_000_000;
+  const url =
+    `https://image.pollinations.ai/prompt/${encoded}` +
+    `?width=${width}&height=${height}&model=${model}&seed=${seed}&nologo=true&enhance=true`;
+
+  const result = await generateImageLive('pollinations', url, { headers: { 'User-Agent': 'musicathon/0.1' } });
+  if (!result.ok) {
+    return res.status(502).json({ ok: false, mode: 'live', error: result.error, image: placeholderScene(label) });
+  }
+  res.json({ ok: true, mode: 'live', model: `pollinations/${model}`, image: result.image });
+});
+
+// HuggingFace FLUX.1-schnell — POST { inputs, parameters }, Bearer HF_TOKEN.
+router.post('/huggingface/generate', express.json({ limit: '64kb' }), async (req, res) => {
+  const prompt = String(req.body?.prompt || '').trim();
+  const label = String(req.body?.label || '');
+  if (!prompt) return res.status(400).json({ ok: false, error: 'prompt required' });
+
+  if (isMock('huggingface')) {
+    record('huggingface', { status: 200, latencyMs: 0, bytes: prompt.length, mode: 'mock', error: null });
+    return res.json({ ok: true, mode: 'mock', model: 'mock', image: placeholderScene(label || 'FLUX.1-schnell') });
+  }
+
+  const model = req.body?.model ? String(req.body.model) : 'black-forest-labs/FLUX.1-schnell';
+  const url = `https://router.huggingface.co/hf-inference/models/${model}`;
+  const result = await generateImageLive('huggingface', url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${process.env.HF_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ inputs: prompt.slice(0, 1900), parameters: { width: 1024, height: 1024 } }),
+  });
+  if (!result.ok) {
+    return res.status(502).json({ ok: false, mode: 'live', error: result.error, image: placeholderScene(label) });
+  }
+  res.json({ ok: true, mode: 'live', model: `hf/${model}`, image: result.image });
+});
+
+// Dashboard "Probe" buttons (GET) — a small live generation so stats populate.
+router.get('/pollinations/probe', async (_req, res) => {
+  if (isMock('pollinations')) {
+    record('pollinations', { status: 200, latencyMs: 0, bytes: 0, mode: 'mock', error: null });
+    return res.json({ ok: true, mode: 'mock' });
+  }
+  const seed = Date.now() % 1_000_000;
+  const url =
+    `https://image.pollinations.ai/prompt/${encodeURIComponent('a glowing neon concert stage')}` +
+    `?width=512&height=512&model=flux&seed=${seed}&nologo=true`;
+  const result = await generateImageLive('pollinations', url, { headers: { 'User-Agent': 'musicathon/0.1' } });
+  res.status(result.ok ? 200 : 502).json({ ok: result.ok, mode: 'live', bytes: result.bytes || 0, error: result.ok ? null : result.error });
+});
+
+router.get('/huggingface/probe', async (_req, res) => {
+  if (isMock('huggingface')) {
+    record('huggingface', { status: 200, latencyMs: 0, bytes: 0, mode: 'mock', error: null });
+    return res.json({ ok: true, mode: 'mock' });
+  }
+  const url = 'https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell';
+  const result = await generateImageLive('huggingface', url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${process.env.HF_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ inputs: 'a glowing neon concert stage', parameters: { width: 512, height: 512 } }),
+  });
+  res.status(result.ok ? 200 : 502).json({ ok: result.ok, mode: 'live', bytes: result.bytes || 0, error: result.ok ? null : result.error });
+});
+
+// --- Cerebras / Groq (free-tier text generation) -------------------------
+// Both expose an OpenAI-compatible Chat Completions API, so one helper covers
+// both: POST {baseUrl}/chat/completions with a Bearer key. Text only — neither
+// generates images (Groq has vision = image *understanding*, not generation).
+const FREE_LLM = {
+  cerebras: {
+    baseUrl: 'https://api.cerebras.ai/v1',
+    keyEnv: 'CEREBRAS_API_KEY',
+    defaultModel: process.env.CEREBRAS_TEXT_MODEL || 'gpt-oss-120b',
+  },
+  groq: {
+    baseUrl: 'https://api.groq.com/openai/v1',
+    keyEnv: 'GROQ_API_KEY',
+    defaultModel: process.env.GROQ_TEXT_MODEL || 'llama-3.3-70b-versatile',
+  },
+};
+
+async function chatCompletion(id, { prompt, system, model, maxTokens }) {
+  const cfg = FREE_LLM[id];
+  const messages = [];
+  if (system) messages.push({ role: 'system', content: system });
+  messages.push({ role: 'user', content: prompt });
+
+  const result = await callLive(id, `${cfg.baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${process.env[cfg.keyEnv]}`,
+    },
+    body: JSON.stringify({
+      model: model || cfg.defaultModel,
+      messages,
+      // Reasoning models (e.g. gpt-oss-120b) spend tokens thinking before they
+      // emit content, so give a generous default budget or `content` comes back
+      // empty (finish_reason: length).
+      max_tokens: maxTokens || 1024,
+    }),
+  });
+  return result;
+}
+
+// Pull the assistant text out of an OpenAI-compatible response (live or mock).
+// Reasoning models may leave `content` empty and put the answer (or its
+// chain-of-thought) under `reasoning` — fall back to that so the UI isn't blank.
+function extractText(data) {
+  const msg = data?.choices?.[0]?.message || {};
+  return msg.content || msg.reasoning || msg.reasoning_content || '';
+}
+
+for (const id of ['cerebras', 'groq']) {
+  // Text generation — POST { prompt, system?, model?, maxTokens? } -> { text }.
+  router.post(`/${id}/generate`, express.json({ limit: '64kb' }), async (req, res) => {
+    const prompt = String(req.body?.prompt || '').trim();
+    if (!prompt) return res.status(400).json({ ok: false, error: 'prompt required' });
+
+    if (isMock(id)) {
+      const mock = await serveMock(id);
+      return res.json({ ok: true, mode: 'mock', text: extractText(mock.data), model: 'mock' });
+    }
+
+    const result = await chatCompletion(id, {
+      prompt,
+      system: req.body?.system ? String(req.body.system) : '',
+      model: req.body?.model ? String(req.body.model) : '',
+      maxTokens: Number(req.body?.maxTokens) || 0,
+    });
+    if (!result.ok) {
+      const msg = result.data?.error?.message || `HTTP ${result.status}`;
+      return res.status(502).json({ ok: false, mode: 'live', error: msg });
+    }
+    res.json({
+      ok: true,
+      mode: 'live',
+      model: result.data?.model || '',
+      text: extractText(result.data),
+    });
+  });
+
+  // Dashboard "Probe" — a tiny live ping so usage stats populate (GET).
+  router.get(`/${id}/probe`, async (_req, res) => {
+    if (isMock(id)) return res.json(await serveMock(id));
+    const result = await chatCompletion(id, {
+      prompt: 'Reply with the single word: ok',
+      maxTokens: 5,
+    });
+    res.status(result.ok ? 200 : 502).json({
+      ok: result.ok,
+      mode: 'live',
+      model: result.data?.model || '',
+      text: extractText(result.data),
+      error: result.ok ? null : result.data?.error?.message || `HTTP ${result.status}`,
+    });
+  });
+}
+
 // --- Stub services (mock only until keys arrive) -------------------------
 for (const id of ['cyanite', 'lalalai', 'elevenlabs']) {
   router.get(`/${id}/ping`, async (_req, res) => {
