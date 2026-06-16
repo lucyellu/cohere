@@ -5,6 +5,13 @@ const KEY_STORAGE = 'reverb_byoc_gemini';
 const SEED_IMG = 'reverb_seed_image';
 const SEED_TXT = 'reverb_seed_text';
 const SEED_SRC = 'reverb_seed_src';
+const IMG_PROVIDER = 'reverb_img_provider';
+
+const PROVIDERS = [
+  { id: 'auto', label: 'Auto', hint: 'Gemini if a key is set, otherwise free FLUX.' },
+  { id: 'pollinations', label: 'Pollinations', hint: 'Free, keyless FLUX. No setup — works right now.' },
+  { id: 'huggingface', label: 'HF FLUX', hint: 'FLUX.1-schnell — needs HF_TOKEN on the gateway.' },
+];
 
 export function getByocKey() {
   return localStorage.getItem(KEY_STORAGE) || '';
@@ -15,6 +22,7 @@ export function getSeedImage() {
 
 export default function BYOCModal({ open, onClose, onSaved }) {
   const [value, setValue] = useState(getByocKey());
+  const [provider, setProvider] = useState(localStorage.getItem(IMG_PROVIDER) || 'auto');
   const [seedUrl, setSeedUrl] = useState(localStorage.getItem(SEED_SRC) || '');
   const [seedImg, setSeedImg] = useState(getSeedImage());
   const [seedBusy, setSeedBusy] = useState(false);
@@ -25,8 +33,14 @@ export default function BYOCModal({ open, onClose, onSaved }) {
     const v = value.trim();
     if (v) localStorage.setItem(KEY_STORAGE, v);
     else localStorage.removeItem(KEY_STORAGE);
+    localStorage.setItem(IMG_PROVIDER, provider);
     onSaved?.(v);
     onClose();
+  }
+
+  function pickProvider(id) {
+    setProvider(id);
+    localStorage.setItem(IMG_PROVIDER, id); // persist immediately, even without Save
   }
 
   function clearKey() {
@@ -70,8 +84,32 @@ export default function BYOCModal({ open, onClose, onSaved }) {
           <h3 className="text-base font-semibold text-zinc-100">Bring Your Own Compute</h3>
         </div>
 
+        {/* Image model picker */}
+        <div className="mt-4">
+          <h4 className="text-sm font-semibold text-zinc-100">Image model</h4>
+          <div className="mt-2 grid grid-cols-3 gap-1.5">
+            {PROVIDERS.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => pickProvider(p.id)}
+                className={`rounded-lg px-2 py-2 text-xs font-medium transition ${
+                  provider === p.id
+                    ? 'bg-indigo-500 text-white'
+                    : 'bg-white/5 text-zinc-300 hover:bg-white/10'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1.5 text-[11px] text-zinc-500">
+            {PROVIDERS.find((p) => p.id === provider)?.hint}
+          </p>
+        </div>
+
         {/* Gemini key */}
-        <p className="mt-3 text-sm text-zinc-400">
+        <div className="mt-5 border-t border-white/10 pt-4">
+        <p className="text-sm text-zinc-400">
           Paste your own <span className="text-zinc-200">Google&nbsp;Gemini</span> key to power real AI scene synthesis
           for songs no one filmed.
         </p>
@@ -95,6 +133,7 @@ export default function BYOCModal({ open, onClose, onSaved }) {
             Get a free key →
           </a>
         </p>
+        </div>
 
         {/* Pinterest style seed */}
         <div className="mt-5 border-t border-white/10 pt-4">

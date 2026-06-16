@@ -44,9 +44,21 @@ export async function probeAll() {
 
 // --- Show-page data ------------------------------------------------------
 
+// Returns { items, error }. `error` is set on quota/API failure so the UI can
+// distinguish "YouTube quota reached" from "this song genuinely has no footage".
 export async function youtubeSearch(q) {
-  const res = await fetch(`/api/youtube/search?q=${encodeURIComponent(q)}`);
-  return res.json();
+  const res = await fetch(`/api/youtube/search?q=${encodeURIComponent(q)}`).catch(() => null);
+  const j = await res?.json().catch(() => null);
+  const items = (j?.data?.items || []).filter((i) => i?.id?.videoId);
+  let error = null;
+  const apiErr = j?.data?.error;
+  if (apiErr) {
+    const reason = apiErr.errors?.[0]?.reason || '';
+    error = /quota/i.test(reason) || apiErr.code === 403 ? 'quota' : 'api';
+  } else if (!j || j.ok === false) {
+    error = 'api';
+  }
+  return { items, error };
 }
 
 // Real setlist for a show via setlist.fm (exact-date match, else the artist's
@@ -114,16 +126,45 @@ export async function generateImage(provider, prompt, opts = {}) {
   return res.json();
 }
 
-// BYOC scene synthesis. Resolution order:
-//   1. Gemini — uses the viewer's stored key (x-byoc-key, "their compute") or
-//      the gateway key. A stored Pinterest style-seed is blended in when present.
-//   2. If Gemini isn't truly live (disabled → placeholder/seed) or errors, fall
-//      back to Pollinations (free, keyless FLUX) so we still get a REAL image.
-//   3. If that fails too, return whatever Gemini gave (placeholder/seed).
+// Enrich a base scene description into a vivid, concrete image prompt using a
+// free LLM (Cerebras, then Groq as fallback). Returns '' if both are unavailable.
+export async function enrichPrompt(basePrompt) {
+  const system =
+    'You are a concert visual art director. Rewrite the scene description into ONE vivid, ' +
+    'concrete image-generation prompt: a single paragraph, no preamble, no lists. Emphasize ' +
+    'lighting, lens/composition, atmosphere, color, and crowd energy. Under 110 words. The ' +
+    'image must contain no text or watermark.';
+  for (const provider of ['cerebras', 'groq']) {
+    const res = await generateText(provider, basePrompt, { system, maxTokens: 320 }).catch(() => null);
+    const t = (res?.text || '').trim();
+    if (res?.ok && t) return t;
+  }
+  return '';
+}
+
+// The image backend the viewer picked in the BYOC modal.
+// 'auto' (Gemini → FLUX fallback) | 'pollinations' | 'huggingface'.
+export function getImageProvider() {
+  return localStorage.getItem('reverb_img_provider') || 'auto';
+}
+
+// BYOC scene synthesis. Honors the picked provider; otherwise:
+//   1. Gemini — viewer's stored key (x-byoc-key, "their compute") or gateway key.
+//   2. Fallback to Pollinations (free, keyless FLUX) for a REAL image.
+//   3. Else return whatever Gemini gave (placeholder/seed).
 export async function synthesizeScene(prompt, label) {
+  const provider = getImageProvider();
   const byoc = localStorage.getItem('reverb_byoc_gemini') || '';
   const seedImageUrl = localStorage.getItem('reverb_seed_image') || '';
   const seedText = localStorage.getItem('reverb_seed_text') || '';
+  const fullPrompt = seedText ? `${prompt} Visual style reference: ${seedText}` : prompt;
+
+  // Forced free-FLUX providers skip Gemini entirely.
+  if (provider === 'pollinations' || provider === 'huggingface') {
+    const r = await generateImage(provider, fullPrompt, { label }).catch(() => null);
+    if (r?.ok && r.image && r.mode === 'live') return { ...r, mode: provider };
+    // chosen provider failed (e.g. HF has no key) → fall through to the cascade
+  }
 
   const gem = await fetch('/api/gemini/generate', {
     method: 'POST',
@@ -137,7 +178,6 @@ export async function synthesizeScene(prompt, label) {
   if (gem?.ok && gem.image && (gem.mode === 'byoc' || gem.mode === 'live')) return gem;
 
   // Otherwise generate a real image for free via Pollinations FLUX.
-  const fullPrompt = seedText ? `${prompt} Visual style reference: ${seedText}` : prompt;
   const poll = await generateImage('pollinations', fullPrompt, { label }).catch(() => null);
   if (poll?.ok && poll.image && poll.mode === 'live') return { ...poll, mode: 'pollinations' };
 

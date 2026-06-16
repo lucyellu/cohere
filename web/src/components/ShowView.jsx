@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { youtubeSearch, getLyrics, synthesizeScene, getTopTracks, getSetlist } from '../api.js';
+import { youtubeSearch, getLyrics, synthesizeScene, enrichPrompt, getTopTracks, getSetlist } from '../api.js';
 import { fmtDate, fmtCapacity } from '../tour.js';
 
 // The Show: relive one concert. Per setlist song we pull real fan clips
@@ -13,24 +13,30 @@ export default function ShowView({ show, onBack, onOpenByoc }) {
   const [setlistSrc, setSetlistSrc] = useState(null); // setlist.fm source meta
   const [angle, setAngle] = useState(0);
   const [clips, setClips] = useState({}); // song -> [videos] | 'none'
+  const [ytErr, setYtErr] = useState({}); // song -> 'quota' | 'api' | null
   const [lyrics, setLyrics] = useState({}); // song -> text | 'none'
   const [synth, setSynth] = useState({}); // song -> { loading, image, mode, error }
   const [synthView, setSynthView] = useState(false); // show AI scene instead of video
   const [loading, setLoading] = useState(false);
   const cache = useRef({ clips: {}, lyrics: {} });
 
-  async function synthesize(song) {
-    setSynth((s) => ({ ...s, [song]: { loading: true } }));
+  async function synthesize(song, { enrich = false } = {}) {
+    setSynth((s) => ({ ...s, [song]: { loading: true, enriching: enrich } }));
     const lyr = lyrics[song] && lyrics[song] !== 'none' ? lyrics[song] : '';
     const mood = lyr.split('\n').filter(Boolean).slice(0, 6).join(' ').slice(0, 240);
-    const prompt =
+    let prompt =
       `Cinematic wide concert photograph of ${show.artist} performing "${song}" live at ${show.venue}, ` +
       `${show.city}. Dramatic stage lighting, lasers, crowd silhouettes with phone lights, atmospheric haze, ` +
       `emotional and epic. Mood from the lyrics: ${mood}. No text, no watermark.`;
+    // Optionally let a free LLM rewrite the prompt into a richer art-directed one.
+    if (enrich) {
+      const better = await enrichPrompt(prompt).catch(() => '');
+      if (better) prompt = better;
+    }
     const res = await synthesizeScene(prompt, song).catch(() => null);
     setSynth((s) => ({
       ...s,
-      [song]: { loading: false, image: res?.image || null, mode: res?.mode, error: res?.error || null },
+      [song]: { loading: false, image: res?.image || null, mode: res?.mode, error: res?.error || null, enriched: enrich },
     }));
   }
 
@@ -44,16 +50,20 @@ export default function ShowView({ show, onBack, onOpenByoc }) {
       return;
     }
     setLoading(true);
+    // Search by artist + song + "live" (no venue): an upcoming show has no
+    // venue-specific footage yet, and the BYOC premise is crowd footage of the
+    // song from anywhere. youtubeSearch returns { items, error } so a quota/API
+    // failure is distinct from "nobody filmed this".
     const [yt, lyr] = await Promise.all([
-      youtubeSearch(`${show.artist} ${song} ${show.venue} live`).catch(() => null),
+      youtubeSearch(`${show.artist} ${song} live`),
       getLyrics(song, show.artist).catch(() => null),
     ]);
-    const items = (yt?.data?.items || []).filter((i) => i?.id?.videoId);
-    const clipVal = items.length ? items.slice(0, 4) : 'none';
-    const body = yt && parseLyrics(lyr);
+    const clipVal = yt.items.length ? yt.items.slice(0, 4) : 'none';
+    const body = parseLyrics(lyr);
     cache.current.clips[song] = clipVal;
     cache.current.lyrics[song] = body || 'none';
     setClips((c) => ({ ...c, [song]: clipVal }));
+    setYtErr((e) => ({ ...e, [song]: yt.error || null }));
     setLyrics((l) => ({ ...l, [song]: body || 'none' }));
     setLoading(false);
   }
@@ -179,6 +189,7 @@ export default function ShowView({ show, onBack, onOpenByoc }) {
                 gap={songClips === 'none'}
                 state={synth[activeSong]}
                 onSynthesize={() => synthesize(activeSong)}
+                onEnrich={() => synthesize(activeSong, { enrich: true })}
                 onOpenByoc={onOpenByoc}
               />
             ) : current ? (
@@ -196,6 +207,15 @@ export default function ShowView({ show, onBack, onOpenByoc }) {
               </div>
             )}
           </div>
+
+          {/* Why a song shows no footage: distinguish quota from a genuine gap. */}
+          {ytErr[activeSong] && (
+            <p className="mt-2 rounded-lg bg-amber-500/10 px-3 py-2 text-[11px] text-amber-300/90">
+              {ytErr[activeSong] === 'quota'
+                ? "YouTube's daily search quota is used up — fan-footage search is paused (it resets tomorrow). The AI scene still works below."
+                : "Couldn't reach YouTube for this song right now. The AI scene still works below."}
+            </p>
+          )}
 
           {/* Angle switcher: crowd footage angles + the AI scene (always available) */}
           {(hasFootage || songClips === 'none') && (
@@ -246,12 +266,12 @@ export default function ShowView({ show, onBack, onOpenByoc }) {
   );
 }
 
-function SynthStage({ gap, state, onSynthesize, onOpenByoc }) {
+function SynthStage({ gap, state, onSynthesize, onEnrich, onOpenByoc }) {
   if (state?.loading) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-zinc-400">
         <div className="animate-pulse text-3xl">✨</div>
-        Synthesizing scene…
+        {state.enriching ? 'Writing a richer prompt…' : 'Synthesizing scene…'}
       </div>
     );
   }
@@ -263,16 +283,26 @@ function SynthStage({ gap, state, onSynthesize, onOpenByoc }) {
         {gap ? 'No crowd footage found for this song.' : 'Reimagine this performance with AI.'}
       </p>
       <p className="max-w-sm text-xs text-zinc-600">
-        Bring your own compute to synthesize the scene from the song's lyrics &amp; mood.
+        Synthesize the scene from the song's lyrics &amp; mood — or enrich the prompt with a free
+        LLM first for a more cinematic result.
       </p>
-      <button
-        onClick={onSynthesize}
-        className="rounded-xl bg-gradient-to-r from-indigo-500 to-fuchsia-500 px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
-      >
-        Synthesize performance →
-      </button>
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        <button
+          onClick={onSynthesize}
+          className="rounded-xl bg-gradient-to-r from-indigo-500 to-fuchsia-500 px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+        >
+          Synthesize performance →
+        </button>
+        <button
+          onClick={onEnrich}
+          className="rounded-xl border border-fuchsia-400/40 bg-fuchsia-500/10 px-4 py-2 text-sm font-semibold text-fuchsia-200 hover:bg-fuchsia-500/20"
+          title="Use a free LLM (Cerebras/Groq) to expand the prompt, then generate"
+        >
+          ✨ Enrich + synthesize
+        </button>
+      </div>
       <button onClick={onOpenByoc} className="text-[11px] text-zinc-500 hover:text-zinc-300">
-        add a Gemini key for real AI generation →
+        choose image model / add a Gemini key →
       </button>
     </div>
   );
@@ -286,9 +316,11 @@ function SynthScene({ state }) {
         ? 'AI · gateway'
         : state.mode === 'pollinations'
           ? 'AI · FLUX (free)'
-          : state.mode === 'seed'
-            ? 'Pinterest seed'
-            : 'placeholder';
+          : state.mode === 'huggingface'
+            ? 'AI · FLUX (HF)'
+            : state.mode === 'seed'
+              ? 'Pinterest seed'
+              : 'placeholder';
   return (
     <div className="relative h-full w-full">
       <img src={state.image} alt="synthesized concert scene" className="h-full w-full object-cover" />

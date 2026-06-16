@@ -86,9 +86,9 @@ per service. Effective mode: no key → forced mock; else a runtime toggle (Dev 
 ## Features built so far
 - API gateway + monitor (mock/live toggle, usage, health) — the "Dev" tab.
 - Tour Globe: react-globe.gl, capacity-scaled venue points, chronological route arcs, click-to-focus, artist search, sortable stops (date / capacity / venue / city), per-stop setlist.
-- Show page: per-song multi-angle YouTube fan footage + Musixmatch lyrics; "✨ AI scene" available on every song.
+- Show page: per-song multi-angle YouTube fan footage + Musixmatch lyrics; "✨ AI scene" available on every song. Footage search is `artist + song + live` (no venue — upcoming shows have none, and crowd footage of the song from anywhere is the point). On YouTube quota/API failure the UI shows an amber notice instead of a silent "no footage".
 - Real setlists via setlist.fm (exact date → most recent past show → top tracks fallback), with honest labeling.
-- BYOC: gateway-proxied Gemini image synthesis; key vault in localStorage; Standard vs Crowd-Powered badge.
+- BYOC: image synthesis with a **model picker** (Auto / Pollinations FLUX / HF FLUX) in the ✨ vault, an **"Enrich + synthesize"** button (a free LLM rewrites the prompt into a richer art-directed one before generation), Gemini key vault in localStorage, and a mode badge (your compute / gateway / FLUX free / FLUX HF / seed / placeholder).
 - Pinterest style-seed: extract image+description from a public URL → image-to-image seed for Gemini; shows the seed image as the scene until Gemini is live.
 
 ## Gotchas / lessons (don't relearn these)
