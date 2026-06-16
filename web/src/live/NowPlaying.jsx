@@ -1,4 +1,5 @@
 import { fmtCountdown, fmtDur, fmtClock } from './clock.js';
+import { usePlayer } from './player.jsx';
 
 // The heartbeat of the room: what the crowd is on RIGHT NOW. Renders pre-show
 // countdown, the current song with a live progress bar, the between-songs
@@ -42,7 +43,10 @@ export default function NowPlaying({ np, event, syncedNow }) {
         <span className="h-2 w-2 animate-pulse rounded-full bg-rose-500" />
         Now playing · song {np.index + 1} of {event.timeline.length}
       </div>
-      <h2 className="mt-2 text-3xl font-bold leading-tight text-zinc-50">{np.song}</h2>
+      <div className="mt-2 flex items-start justify-between gap-3">
+        <h2 className="text-3xl font-bold leading-tight text-zinc-50">{np.song}</h2>
+        <PlayButton artist={event.artist} song={np.song} />
+      </div>
 
       <div className="mt-4">
         <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
@@ -63,6 +67,19 @@ export default function NowPlaying({ np, event, syncedNow }) {
         </p>
       )}
     </div>
+  );
+}
+
+function PlayButton({ artist, song }) {
+  const player = usePlayer();
+  return (
+    <button
+      onClick={() => player?.playSong(artist, song)}
+      className="mt-1 shrink-0 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-zinc-100 hover:bg-white/20"
+      title="Play this song in the bottom player"
+    >
+      ▶ Play
+    </button>
   );
 }
 

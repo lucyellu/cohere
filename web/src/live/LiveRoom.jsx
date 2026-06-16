@@ -157,8 +157,8 @@ export default function LiveRoom({ event: initial, onBack }) {
         </aside>
       </div>
 
-      {/* Fan footage wall (full width) */}
-      <FanWall event={event} clips={event.clips || []} onClipsChanged={async () => {
+      {/* Crowd-sourced live feed (full width) */}
+      <FanWall event={event} clips={event.clips || []} np={np} onClipsChanged={async () => {
         const fresh = await getEvent(event.id);
         if (fresh) setEvent((prev) => ({ ...prev, ...fresh }));
       }} />

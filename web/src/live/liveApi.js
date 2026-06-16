@@ -35,6 +35,12 @@ export async function getFeatured() {
   return r?.event || null;
 }
 
+// All featured shows (Post Malone live + Madison Beer replay).
+export async function getFeaturedList() {
+  const r = await fetch('/api/live/featured').then((x) => x.json()).catch(() => null);
+  return r?.events || (r?.event ? [r.event] : []);
+}
+
 export async function getEvent(id) {
   const r = await fetch(`/api/live/event/${encodeURIComponent(id)}`).then((x) => x.json()).catch(() => null);
   return r?.ok ? r.event : null;
@@ -59,11 +65,11 @@ export async function sendBeacon(eventId, songIndex) {
 }
 
 // --- Crowd fan-clip wall -------------------------------------------------
-export async function submitClip(eventId, url, title) {
+export async function submitClip(eventId, url, { title, songIndex } = {}) {
   return fetch('/api/live/clip', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ eventId, url, title, userId: guestId() }),
+    body: JSON.stringify({ eventId, url, title, songIndex, userId: guestId() }),
   }).then((x) => x.json()).catch(() => null);
 }
 
@@ -83,4 +89,24 @@ export async function liveYoutube(q, { live = false, since } = {}) {
   if (since) p.set('since', since);
   const r = await fetch(`/api/live/youtube?${p.toString()}`).then((x) => x.json()).catch(() => null);
   return r || { fresh: [], live: [], error: 'api' };
+}
+
+// --- YouTube top result for a song (drives the persistent player) --------
+// Cached in localStorage by query so re-plays don't re-spend the ~100/day quota.
+export async function youtubeTop(query) {
+  const key = `cohere_yt_${query}`;
+  const cached = localStorage.getItem(key);
+  if (cached) {
+    try {
+      return JSON.parse(cached);
+    } catch {
+      /* fall through */
+    }
+  }
+  const r = await fetch(`/api/youtube/search?q=${encodeURIComponent(query)}`).then((x) => x.json()).catch(() => null);
+  const item = (r?.data?.items || []).find((i) => i?.id?.videoId);
+  if (!item) return null;
+  const out = { videoId: item.id.videoId, title: item.snippet?.title || query, channel: item.snippet?.channelTitle || '' };
+  localStorage.setItem(key, JSON.stringify(out));
+  return out;
 }

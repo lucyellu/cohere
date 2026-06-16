@@ -1,19 +1,19 @@
 import { useEffect, useState } from 'react';
-import { getFeatured, resolveEvent } from './liveApi.js';
+import { getFeaturedList, resolveEvent } from './liveApi.js';
 
 // The door into Cohere. A featured live show (Post Malone @ Rogers Stadium) you
 // can join in one tap, plus a search to summon any artist as a live room or a
 // synced replay of their most recent show.
 
 export default function LiveLanding({ onJoin }) {
-  const [featured, setFeatured] = useState(null);
+  const [featured, setFeatured] = useState([]);
   const [artist, setArtist] = useState('');
   const [mode, setMode] = useState('live'); // 'live' | 'replay'
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
 
   useEffect(() => {
-    getFeatured().then(setFeatured);
+    getFeaturedList().then(setFeatured);
   }, []);
 
   async function summon() {
@@ -37,29 +37,47 @@ export default function LiveLanding({ onJoin }) {
         </p>
       </div>
 
-      {/* Featured live show */}
-      {featured && (
-        <button
-          onClick={() => onJoin(featured)}
-          className="group block w-full overflow-hidden rounded-2xl border border-rose-400/30 bg-gradient-to-br from-rose-500/15 via-fuchsia-500/5 to-transparent p-6 text-left transition hover:border-rose-400/60"
-        >
-          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-rose-300">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-rose-500" /> Live tonight
-          </div>
-          <h3 className="mt-2 text-2xl font-bold text-zinc-50">{featured.artist}</h3>
-          <p className="text-sm text-zinc-300">
-            {featured.venue} · {featured.city} · {featured.timeline.length} songs
-          </p>
-          <p className="mt-3 text-xs text-zinc-500">
-            {featured.songsSource === 'setlistfm'
-              ? `Setlist from their latest show (setlist.fm) · doors then 9pm ${featured.city} time`
-              : 'Typical current setlist · doors then 9pm local'}
-          </p>
-          <span className="mt-4 inline-block rounded-xl bg-gradient-to-r from-rose-500 to-fuchsia-500 px-5 py-2.5 text-sm font-bold text-white group-hover:opacity-90">
-            Join the crowd →
-          </span>
-        </button>
-      )}
+      {/* Featured shows */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {featured.map((ev) => {
+          const replay = ev.mode === 'replay';
+          return (
+            <button
+              key={ev.id}
+              onClick={() => onJoin(ev)}
+              className={`group block w-full overflow-hidden rounded-2xl border p-6 text-left transition ${
+                replay
+                  ? 'border-indigo-400/30 bg-gradient-to-br from-indigo-500/15 via-fuchsia-500/5 to-transparent hover:border-indigo-400/60'
+                  : 'border-rose-400/30 bg-gradient-to-br from-rose-500/15 via-fuchsia-500/5 to-transparent hover:border-rose-400/60'
+              }`}
+            >
+              <div className={`flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider ${replay ? 'text-indigo-300' : 'text-rose-300'}`}>
+                {replay ? (
+                  <>📼 Replay · {ev.setlistDate || 'past show'}</>
+                ) : (
+                  <>
+                    <span className="h-2 w-2 animate-pulse rounded-full bg-rose-500" /> Live tonight
+                  </>
+                )}
+              </div>
+              <h3 className="mt-2 text-2xl font-bold text-zinc-50">{ev.artist}</h3>
+              <p className="text-sm text-zinc-300">
+                {ev.venue} · {ev.city} · {ev.timeline.length} songs
+              </p>
+              <p className="mt-3 text-xs text-zinc-500">
+                {replay
+                  ? 'Press play together — synced to the real setlist, with fans’ uploaded footage.'
+                  : ev.songsSource === 'setlistfm'
+                    ? `Setlist from their latest show (setlist.fm) · doors then 9pm ${ev.city} time`
+                    : 'Typical current setlist · doors then 9pm local'}
+              </p>
+              <span className={`mt-4 inline-block rounded-xl px-5 py-2.5 text-sm font-bold text-white group-hover:opacity-90 ${replay ? 'bg-gradient-to-r from-indigo-500 to-fuchsia-500' : 'bg-gradient-to-r from-rose-500 to-fuchsia-500'}`}>
+                {replay ? 'Replay together →' : 'Join the crowd →'}
+              </span>
+            </button>
+          );
+        })}
+      </div>
 
       {/* Summon any artist */}
       <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">

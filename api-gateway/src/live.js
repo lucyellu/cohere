@@ -131,7 +131,9 @@ function snapshot(ev) {
 }
 
 // ---- setlist.fm: real recent setlist ------------------------------------
-async function fetchSetlist(artist, date) {
+// Picks an exact-date match if `date` is given, else a show in `cityPref` if
+// given (e.g. "Vancouver"), else the most recent show with songs.
+async function fetchSetlist(artist, { date, cityPref } = {}) {
   const key = process.env.SETLISTFM_API_KEY;
   if (!key || !key.trim()) return null;
   const start = Date.now();
@@ -143,7 +145,10 @@ async function fetchSetlist(artist, date) {
     if (!r.ok) return null;
     const setlists = (data?.setlist || []).filter((s) => songsOf(s).length);
     const want = isoToDmy(String(date || '').slice(0, 10));
-    const chosen = setlists.find((s) => s.eventDate === want) || setlists[0];
+    const byCity = cityPref
+      ? setlists.find((s) => (s.venue?.city?.name || '').toLowerCase().includes(cityPref.toLowerCase()))
+      : null;
+    const chosen = setlists.find((s) => s.eventDate === want) || byCity || setlists[0];
     if (!chosen) return null;
     return {
       songs: songsOf(chosen),
@@ -165,11 +170,15 @@ function isoToDmy(iso) {
   return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
 }
 
-// A real-ish Post Malone setlist so the featured show always works offline.
+// Real-ish fallback setlists so the featured shows always work offline.
 const POSTMALONE_FALLBACK = [
   'Wow.', 'Too Young', 'Better Now', 'I Fall Apart', 'Reputation', 'Goodbyes',
   'Saint-Tropez', 'Otherside', 'Chemical', 'Cooped Up', 'Circles', 'Wrapped Around Your Finger',
   'I Like You (A Happier Song)', 'White Iverson', 'Psycho', 'Congratulations', 'rockstar', 'Sunflower',
+];
+const MADISONBEER_FALLBACK = [
+  'Make You Mine', 'Reckless', 'Home to Another One', 'Spinnin', 'Selfish', 'Good in Goodbye',
+  'Default', '15 Minutes', 'Ryder', 'Yes Baby', 'Sweet Relief', 'Dangerous', 'Showed Me (How I Fell in Love with You)', 'Baby',
 ];
 
 // ---- Event factory ------------------------------------------------------
@@ -185,40 +194,65 @@ function makeEvent({ id, artist, venue, city, country, lat, lng, tz, startUTC, m
   return ev;
 }
 
-// ---- Featured show: Post Malone @ Rogers Stadium, Toronto ---------------
-// Rogers Stadium — Toronto's new (2025) open-air stadium at Downsview Park.
-const FEATURED = {
-  id: 'featured-postmalone-toronto',
-  artist: 'Post Malone',
-  venue: 'Rogers Stadium',
-  city: 'Toronto',
-  country: 'Canada',
-  lat: 43.7460,
-  lng: -79.4768,
-  tz: 'America/Toronto',
-};
+// ---- Featured shows -----------------------------------------------------
+// 1) Post Malone @ Rogers Stadium, Toronto — the new (2025) open-air stadium at
+//    Downsview Park (NOT downtown by the CN Tower — that's Rogers *Centre*).
+//    A LIVE/upcoming show: predict + crowd-correct.
+// 2) Madison Beer @ Vancouver — a PAST show replayed in sync (real setlist.fm
+//    setlist; great for fan footage since attendees have already uploaded).
+const FEATURED = [
+  {
+    id: 'featured-postmalone-toronto',
+    artist: 'Post Malone', venue: 'Rogers Stadium', city: 'Toronto', country: 'Canada',
+    lat: 43.7460, lng: -79.4768, tz: 'America/Toronto', mode: 'live',
+    fallback: POSTMALONE_FALLBACK,
+  },
+  {
+    id: 'featured-madisonbeer-vancouver',
+    artist: 'Madison Beer', venue: 'Doug Mitchell Thunderbird Sports Centre', city: 'Vancouver', country: 'Canada',
+    lat: null, lng: null, tz: 'America/Vancouver', mode: 'replay', cityPref: 'Vancouver',
+    fallback: MADISONBEER_FALLBACK,
+  },
+];
 
-export async function getFeatured() {
-  let ev = events.get(FEATURED.id);
-  if (ev) return snapshot(ev);
+async function buildFeatured(cfg) {
+  let ev = events.get(cfg.id);
+  if (ev) return ev;
 
-  // Tonight at the venue, doors-then-headliner ~9:00pm local.
-  const { y, mo, d } = todayInTz(FEATURED.tz);
-  const startUTC = zonedToUtc(FEATURED.tz, y, mo, d, 21, 0);
+  const sf = await fetchSetlist(cfg.artist, { cityPref: cfg.cityPref }).catch(() => null);
+  const songs = sf?.songs?.length ? sf.songs : cfg.fallback;
 
-  // Prefer a real recent Post Malone setlist; fall back to a baked one.
-  const sf = await fetchSetlist(FEATURED.artist).catch(() => null);
-  const songs = sf?.songs?.length ? sf.songs : POSTMALONE_FALLBACK;
+  // Live shows: tonight 9pm local. Replays: anchor to the real show date 9pm local.
+  let startUTC;
+  if (cfg.mode === 'replay' && sf?.date) {
+    const [dd, mm, yy] = sf.date.split('-').map(Number);
+    startUTC = zonedToUtc(cfg.tz, yy, mm, dd, 21, 0);
+  } else {
+    const { y, mo, d } = todayInTz(cfg.tz);
+    startUTC = zonedToUtc(cfg.tz, y, mo, d, 21, 0);
+  }
 
   ev = makeEvent({
-    ...FEATURED,
-    startUTC,
-    mode: 'live',
-    songs,
+    id: cfg.id, artist: cfg.artist,
+    venue: cfg.venue || sf?.venue || 'Venue',
+    city: cfg.city, country: cfg.country,
+    lat: cfg.lat, lng: cfg.lng, tz: cfg.tz,
+    startUTC, mode: cfg.mode, songs,
     songsSource: sf?.songs?.length ? 'setlistfm' : 'fallback',
     setlistDate: sf?.date || null,
   });
-  return snapshot(ev);
+  return ev;
+}
+
+// All featured shows (for the landing). Built once, then cached.
+export async function getFeaturedList() {
+  const built = await Promise.all(FEATURED.map((c) => buildFeatured(c).catch(() => null)));
+  return built.filter(Boolean).map(snapshot);
+}
+
+// The primary featured show (kept for compatibility).
+export async function getFeatured() {
+  return snapshot(await buildFeatured(FEATURED[0]));
 }
 
 // ---- Resolve an arbitrary artist into a live/replay event ---------------
@@ -227,7 +261,7 @@ export async function getFeatured() {
 export async function resolveEvent({ artist, date, venue, city, country, lat, lng, tz, mode = 'live' }) {
   if (!artist) throw new Error('artist required');
   const zone = tz || 'America/New_York';
-  const sf = await fetchSetlist(artist, date).catch(() => null);
+  const sf = await fetchSetlist(artist, { date, cityPref: city }).catch(() => null);
   const songs = sf?.songs?.length ? sf.songs : [];
   if (!songs.length) return null; // no setlist anywhere -> caller falls back to top tracks
 
@@ -281,14 +315,19 @@ export function addBeacon(id, { songIndex, userId }) {
   return { ok: true, correctionMs: ev.correctionMs, beaconPeople: ev.beaconPeople, beaconCount: ev.beaconCount };
 }
 
-export function addClip(id, { url, platform, title, userId }) {
+export function addClip(id, { url, platform, title, userId, songIndex }) {
   const ev = events.get(id);
   if (!ev) return null;
   const clean = String(url || '').trim();
   if (!/^https?:\/\//i.test(clean)) return { ok: false, error: 'valid url required' };
+  // Tag the clip to a setlist song (its live timecode) when provided.
+  const idx = Number.isInteger(Number(songIndex)) && Number(songIndex) >= 0 && Number(songIndex) < ev.timeline.length
+    ? Number(songIndex)
+    : null;
   const existing = ev.clips.find((c) => c.url === clean);
   if (existing) {
     existing.votes += 1;
+    if (idx != null && existing.songIndex == null) existing.songIndex = idx;
     return { ok: true, clip: existing, deduped: true };
   }
   const clip = {
@@ -296,6 +335,8 @@ export function addClip(id, { url, platform, title, userId }) {
     url: clean,
     platform: platform || detectPlatform(clean),
     title: String(title || '').slice(0, 140),
+    songIndex: idx,
+    song: idx != null ? ev.timeline[idx].song : null,
     votes: 1,
     by: userId || 'anon',
     ts: Date.now(),

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import LiveLanding from './live/LiveLanding.jsx';
 import LiveRoom from './live/LiveRoom.jsx';
+import { PlayerProvider } from './live/player.jsx';
+import BottomPlayer from './live/BottomPlayer.jsx';
 import TourView from './components/TourView.jsx';
 import ShowView from './components/ShowView.jsx';
 import ControlRoom from './components/ControlRoom.jsx';
@@ -32,7 +34,8 @@ export default function App() {
   }
 
   return (
-    <div className="mx-auto min-h-full max-w-6xl px-4 py-8 text-zinc-100">
+    <PlayerProvider>
+    <div className="mx-auto min-h-full max-w-6xl px-4 py-8 pb-28 text-zinc-100">
       <header className="mb-6">
         <div className="flex items-baseline gap-3">
           <h1 className="text-2xl font-bold tracking-tight">
@@ -113,5 +116,7 @@ export default function App() {
 
       <BYOCModal open={byocOpen} onClose={() => setByocOpen(false)} onSaved={setByocKey} />
     </div>
+    <BottomPlayer />
+    </PlayerProvider>
   );
 }

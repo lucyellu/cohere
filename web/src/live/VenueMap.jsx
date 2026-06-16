@@ -18,9 +18,25 @@ export default function VenueMap({ venue, city, lat, lng, live, viewers }) {
     }
     let cancelled = false;
     loadGoogleMaps()
-      .then((maps) => {
+      .then(async (maps) => {
         if (cancelled || !mapRef.current) return;
-        const center = { lat: Number(lat) || 43.7460, lng: Number(lng) || -79.4768 };
+
+        // Accuracy: geocode the venue BY NAME (so "Rogers Stadium, Toronto"
+        // lands on the actual stadium) rather than trusting a hardcoded coord.
+        // Fall back to provided lat/lng, then a default.
+        let center = Number(lat) && Number(lng) ? { lat: Number(lat), lng: Number(lng) } : null;
+        try {
+          const geocoder = new maps.Geocoder();
+          const { results } = await geocoder.geocode({ address: `${venue}, ${city}` });
+          if (results?.[0]?.geometry?.location) {
+            center = { lat: results[0].geometry.location.lat(), lng: results[0].geometry.location.lng() };
+          }
+        } catch {
+          /* fall back to coords below */
+        }
+        if (!center) center = { lat: 43.7460, lng: -79.4768 };
+        if (cancelled) return;
+
         const map = new maps.Map(mapRef.current, {
           center,
           zoom: 16,

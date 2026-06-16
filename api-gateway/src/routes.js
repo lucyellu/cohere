@@ -690,10 +690,11 @@ router.get('/live/time', (_req, res) => {
   res.json({ now: Date.now() });
 });
 
-// The featured show (Post Malone @ Rogers Stadium, Toronto) — always works.
+// The featured shows (Post Malone live + Madison Beer replay) — always work.
 router.get('/live/featured', async (_req, res) => {
   try {
-    res.json({ ok: true, event: await live.getFeatured() });
+    const events = await live.getFeaturedList();
+    res.json({ ok: true, events, event: events[0] || null });
   } catch (e) {
     res.status(502).json({ ok: false, error: e.message });
   }
@@ -729,8 +730,8 @@ router.post('/live/beacon', express.json(), (req, res) => {
 
 // Crowd-curated fan-clip wall: submit a clip URL, or upvote one.
 router.post('/live/clip', express.json(), (req, res) => {
-  const { eventId, url, platform, title, userId } = req.body || {};
-  const out = live.addClip(eventId, { url, platform, title, userId });
+  const { eventId, url, platform, title, userId, songIndex } = req.body || {};
+  const out = live.addClip(eventId, { url, platform, title, userId, songIndex });
   if (!out) return res.status(404).json({ ok: false, error: 'event not found' });
   res.status(out.ok ? 200 : 400).json(out);
 });

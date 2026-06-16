@@ -34,12 +34,32 @@ under 📼 Archive.**
 - **Anonymous identity** (`liveApi.js`): zero-friction guest id + optional name —
   judges open the URL and are instantly "in the crowd", no signup.
 
-**Built in code, needs infra (the one gap):**
-- **Supabase Realtime presence** ("N here now") — `web/src/live/supabase.js` +
-  `presence.js` are done and self-register when configured. BLOCKED: both existing
-  Supabase projects are paused >90 days and **un-restorable**; needs a **new**
-  project (possible cost) + `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY`. Until
-  then the room honestly shows the **beacon "N syncing the crowd"** count.
+**Supabase Realtime presence — LIVE (2026-06-16).** The two old projects were
+paused >90 days and un-restorable, but a **new free ($0/mo) project "cohere"**
+(ref `bzbxtnivfzeqgoajsyhc`, ca-central-1) was created and wired into the
+gitignored `web/.env` (`VITE_SUPABASE_URL` + publishable `VITE_SUPABASE_ANON_KEY`).
+`supabase.js` self-registers a Realtime **presence** channel per room (no tables/
+migration needed) → "N here now"; honest beacon fallback remains if env is blank.
+**For Netlify, set these two vars in the site env** (they're not committed).
+
+**Added 2026-06-16 (second batch):**
+- **Accurate map** — `VenueMap` now **geocodes the venue by name** (`Geocoder`)
+  instead of trusting hardcoded coords. (NB: "Rogers Stadium" is the 2025
+  open-air venue at **Downsview Park**, ~20km from the CN Tower — that downtown
+  domed stadium is **Rogers Centre**. The map was right; the names differ.)
+- **Madison Beer @ Vancouver** — a 2nd featured show in **replay** mode (real
+  setlist.fm Vancouver setlist) alongside Post Malone live. `/live/featured`
+  now returns `{events:[…]}`; landing shows both cards.
+- **Dual song times** — each setlist row shows venue-local **and** your-local
+  start time, with a Venue/You/Both toggle.
+- **Aggregated crowd feed** — `FanWall` is one grid mixing live YouTube
+  (fresh + livestreams) with crowd-pasted clips from any platform, each
+  **tagged to the setlist song** it captured (🎥 counts on the timeline) +
+  TikTok/IG/X **deep-link** search (no free search API for those — honest).
+- **Persistent bottom player** — Spotify/YouTube-style fixed bar
+  (`player.jsx` context + `BottomPlayer.jsx`) that survives tab changes; clicking
+  a song plays its **YouTube top result** with a **Live/Music** toggle (cached in
+  localStorage to spare the ~100/day quota).
 
 **Deploy for judges:** see **[DEPLOY.md](DEPLOY.md)** — web → Netlify
 (`netlify.toml` present), gateway → Render/Railway/Fly/tunnel, then point the
