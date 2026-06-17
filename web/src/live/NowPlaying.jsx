@@ -11,9 +11,32 @@ export default function NowPlaying({ np, event, syncedNow }) {
   }
 
   if (np.status === 'pre') {
+    // Distinguish the opener (e.g. Jelly Roll) from the headliner so the
+    // countdown is unambiguous about who's about to be on.
+    const openerStart = event.openerStartUTC ? event.openerStartUTC + (event.correctionMs || 0) : null;
+    if (event.opener && openerStart && syncedNow < openerStart) {
+      return (
+        <Shell
+          kicker={`DOORS OPEN · ${event.opener.toUpperCase()} (OPENER) IN`}
+          big={fmtCountdown(Math.round((openerStart - syncedNow) / 1000))}
+          sub={`Then ${event.artist} (headliner) — first song “${np.nextSong}”`}
+          tone="amber"
+        />
+      );
+    }
+    if (event.opener && openerStart && syncedNow >= openerStart) {
+      return (
+        <Shell
+          kicker={`🎤 ${event.opener.toUpperCase()} IS ON NOW · ${event.artist.toUpperCase()} (HEADLINER) IN`}
+          big={fmtCountdown(np.startsInSec)}
+          sub={`First up from ${event.artist}: “${np.nextSong}”`}
+          tone="amber"
+        />
+      );
+    }
     return (
       <Shell
-        kicker="DOORS OPEN · SHOW STARTS IN"
+        kicker={`DOORS OPEN · ${event.artist.toUpperCase()} STARTS IN`}
         sub={`First up: ${np.nextSong}`}
         big={fmtCountdown(np.startsInSec)}
         tone="amber"

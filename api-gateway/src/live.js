@@ -117,6 +117,8 @@ function snapshot(ev) {
     lng: ev.lng,
     tz: ev.tz,
     startUTC: ev.startUTC,
+    opener: ev.opener,
+    openerStartUTC: ev.openerStartUTC,
     mode: ev.mode, // 'live' | 'replay'
     songsSource: ev.songsSource, // 'setlistfm' | 'fallback'
     setlistDate: ev.setlistDate || null,
@@ -182,11 +184,15 @@ const MADISONBEER_FALLBACK = [
 ];
 
 // ---- Event factory ------------------------------------------------------
-function makeEvent({ id, artist, venue, city, country, lat, lng, tz, startUTC, mode, songs, songsSource, setlistDate, durations }) {
+function makeEvent({ id, artist, venue, city, country, lat, lng, tz, startUTC, mode, songs, songsSource, setlistDate, durations, opener, openerOffsetMin }) {
   const timeline = buildTimeline(songs, startUTC, durations);
+  // Most stadium shows have an opener: the announced "show time" is when THEY
+  // start; the headliner's first song is ~openerOffsetMin later (= timeline[0]).
+  const openerStartUTC = opener && openerOffsetMin ? startUTC - openerOffsetMin * 60000 : null;
   const ev = {
     id, artist, venue, city, country, lat, lng, tz, startUTC, mode,
     songs, songsSource, setlistDate, timeline,
+    opener: opener || null, openerStartUTC,
     beacons: [], correctionMs: 0, beaconCount: 0, beaconPeople: 0,
     clips: [],
   };
@@ -205,6 +211,7 @@ const FEATURED = [
     id: 'featured-postmalone-toronto',
     artist: 'Post Malone', venue: 'Rogers Stadium', city: 'Toronto', country: 'Canada',
     lat: 43.7460, lng: -79.4768, tz: 'America/Toronto', mode: 'live',
+    opener: 'Jelly Roll', openerOffsetMin: 90, // Jelly Roll opens ~90 min before Posty
     fallback: POSTMALONE_FALLBACK,
   },
   {
@@ -240,6 +247,7 @@ async function buildFeatured(cfg) {
     startUTC, mode: cfg.mode, songs,
     songsSource: sf?.songs?.length ? 'setlistfm' : 'fallback',
     setlistDate: sf?.date || null,
+    opener: cfg.opener, openerOffsetMin: cfg.openerOffsetMin,
   });
   return ev;
 }

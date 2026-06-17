@@ -83,6 +83,7 @@ export default function FanWall({ event, clips, np, onClipsChanged }) {
 
 function FeedCard({ it, event, onVote }) {
   const ytId = it.kind === 'yt' ? it.videoId : ytIdFrom(it.url);
+  const embed = ytId ? null : embedFor(it.url); // TikTok / IG / X inline players
   return (
     <div className="overflow-hidden rounded-xl border border-white/10 bg-black/40">
       {ytId ? (
@@ -92,6 +93,15 @@ function FeedCard({ it, event, onVote }) {
           title={it.title || 'clip'}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
+        />
+      ) : embed ? (
+        <iframe
+          className={`w-full ${embed.tall ? 'h-[480px]' : 'h-[280px]'}`}
+          src={embed.src}
+          title={it.title || 'clip'}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+          scrolling="no"
         />
       ) : (
         <a href={it.url} target="_blank" rel="noreferrer" className="flex aspect-video w-full flex-col items-center justify-center gap-1 bg-zinc-900 text-center hover:bg-zinc-800">
@@ -205,6 +215,26 @@ function SocialSearch({ event }) {
 function ytIdFrom(url) {
   const m = String(url).match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([\w-]{11})/);
   return m?.[1] || null;
+}
+
+// Inline embed players for a pasted clip URL (no API key needed — these are the
+// platforms' own public embed endpoints). Auto-search isn't possible for free,
+// but embedding a known URL is.
+function embedFor(url) {
+  const u = String(url);
+  // TikTok: .../video/{id} -> official player iframe
+  const tt = u.match(/tiktok\.com\/.*\/video\/(\d+)/) || u.match(/tiktok\.com\/.*\/(\d{15,})/);
+  if (tt) return { src: `https://www.tiktok.com/player/v1/${tt[1]}`, tall: true };
+  // Instagram: /p|reel|tv/{code}/ -> /embed iframe
+  const ig = u.match(/instagram\.com\/(p|reel|tv|reels)\/([\w-]+)/);
+  if (ig) {
+    const type = ig[1] === 'reels' ? 'reel' : ig[1];
+    return { src: `https://www.instagram.com/${type}/${ig[2]}/embed`, tall: true };
+  }
+  // Twitter / X: status/{id} -> twitframe (free, no auth)
+  const tw = u.match(/(?:twitter|x)\.com\/.+\/status\/(\d+)/);
+  if (tw) return { src: `https://twitframe.com/show?url=${encodeURIComponent(u)}`, tall: false };
+  return null;
 }
 function platformIcon(p) {
   return { youtube: '▶️', tiktok: '🎵', instagram: '📸', x: '𝕏' }[p] || '🔗';
