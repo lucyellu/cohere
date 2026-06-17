@@ -19,11 +19,14 @@ export function PlayerProvider({ children }) {
 
   const load = useCallback(async (artist, song, m) => {
     const id = ++reqId.current;
+    // Show the bar immediately (even before the search resolves) so a click
+    // always gets a visible reaction.
+    setTrack({ artist, song, videoId: null, title: song, channel: '', notFound: false });
     setLoading(true);
     const top = await youtubeTop(queryFor(artist, song, m)).catch(() => null);
     if (id !== reqId.current) return; // a newer request superseded this one
     setLoading(false);
-    if (top) setTrack({ ...top, artist, song });
+    setTrack(top ? { ...top, artist, song } : { artist, song, videoId: null, title: song, channel: '', notFound: true });
   }, []);
 
   // Play a song; remembers artist/song so the Music/Live toggle can re-query.

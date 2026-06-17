@@ -7,11 +7,12 @@ export default function BottomPlayer() {
   const player = usePlayer();
   if (!player?.track) return null;
   const { track, mode, expanded, loading, switchMode, setExpanded, close } = player;
+  const hasVideo = Boolean(track.videoId);
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-50">
       {/* Expanded video */}
-      {expanded && (
+      {expanded && hasVideo && (
         <div className="mx-auto max-w-3xl px-3 pb-1">
           <div className="overflow-hidden rounded-t-xl border border-white/10 bg-black shadow-2xl">
             <iframe
@@ -30,7 +31,7 @@ export default function BottomPlayer() {
       <div className="border-t border-white/10 bg-zinc-950/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-2.5">
           {/* Hidden audio iframe keeps playback alive when collapsed. */}
-          {!expanded && (
+          {!expanded && hasVideo && (
             <iframe
               key={track.videoId}
               className="h-10 w-16 shrink-0 rounded bg-black"
@@ -39,12 +40,19 @@ export default function BottomPlayer() {
               allow="autoplay; encrypted-media; picture-in-picture"
             />
           )}
+          {!hasVideo && (
+            <div className="flex h-10 w-16 shrink-0 items-center justify-center rounded bg-black text-zinc-500">
+              {loading ? <span className="animate-pulse">♪</span> : '—'}
+            </div>
+          )}
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-zinc-100">
-              {loading ? 'Loading…' : track.song}
-            </p>
+            <p className="truncate text-sm font-medium text-zinc-100">{track.song}</p>
             <p className="truncate text-[11px] text-zinc-500">
-              {track.artist} · {track.channel}
+              {loading
+                ? 'Finding a video…'
+                : track.notFound
+                  ? <a className="text-indigo-400 hover:underline" href={`https://www.youtube.com/results?search_query=${encodeURIComponent(`${track.artist} ${track.song} ${mode === 'live' ? 'live' : ''}`)}`} target="_blank" rel="noreferrer">No embeddable result — search YouTube →</a>
+                  : `${track.artist} · ${track.channel}`}
             </p>
           </div>
 

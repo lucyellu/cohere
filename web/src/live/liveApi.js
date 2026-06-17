@@ -82,13 +82,14 @@ export async function voteClip(eventId, clipId) {
 }
 
 // --- Fan footage of the actual event ------------------------------------
-// Fresh uploads (last 24h) + active livestreams. Returns { fresh, live, error }.
-export async function liveYoutube(q, { live = false, since } = {}) {
+// Returns { items: [{videoId,title,channel,publishedAt,views,live}], error }.
+export async function liveYoutube(q, { live = false, since, hours } = {}) {
   const p = new URLSearchParams({ q });
   if (live) p.set('live', '1');
   if (since) p.set('since', since);
+  if (hours) p.set('hours', String(hours));
   const r = await fetch(`/api/live/youtube?${p.toString()}`).then((x) => x.json()).catch(() => null);
-  return r || { fresh: [], live: [], error: 'api' };
+  return r || { items: [], error: 'api' };
 }
 
 // --- YouTube top result for a song (drives the persistent player) --------

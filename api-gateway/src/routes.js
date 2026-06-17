@@ -744,38 +744,64 @@ router.post('/live/clip/vote', express.json(), (req, res) => {
 });
 
 // Fan footage of the ACTUAL event: fresh uploads (publishedAfter + order=date)
-// and active livestreams (eventType=live) — not old concerts. Falls back to a
-// plain recency search when no live broadcasts exist.
+// and active livestreams (eventType=live) — not old concerts. Each result is
+// enriched with viewCount + publishedAt (one videos.list call) so the UI can
+// sort by views / upload time / title. Returns a flat `items` array.
 router.get('/live/youtube', async (req, res) => {
   const q = String(req.query.q || '').trim() || 'concert';
   const sinceIso = String(req.query.since || '').trim(); // RFC3339
   const wantLive = String(req.query.live || '') === '1';
+  const windowHours = Number(req.query.hours) || 24;
 
   if (isMock('youtube')) {
     return res.json(await serveMock('youtube'));
   }
   const key = process.env.YOUTUBE_API_KEY;
   const base = (extra) =>
-    `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=8` +
+    `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=12` +
     `&q=${encodeURIComponent(q)}&order=date${extra}&key=${key}`;
 
-  // RFC3339 lower bound — default to the last 24h so we surface tonight's clips.
-  const since = sinceIso || new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-  const params = `&publishedAfter=${encodeURIComponent(since)}`;
+  const since = sinceIso || new Date(Date.now() - windowHours * 3600 * 1000).toISOString();
 
-  const results = {};
-  // Active livestreams of the event (the true real-time window).
+  // Active livestreams (the true real-time window) + fresh uploads.
+  const live = [];
   if (wantLive) {
     const liveRes = await callLive('youtube', base('&eventType=live'));
-    results.live = (liveRes.data?.items || []).filter((i) => i?.id?.videoId);
+    for (const i of liveRes.data?.items || []) if (i?.id?.videoId) live.push({ ...i, _live: true });
   }
-  const freshRes = await callLive('youtube', base(params));
-  results.fresh = (freshRes.data?.items || []).filter((i) => i?.id?.videoId);
+  const freshRes = await callLive('youtube', base(`&publishedAfter=${encodeURIComponent(since)}`));
+  const fresh = (freshRes.data?.items || []).filter((i) => i?.id?.videoId);
 
   const apiErr = freshRes.data?.error;
   let error = null;
   if (apiErr) error = /quota/i.test(apiErr.errors?.[0]?.reason || '') || apiErr.code === 403 ? 'quota' : 'api';
-  res.json({ ok: !error, ...results, error });
+
+  // Merge + de-dupe, then enrich with view counts in one batched call.
+  const seen = new Set();
+  const merged = [...live, ...fresh].filter((i) => {
+    const id = i.id.videoId;
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+
+  const views = {};
+  if (merged.length && !error) {
+    const ids = merged.map((i) => i.id.videoId).join(',');
+    const statRes = await callLive('youtube', `https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${ids}&key=${key}`);
+    for (const v of statRes.data?.items || []) views[v.id] = Number(v.statistics?.viewCount) || 0;
+  }
+
+  const items = merged.map((i) => ({
+    videoId: i.id.videoId,
+    title: i.snippet?.title || '',
+    channel: i.snippet?.channelTitle || '',
+    publishedAt: i.snippet?.publishedAt || '',
+    views: views[i.id.videoId] ?? null,
+    live: Boolean(i._live),
+  }));
+
+  res.json({ ok: !error, items, error });
 });
 
 export default router;
