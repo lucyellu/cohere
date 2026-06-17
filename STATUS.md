@@ -52,10 +52,14 @@ migration needed) → "N here now"; honest beacon fallback remains if env is bla
   now returns `{events:[…]}`; landing shows both cards.
 - **Dual song times** — each setlist row shows venue-local **and** your-local
   start time, with a Venue/You/Both toggle.
-- **Aggregated crowd feed** — `FanWall` is one grid mixing live YouTube
-  (fresh + livestreams) with crowd-pasted clips from any platform, each
-  **tagged to the setlist song** it captured (🎥 counts on the timeline) +
-  TikTok/IG/X **deep-link** search (no free search API for those — honest).
+- **Aggregated crowd feed** — `FanWall` is one grid embedding **all four
+  platforms** inline with **source badges**: YouTube (free API) + **TikTok /
+  Instagram / X via RapidAPI** (`rapid.js`, `/live/social`). TikTok + X are real
+  keyword search; Instagram is a handle's recent posts (provider has no hashtag
+  search). Plus crowd-pasted clips, platform filter, sort (recent/views/A–Z),
+  and **setlist-song mapping**. Key in `.env` as `RAPIDAPI_KEY` (**rotate after
+  the hackathon** — passed through chat). Verified: "Post Malone Toronto" returns
+  real fans posting from tonight's Rogers Stadium show across all three.
 - **Persistent bottom player** — Spotify/YouTube-style fixed bar
   (`player.jsx` context + `BottomPlayer.jsx`) that survives tab changes; clicking
   a song plays its **YouTube top result** with a **Live/Music** toggle (cached in

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { liveYoutube, submitClip, voteClip } from './liveApi.js';
+import { liveYoutube, socialSearch, submitClip, voteClip } from './liveApi.js';
 
 // The crowd-sourced live feed of the actual event — ONE grid, every platform,
 // each clip embedded inline with a SOURCE BADGE (YouTube / TikTok / IG / X):
@@ -29,10 +29,13 @@ export default function FanWall({ event, np, clips, onClipsChanged }) {
   const [sort, setSort] = useState('recent');
   const [scope, setScope] = useState('all'); // 'all' | songIndex
   const [yt, setYt] = useState({ items: [], error: null, loading: true });
+  const [social, setSocial] = useState({ items: [], loading: true });
   const cache = useRef({});
+  const socialCache = useRef({});
 
   const scopeSong = scope !== 'all' ? event.timeline[Number(scope)]?.song : null;
   const query = scopeSong ? `${event.artist} ${scopeSong} live` : `${event.artist} ${event.city}`;
+  const socialQ = scopeSong ? `${event.artist} ${scopeSong}` : `${event.artist} ${event.city}`;
 
   // YouTube auto-feed (per-song when a song is selected).
   useEffect(() => {
@@ -53,6 +56,24 @@ export default function FanWall({ event, np, clips, onClipsChanged }) {
     };
   }, [query]);
 
+  // TikTok / Instagram / X feed (RapidAPI), fetched in parallel + cached.
+  useEffect(() => {
+    let cancelled = false;
+    if (socialCache.current[socialQ]) {
+      setSocial({ items: socialCache.current[socialQ], loading: false });
+      return;
+    }
+    setSocial((d) => ({ ...d, loading: true }));
+    socialSearch({ q: socialQ, artist: event.artist }).then((items) => {
+      if (cancelled) return;
+      socialCache.current[socialQ] = items;
+      setSocial({ items, loading: false });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [socialQ, event.artist]);
+
   // Unified list: YouTube auto items + crowd-submitted clips, normalized.
   const items = useMemo(() => {
     const ytItems = (yt.items || []).map((v) => ({
@@ -64,6 +85,17 @@ export default function FanWall({ event, np, clips, onClipsChanged }) {
       views: v.views,
       ts: v.publishedAt ? Date.parse(v.publishedAt) : 0,
       live: v.live,
+      song: scopeSong,
+    }));
+    const socialItems = (social.items || []).map((s) => ({
+      key: s.source + '-' + s.url,
+      source: s.source,
+      embed: embedFor(s.url),
+      url: s.url,
+      title: s.title || s.url,
+      channel: s.author ? '@' + s.author : '',
+      views: s.views,
+      ts: s.ts || 0,
       song: scopeSong,
     }));
     const crowd = (clips || [])
@@ -81,7 +113,7 @@ export default function FanWall({ event, np, clips, onClipsChanged }) {
         clipId: c.id,
       }));
 
-    let list = [...crowd, ...ytItems];
+    let list = [...crowd, ...ytItems, ...socialItems];
     if (platform !== 'all') list = list.filter((i) => i.source === platform);
 
     if (sort === 'views') list.sort((a, b) => (b.views ?? b.votes ?? -1) - (a.views ?? a.votes ?? -1));
@@ -89,7 +121,7 @@ export default function FanWall({ event, np, clips, onClipsChanged }) {
     else list.sort((a, b) => (b.ts || 0) - (a.ts || 0));
     list.sort((a, b) => (b.live ? 1 : 0) - (a.live ? 1 : 0)); // livestreams first
     return list;
-  }, [yt.items, clips, platform, sort, scope, scopeSong]);
+  }, [yt.items, social.items, clips, platform, sort, scope, scopeSong]);
 
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
@@ -130,22 +162,21 @@ export default function FanWall({ event, np, clips, onClipsChanged }) {
       <PasteBar event={event} np={np} onClipsChanged={onClipsChanged} />
 
       {/* Unified embedded grid */}
-      {yt.loading && !items.length ? (
-        <p className="py-6 text-center text-sm text-zinc-500">Pulling footage…</p>
+      {(yt.loading || social.loading) && !items.length ? (
+        <p className="py-6 text-center text-sm text-zinc-500">Pulling footage from YouTube, TikTok, Instagram &amp; X…</p>
       ) : !items.length ? (
         <p className="py-6 text-center text-sm text-zinc-500">
-          {platform !== 'all' && platform !== 'youtube'
-            ? `No ${platform} clips yet — paste one above and it'll embed here with a badge.`
-            : yt.error === 'quota'
-              ? "YouTube's search quota is used up (resets tomorrow). Paste clips above to keep the feed going."
-              : 'No footage yet for this ' + (scopeSong ? 'song.' : 'show.')}
+          No {platform === 'all' ? '' : platform + ' '}footage found yet for this {scopeSong ? 'song' : 'show'}.
         </p>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {items.slice(0, 15).map((it) => (
-            <FeedCard key={it.key} it={it} event={event} onVote={onClipsChanged} />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {items.slice(0, 18).map((it) => (
+              <FeedCard key={it.key} it={it} event={event} onVote={onClipsChanged} />
+            ))}
+          </div>
+          {social.loading && <p className="mt-2 text-center text-[11px] text-zinc-500">loading more from TikTok / IG / X…</p>}
+        </>
       )}
     </div>
   );

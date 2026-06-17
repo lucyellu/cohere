@@ -92,6 +92,15 @@ export async function liveYoutube(q, { live = false, since, hours } = {}) {
   return r || { items: [], error: 'api' };
 }
 
+// --- Multi-platform social search (TikTok / Instagram / X via RapidAPI) ---
+// Returns normalized items [{source, url, title, author, views, ts}] the feed
+// merges with YouTube and embeds with a source badge.
+export async function socialSearch({ q, artist, platform = 'all' }) {
+  const p = new URLSearchParams({ q, artist, platform });
+  const r = await fetch(`/api/live/social?${p.toString()}`).then((x) => x.json()).catch(() => null);
+  return r?.items || [];
+}
+
 // --- YouTube top result for a song (drives the persistent player) --------
 // Cached in localStorage by query so re-plays don't re-spend the ~100/day quota.
 export async function youtubeTop(query) {

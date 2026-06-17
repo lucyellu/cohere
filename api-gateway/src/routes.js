@@ -9,6 +9,7 @@ import { listAccounts, feedAll } from './suno.js';
 import * as pool from './genpool.js';
 import { synthesize } from './pipeline.js';
 import * as live from './live.js';
+import * as rapid from './rapid.js';
 
 const router = express.Router();
 
@@ -802,6 +803,38 @@ router.get('/live/youtube', async (req, res) => {
   }));
 
   res.json({ ok: !error, items, error });
+});
+
+// Multi-platform fan footage via RapidAPI (TikTok / Instagram / X). `platform`
+// = 'all' (default) fans out to all three concurrently; or a single platform.
+// Returns normalized items (source, url, title, author, views, ts) the live
+// feed merges with YouTube + embeds with a source badge.
+router.get('/live/social', async (req, res) => {
+  if (!rapid.hasRapid()) return res.json({ ok: false, error: 'no RapidAPI key', items: [] });
+  const q = String(req.query.q || '').trim();
+  const artist = String(req.query.artist || '').trim();
+  const platform = String(req.query.platform || 'all');
+  const igUser = String(req.query.username || '') || rapid.igHandle(artist);
+
+  try {
+    if (platform !== 'all') {
+      const r = await rapid.searchSocial(platform, { q, username: igUser });
+      return res.json(r);
+    }
+    const [tt, x, ig] = await Promise.allSettled([
+      rapid.searchTikTok(q),
+      rapid.searchX(q),
+      rapid.searchInstagram(igUser),
+    ]);
+    const items = [
+      ...(tt.status === 'fulfilled' ? tt.value : []),
+      ...(x.status === 'fulfilled' ? x.value : []),
+      ...(ig.status === 'fulfilled' ? ig.value : []),
+    ];
+    res.json({ ok: true, items });
+  } catch (e) {
+    res.status(502).json({ ok: false, error: e.message, items: [] });
+  }
 });
 
 export default router;
