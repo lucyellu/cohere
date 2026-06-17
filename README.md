@@ -34,7 +34,30 @@ Songstats, Cyanite, JamBase, N8N, Replit.
 
 ## This repo so far
 
-Two tabs in the web app:
+The app has two top-level views: **🔴 Live** (the home — Cohere) and **📼 Archive**
+(the original Reverb).
+
+### 🔴 Live (Cohere)
+- **Landing** — a featured **live** show (Post Malone @ Rogers Stadium, Toronto)
+  and a featured **replay** (Madison Beer's real past Vancouver show), plus a box
+  to summon any artist as a live or replay room from their real setlist.
+- **Live Room** — one shared synchronized clock drives everything:
+  - **Venue map** (Google Maps satellite, geocoded by name, pulsing LIVE dot,
+    Street View) + live presence count (**Supabase Realtime**).
+  - **Now-playing** — pre-show countdown that distinguishes **opener vs
+    headliner** (e.g. Jelly Roll → Post Malone), live progress bar, between-songs.
+  - **Synced setlist** — each song shows venue-local **and** your-local time
+    (toggle); auto-scrolls to "now".
+  - **Tap-to-sync** — people at the show tap when a song starts; the median drift
+    corrects the clock for everyone (the coordination core).
+  - **Crowd-sourced live feed** — YouTube + **TikTok + Instagram + X** footage of
+    the actual event (via the free YouTube API + RapidAPI), embedded inline with
+    source badges, platform filter, sort, and per-song mapping.
+  - **Persistent bottom player** — click any song to play its YouTube top result
+    (Live/Music toggle); keeps playing across tabs.
+  - **🎬 Demo time-warp** — jump the shared clock into the show at any real time.
+
+### 📼 Archive (Reverb)
 
 - **🌍 Tour Globe** — search an artist, see their tour plotted on a 3D globe
   (`react-globe.gl`). Points scale/color by venue capacity; arcs trace the

@@ -65,13 +65,39 @@ migration needed) → "N here now"; honest beacon fallback remains if env is bla
   a song plays its **YouTube top result** with a **Live/Music** toggle (cached in
   localStorage to spare the ~100/day quota).
 
+**How to run / try Cohere:** `npm run dev` from repo root (or the **Cohere**
+desktop shortcut) → gateway **:5001**, web **:5173**. Then in the app:
+1. **🔴 Live** tab (the home) → two featured cards: **Post Malone** (live tonight,
+   Rogers Stadium) + **Madison Beer** (replay of a real past Vancouver show).
+2. Open a show → the real show is anchored to 9pm venue-local, so you'll see a
+   pre-show countdown. Use **🎬 Demo: jump into the show** to warp the shared
+   clock to any song and see the live now-playing / progress / synced timeline.
+3. **At the show? → I'm here** → tap to send a crowd beacon (drift correction).
+4. **Crowd-sourced live feed** = YouTube + TikTok + IG + X embedded with badges;
+   filter by platform, sort, or pick a song to map footage onto it.
+5. Click any song → it plays in the **persistent bottom player** (Live/Music).
+6. **📼 Archive** tab = the original Reverb (globe / show / library / dev).
+
+**Repo:** `https://github.com/lucyellu/cohere.git` (origin, push to `main`).
+
 **Deploy for judges:** see **[DEPLOY.md](DEPLOY.md)** — web → Netlify
 (`netlify.toml` present), gateway → Render/Railway/Fly/tunnel, then point the
-`/api/*` redirect at it. Local run always works (Cohere desktop shortcut).
+`/api/*` redirect at it. **Set in the relevant host's env** (not committed):
+`VITE_GOOGLE_MAPS_KEY`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (web/Netlify)
+and all `api-gateway/.env` keys incl. `RAPIDAPI_KEY` (gateway host). Local run
+always works (Cohere desktop shortcut).
 
-**Next:** create a new Supabase project for presence; host the gateway; restrict
-the Maps key by referrer; optionally fetch real per-song durations (Musixmatch
-track length) to tighten the prediction before crowd correction kicks in.
+**Open follow-ups / ideas (none blocking):**
+- **Rotate keys** after the hackathon — `RAPIDAPI_KEY` + the Google/partner keys
+  all passed through chat.
+- **Instagram** footage is the artist's official-handle posts (the `instagram120`
+  provider has no hashtag/keyword search) — swap to a provider with a hashtag
+  endpoint if fan-IG matters. TikTok + X are true keyword search.
+- Restrict the Google Maps key by HTTP referrer before any public deploy.
+- Optionally fetch real per-song durations (Musixmatch track length) + real
+  door/stage times to tighten the predicted timeline before crowd correction.
+- Mind RapidAPI + YouTube request caps (each feed load = 3 RapidAPI calls + a
+  YouTube search; cached per query client-side).
 
 ---
 
