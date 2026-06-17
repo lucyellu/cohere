@@ -14,21 +14,34 @@ clock per show so everyone is on the same song at the same second. Coordination
 is the product. **Live is now the home tab; the old globe/show/library moved
 under 📼 Archive.**
 
+> **Accuracy model (updated 2026-06-16 late):** the timeline is a **prediction**,
+> labeled as such in-app. It uses (a) **real per-song durations** from Musixmatch
+> track length × a 1.15 live factor (not a flat estimate), (b) a 9pm-local start +
+> opener offset, and (c) the setlist **order**. For a LIVE show it **polls
+> setlist.fm and auto-swaps to tonight's REAL setlist** the moment attendees log
+> it (`exact` flag flips true; until then it borrows the artist's last show's
+> order and says so). The old **"I'm here" crowd-beacon / tap-to-sync was REMOVED**
+> (participation was unrealistic) — accuracy now comes from better prediction +
+> the live setlist swap, not crowd taps. (Beacon backend endpoints remain but are
+> inert/unused.)
+
 **What's built & verified (free, working):**
 - **Live engine** (`api-gateway/src/live.js`, `/api/live/*`): predicted UTC
-  timeline from setlist.fm song order + a duration model (≈3:55/song + 35s gaps);
-  Intl-based venue timezone (no API); featured **Post Malone @ Rogers Stadium,
-  Toronto** (real recent setlist via setlist.fm, baked fallback); resolve **any
-  artist** as a live or **replay** room; **crowd beacons** → median drift
-  correction (clamped to ±3h vs trolls); crowd **clip wall** + votes; clock-sync
-  endpoint. Verified end-to-end via curl (beacon shifts the clock, Coldplay
-  replay pulled a real setlist, fresh YouTube returned 3 uploads + 1 livestream).
+  timeline = setlist.fm order + **real Musixmatch durations** (×1.15 live, cached,
+  fetched in background) + opener offset; **live setlist.fm polling** swaps in
+  tonight's real order when logged (`refreshLiveSetlist`, throttled 90s, fire-and-
+  forget from `getEvent`); Intl venue timezone (no API); featured **Post Malone @
+  Rogers Stadium, Toronto**; resolve **any artist** as live/replay; crowd **clip
+  wall** + votes; clock-sync endpoint. Verified: real durations (106-min Posty set,
+  17 distinct lengths), Coldplay replay pulled a real setlist, fresh YouTube +
+  livestreams returned.
 - **Live Room UI** (`web/src/live/`): Google Maps **satellite venue view +
   pulsing LIVE dot + Street View peek** (`VenueMap`, key in gitignored `web/.env`);
-  **NowPlaying** (pre-show countdown / live progress bar / between-songs); synced
-  **SetlistTimeline** (auto-scrolls to "now"); **tap-to-sync** beacon for
-  attendees; **FanWall** (Fresh / Live / Crowd wall / Social deep-links);
-  **Lyrics** (Musixmatch) for the current song; dual venue+you clocks; a **🎬
+  **NowPlaying** (pre-show countdown that splits **opener vs headliner** /
+  live progress bar / between-songs); synced **SetlistTimeline** (auto-scrolls
+  to "now", dual venue+you times, click a song to play it); an **AccuracyBar**
+  that honestly flags predicted-vs-real setlist + "times estimated"; **FanWall**
+  (multi-platform feed, below); **Lyrics** (Musixmatch); dual clocks; a **🎬
   Demo time-warp** to jump into the show at any real time. `clock.js` does the
   latency-compensated server-time handshake + `nowPlaying()` math.
 - **Anonymous identity** (`liveApi.js`): zero-friction guest id + optional name —
@@ -72,7 +85,8 @@ desktop shortcut) → gateway **:5001**, web **:5173**. Then in the app:
 2. Open a show → the real show is anchored to 9pm venue-local, so you'll see a
    pre-show countdown. Use **🎬 Demo: jump into the show** to warp the shared
    clock to any song and see the live now-playing / progress / synced timeline.
-3. **At the show? → I'm here** → tap to send a crowd beacon (drift correction).
+3. The **AccuracyBar** tells you if the setlist is tonight's real one or a
+   predicted order, and the timeline auto-swaps to real when setlist.fm logs it.
 4. **Crowd-sourced live feed** = YouTube + TikTok + IG + X embedded with badges;
    filter by platform, sort, or pick a song to map footage onto it.
 5. Click any song → it plays in the **persistent bottom player** (Live/Music).

@@ -8,7 +8,7 @@ import { usePlayer } from './player.jsx';
 // Click a song to play it in the bottom player; in "I'm here" mode, a tap sends
 // the crowd beacon instead.
 
-export default function SetlistTimeline({ event, np, onBeacon, beaconMode }) {
+export default function SetlistTimeline({ event, np }) {
   const tl = event?.timeline || [];
   const correction = event?.correctionMs || 0;
   const activeRef = useRef(null);
@@ -27,7 +27,6 @@ export default function SetlistTimeline({ event, np, onBeacon, beaconMode }) {
   }, [np?.index]);
 
   function onSongClick(slot) {
-    if (beaconMode) return onBeacon(slot.i);
     player?.playSong(event.artist, slot.song);
   }
 
@@ -35,23 +34,19 @@ export default function SetlistTimeline({ event, np, onBeacon, beaconMode }) {
     <div>
       <div className="mb-2 flex items-center justify-between gap-2">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-          Setlist {event.songsSource === 'fallback' ? '(typical)' : '· setlist.fm'}
+          Setlist {event.songsSource === 'fallback' ? '(typical)' : event.exact ? '· real' : '· predicted'}
         </h3>
-        {beaconMode ? (
-          <span className="text-[10px] text-rose-300">tap the song they just started ↓</span>
-        ) : (
-          <div className="inline-flex rounded-lg border border-white/10 bg-white/5 p-0.5 text-[10px]">
-            {[['venue', event.city || 'Venue'], ['you', 'You'], ['both', 'Both']].map(([v, label]) => (
-              <button
-                key={v}
-                onClick={() => setTzView(v)}
-                className={`rounded px-1.5 py-0.5 font-medium transition ${tzView === v ? 'bg-white/10 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'}`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="inline-flex rounded-lg border border-white/10 bg-white/5 p-0.5 text-[10px]">
+          {[['venue', event.city || 'Venue'], ['you', 'You'], ['both', 'Both']].map(([v, label]) => (
+            <button
+              key={v}
+              onClick={() => setTzView(v)}
+              className={`rounded px-1.5 py-0.5 font-medium transition ${tzView === v ? 'bg-white/10 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <ol className="max-h-[60vh] space-y-1 overflow-y-auto pr-1">
@@ -70,7 +65,8 @@ export default function SetlistTimeline({ event, np, onBeacon, beaconMode }) {
                     : isPast
                       ? 'border-transparent bg-white/[0.02] text-zinc-500'
                       : 'border-white/10 bg-white/[0.03] text-zinc-300'
-                } ${beaconMode ? 'cursor-pointer hover:border-rose-400/60' : 'hover:border-indigo-400/40'}`}
+                } hover:border-indigo-400/40`}
+                title="Play this song"
               >
                 <span className="w-5 text-xs tabular-nums text-zinc-600">{slot.i + 1}</span>
                 <span className="flex-1 truncate">
@@ -83,7 +79,7 @@ export default function SetlistTimeline({ event, np, onBeacon, beaconMode }) {
                     NOW
                   </span>
                 ) : (
-                  <SongTime startMs={startMs} tz={event.tz} view={beaconMode ? 'venue' : tzView} />
+                  <SongTime startMs={startMs} tz={event.tz} view={tzView} />
                 )}
               </button>
             </li>

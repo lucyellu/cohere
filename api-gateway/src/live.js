@@ -58,6 +58,73 @@ function todayInTz(tz, nowMs = Date.now()) {
   const [y, mo, d] = dtf.format(new Date(nowMs)).split('-').map(Number);
   return { y, mo, d };
 }
+const pad = (n) => String(n).padStart(2, '0');
+function isoToday(tz) {
+  const { y, mo, d } = todayInTz(tz);
+  return `${y}-${pad(mo)}-${pad(d)}`;
+}
+function dmyToday(tz) {
+  const { y, mo, d } = todayInTz(tz);
+  return `${pad(d)}-${pad(mo)}-${y}`;
+}
+
+// ---- Real per-song durations (Musixmatch track length) ------------------
+// Replaces the flat estimate with each song's actual recorded length, so the
+// predicted timeline drifts far less. Cached across events + rebuilds; fetched
+// with limited concurrency to respect Musixmatch rate limits. Falls back to the
+// estimate per song when a track isn't found.
+const durCache = new Map(); // 'artist|song' -> seconds
+
+async function fetchDurations(artist, songs) {
+  const key = process.env.MUSIXMATCH_API_KEY;
+  const fetchOne = async (song) => {
+    const ck = `${artist}|${song}`.toLowerCase();
+    if (durCache.has(ck)) return durCache.get(ck);
+    let sec = SONG_SEC;
+    if (key) {
+      try {
+        const url =
+          `https://api.musixmatch.com/ws/1.1/track.search?q_track=${encodeURIComponent(song)}` +
+          `&q_artist=${encodeURIComponent(artist)}&page_size=1&s_track_rating=desc&apikey=${key}`;
+        const r = await fetch(url);
+        const d = await r.json().catch(() => ({}));
+        const len = d?.message?.body?.track_list?.[0]?.track?.track_length;
+        if (len && len > 45 && len < 900) sec = len; // sanity-bound (45s–15m)
+      } catch {
+        /* keep estimate */
+      }
+    }
+    durCache.set(ck, sec);
+    return sec;
+  };
+  // Limited concurrency (5 at a time).
+  const out = new Array(songs.length);
+  let i = 0;
+  async function worker() {
+    while (i < songs.length) {
+      const idx = i++;
+      out[idx] = await fetchOne(songs[idx]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(5, songs.length) }, worker));
+  return out;
+}
+
+// Live performances run longer than the studio cut (extended intros/outros,
+// crowd moments), so scale the recorded length up a touch for the prediction.
+const LIVE_FACTOR = 1.15;
+
+// Refine an event's timeline with real durations in the background (non-blocking
+// so the landing/room render instantly on the estimate, then tighten).
+function enrichDurations(ev) {
+  fetchDurations(ev.artist, ev.songs)
+    .then((durs) => {
+      const live = durs.map((d) => Math.round(d * LIVE_FACTOR));
+      ev.durations = live;
+      ev.timeline = buildTimeline(ev.songs, ev.startUTC, live);
+    })
+    .catch(() => {});
+}
 
 // ---- Timeline -----------------------------------------------------------
 // Compose per-song UTC start times from a start instant + duration model.
@@ -122,11 +189,10 @@ function snapshot(ev) {
     mode: ev.mode, // 'live' | 'replay'
     songsSource: ev.songsSource, // 'setlistfm' | 'fallback'
     setlistDate: ev.setlistDate || null,
+    exact: Boolean(ev.exact), // true once tonight's REAL setlist is loaded
     timeline: ev.timeline,
     showLengthMs: showLengthMs(ev.timeline),
     correctionMs: ev.correctionMs || 0,
-    beaconCount: ev.beaconCount || 0,
-    beaconPeople: ev.beaconPeople || 0,
     clips: [...ev.clips].sort((a, b) => b.votes - a.votes).slice(0, 24),
     serverNow: Date.now(),
   };
@@ -184,7 +250,7 @@ const MADISONBEER_FALLBACK = [
 ];
 
 // ---- Event factory ------------------------------------------------------
-function makeEvent({ id, artist, venue, city, country, lat, lng, tz, startUTC, mode, songs, songsSource, setlistDate, durations, opener, openerOffsetMin }) {
+function makeEvent({ id, artist, venue, city, country, lat, lng, tz, startUTC, mode, songs, songsSource, setlistDate, durations, opener, openerOffsetMin, exact, watchDateDmy }) {
   const timeline = buildTimeline(songs, startUTC, durations);
   // Most stadium shows have an opener: the announced "show time" is when THEY
   // start; the headliner's first song is ~openerOffsetMin later (= timeline[0]).
@@ -193,11 +259,40 @@ function makeEvent({ id, artist, venue, city, country, lat, lng, tz, startUTC, m
     id, artist, venue, city, country, lat, lng, tz, startUTC, mode,
     songs, songsSource, setlistDate, timeline,
     opener: opener || null, openerStartUTC,
+    exact: Boolean(exact), // tonight's REAL setlist loaded (vs predicted order)
+    watchDateDmy: watchDateDmy || null, // for live setlist polling
+    lastSetlistCheck: 0,
     beacons: [], correctionMs: 0, beaconCount: 0, beaconPeople: 0,
     clips: [],
   };
   events.set(id, ev);
   return ev;
+}
+
+// ---- Live setlist polling -----------------------------------------------
+// For a LIVE show, keep checking setlist.fm for tonight's exact-date setlist.
+// Attendees often log it during/just after the show; the moment it appears we
+// swap the predicted order (borrowed from the artist's last show) for the REAL
+// one. Throttled, and stops once we have it. Fire-and-forget from getEvent.
+const SETLIST_POLL_MS = 90 * 1000;
+async function refreshLiveSetlist(ev) {
+  if (ev.mode !== 'live' || ev.exact || !ev.watchDateDmy) return;
+  const now = Date.now();
+  if (now - ev.lastSetlistCheck < SETLIST_POLL_MS) return;
+  ev.lastSetlistCheck = now;
+  const sf = await fetchSetlist(ev.artist, { date: dmyToIso(ev.watchDateDmy) }).catch(() => null);
+  if (sf?.date === ev.watchDateDmy && sf.songs.length) {
+    ev.songs = sf.songs;
+    ev.setlistDate = sf.date;
+    ev.songsSource = 'setlistfm';
+    ev.exact = true;
+    ev.timeline = buildTimeline(sf.songs, ev.startUTC); // estimate first…
+    enrichDurations(ev); // …then refine with real lengths
+  }
+}
+function dmyToIso(dmy) {
+  const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(dmy || '');
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
 }
 
 // ---- Featured shows -----------------------------------------------------
@@ -226,8 +321,16 @@ async function buildFeatured(cfg) {
   let ev = events.get(cfg.id);
   if (ev) return ev;
 
-  const sf = await fetchSetlist(cfg.artist, { cityPref: cfg.cityPref }).catch(() => null);
+  // For a live show, try tonight's EXACT-date setlist first (usually empty until
+  // attendees log it), else the artist's most recent — the live poller swaps in
+  // the real one when it appears.
+  const watchDateDmy = cfg.mode === 'live' ? dmyToday(cfg.tz) : null;
+  const sf = await fetchSetlist(cfg.artist, {
+    date: cfg.mode === 'live' ? isoToday(cfg.tz) : undefined,
+    cityPref: cfg.cityPref,
+  }).catch(() => null);
   const songs = sf?.songs?.length ? sf.songs : cfg.fallback;
+  const exact = Boolean(sf?.date && watchDateDmy && sf.date === watchDateDmy);
 
   // Live shows: tonight 9pm local. Replays: anchor to the real show date 9pm local.
   let startUTC;
@@ -248,7 +351,9 @@ async function buildFeatured(cfg) {
     songsSource: sf?.songs?.length ? 'setlistfm' : 'fallback',
     setlistDate: sf?.date || null,
     opener: cfg.opener, openerOffsetMin: cfg.openerOffsetMin,
+    exact, watchDateDmy,
   });
+  enrichDurations(ev); // refine timing with real Musixmatch track lengths
   return ev;
 }
 
@@ -297,7 +402,10 @@ export async function resolveEvent({ artist, date, venue, city, country, lat, ln
     songs,
     songsSource: 'setlistfm',
     setlistDate: sf?.date || null,
+    exact: mode === 'replay', // a chosen past show IS that show's real setlist
+    watchDateDmy: mode === 'live' ? dmyToday(zone) : null,
   });
+  enrichDurations(ev); // real per-song lengths
   return snapshot(ev);
 }
 
@@ -309,7 +417,7 @@ function slug(s) {
 export function getEvent(id) {
   const ev = events.get(id);
   if (!ev) return null;
-  recomputeCorrection(ev);
+  refreshLiveSetlist(ev).catch(() => {}); // non-blocking: swaps in tonight's real setlist when logged
   return snapshot(ev);
 }
 
