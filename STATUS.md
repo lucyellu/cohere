@@ -1,7 +1,7 @@
 # Cohere (formerly Reverb) — Status & Handoff
 
 > Living doc for cross-session continuity. Update it as things change.
-> Last updated: 2026-06-16. Hackathon: **Musicathon 2026, June 15–21**.
+> Last updated: 2026-06-16 (checkpoint refresh). Hackathon: **Musicathon 2026, June 15–21**.
 >
 > **Checkpoint:** all work committed + pushed to `github.com/lucyellu/cohere.git`
 > (`main`). App runs locally via `npm run dev` / the Cohere desktop shortcut.
@@ -11,6 +11,22 @@
 > ("Cohere" is the product as of the 2026-06-16 pivot; the repo/folder is still
 > "musicathon". Desktop shortcut renamed **Reverb → Cohere**. We kept "Cohear"
 > (co + *hear*) as a possible later rename.)
+>
+> **This checkpoint = a no-code reasoning session** (clock/setlist math + trust
+> model walkthrough; no files changed). Two things worth carrying forward:
+> 1. **Predicting "now playing" by hand** matches the in-app math — compute
+>    elapsed from 9pm-local start + opener offset, walk the `buildTimeline`
+>    slots (real Musixmatch durations ×1.15, ~235s+35s gap fallback). For the
+>    featured Posty show, ~10:25pm Toronto lands on the encore (rockstar →
+>    Sunflower; Congratulations just before).
+> 2. **External livestream links (TikTok `/live`, etc.) are CONFIRM-layer
+>    candidates, NOT ground truth.** A link "appearing in TikTok live search"
+>    is a weak signal (stale fast; keyword-match ≠ in-venue), and a stream —
+>    even if genuinely live — does **not** validate the timeline prediction.
+>    Only the setlist.fm real-setlist swap (or, if ever re-enabled, a crowd
+>    beacon) closes that gap. Keep these in separate trust domains in any
+>    "is this real?" UI. The URL's own `search_id` prefix is a `YYYYMMDDHHMMSS`
+>    timestamp — useful for sanity-checking a result against showtime.
 
 ## 🔴 Cohere — live sync pivot (added 2026-06-16)
 
