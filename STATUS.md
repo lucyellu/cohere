@@ -2,6 +2,12 @@
 
 > Living doc for cross-session continuity. Update it as things change.
 > Last updated: 2026-06-16. Hackathon: **Musicathon 2026, June 15–21**.
+>
+> **Checkpoint:** all work committed + pushed to `github.com/lucyellu/cohere.git`
+> (`main`). App runs locally via `npm run dev` / the Cohere desktop shortcut.
+> The live timeline is a **labeled prediction** (real durations + setlist order)
+> that auto-swaps to tonight's real setlist when setlist.fm logs it — it is NOT
+> claimed to be second-accurate. Nothing is mid-edit; safe to start fresh.
 > ("Cohere" is the product as of the 2026-06-16 pivot; the repo/folder is still
 > "musicathon". Desktop shortcut renamed **Reverb → Cohere**. We kept "Cohear"
 > (co + *hear*) as a possible later rename.)
