@@ -143,6 +143,10 @@ button:disabled {
   color: white;
 }
 
+.cohear-icon-button:disabled {
+  opacity: 0.45;
+}
+
 .cohear-field {
   display: flex;
   min-height: 2.75rem;

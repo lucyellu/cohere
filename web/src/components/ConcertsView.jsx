@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { fetchConcerts, getCachedConcerts, sortConcerts, filterWhen, spotifyArtist, C_SORTS, defaultDir } from '../concerts.js';
+import { fetchConcerts, getCachedConcerts, filterWhen, spotifyArtist, C_SORTS, defaultDir } from '../concerts.js';
 import { fmtCapacity, fmtDate } from '../tour.js';
 import { loadGoogleMaps, hasMapsKey } from '../live/maps.js';
 
@@ -227,8 +227,8 @@ export default function ConcertsView({ onEnterShow, onSyncLive }) {
       const locationText = [c.city, c.region, c.country, c.venue].filter(Boolean).join(' ').toLowerCase();
       return (!search || haystack.includes(search)) && (!loc || locationText.includes(loc));
     });
-    return sortConcerts(filtered, sortKey, dir);
-  }, [artist, browse, concerts, dir, hideEnded, location, now, query, sortKey, when]);
+    return sortVisibleConcerts(filtered, sortKey, dir, userZone);
+  }, [artist, browse, concerts, dir, hideEnded, location, now, query, sortKey, userZone, when]);
 
   useEffect(() => {
     if (!visible.length) return;
@@ -467,11 +467,22 @@ function ControlSurface(props) {
             ))}
           </select>
         </label>
-        <button className="cohear-icon-button w-auto px-3 text-xs" onClick={() => setDir((d) => (d === 'asc' ? 'desc' : 'asc'))}>
-          {dir === 'asc' ? 'Ascending' : 'Descending'}
+        <button
+          className="cohear-icon-button"
+          onClick={() => setDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
+          aria-label={dir === 'asc' ? 'Sort ascending. Click to reverse.' : 'Sort descending. Click to reverse.'}
+          title={dir === 'asc' ? 'Ascending. Click to reverse.' : 'Descending. Click to reverse.'}
+        >
+          <SortFlipIcon dir={dir} />
         </button>
-        <button className="cohear-secondary min-h-9 px-3 text-xs" onClick={onRefresh} disabled={loading} title="Bypass the 8-hour concert cache and reload this view">
-          {loading ? 'Refreshing...' : 'Refresh concerts'}
+        <button
+          className="cohear-icon-button"
+          onClick={onRefresh}
+          disabled={loading}
+          aria-label={loading ? 'Refreshing concerts' : 'Refresh concerts'}
+          title="Bypass the 8-hour concert cache and reload this view"
+        >
+          <RefreshIcon spinning={loading} />
         </button>
       </div>
     </section>
@@ -1074,6 +1085,49 @@ function TimeStack({ concert, userZone, now }) {
   );
 }
 
+function sortVisibleConcerts(list, key, dir, userZone) {
+  const sort = C_SORTS[key] || C_SORTS.date;
+  const direction = (dir || sort.dir) === 'asc' ? 1 : -1;
+  return [...list].sort((a, b) => {
+    const av = key === 'date' ? userLocalSortValue(a, userZone) : sort.get(a);
+    const bv = key === 'date' ? userLocalSortValue(b, userZone) : sort.get(b);
+    const aMissing = av == null || av === '';
+    const bMissing = bv == null || bv === '';
+    if (aMissing && !bMissing) return 1;
+    if (!aMissing && bMissing) return -1;
+    if (av < bv) return -1 * direction;
+    if (av > bv) return 1 * direction;
+
+    const tieA = `${showStartMs(a) || ''}|${a.artist || ''}|${a.venue || ''}`.toLowerCase();
+    const tieB = `${showStartMs(b) || ''}|${b.artist || ''}|${b.venue || ''}`.toLowerCase();
+    if (tieA < tieB) return -1;
+    if (tieA > tieB) return 1;
+    return 0;
+  });
+}
+
+function userLocalSortValue(concert, userZone) {
+  const ms = showStartMs(concert);
+  if (!ms) return null;
+  try {
+    const parts = {};
+    for (const p of new Intl.DateTimeFormat('en-US', {
+      timeZone: userZone,
+      hour12: false,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).formatToParts(new Date(ms))) {
+      parts[p.type] = p.value;
+    }
+    return Number(`${parts.year}${parts.month}${parts.day}${String(Number(parts.hour) % 24).padStart(2, '0')}${parts.minute}`);
+  } catch {
+    return ms;
+  }
+}
+
 function metricTone(tone) {
   if (tone?.startsWith?.('green') || tone?.startsWith?.('red')) return countdownClass(tone);
   if (tone === 'amber') return 'text-amber-200';
@@ -1370,6 +1424,26 @@ function ClockIcon() {
 }
 function BookmarkIcon({ filled }) {
   return <svg viewBox="0 0 24 24" className="h-4 w-4" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2"><path d="M6 4.8A1.8 1.8 0 0 1 7.8 3h8.4A1.8 1.8 0 0 1 18 4.8V21l-6-3.4L6 21V4.8Z" /></svg>;
+}
+function SortFlipIcon({ dir }) {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M8 4v14" />
+      <path d={dir === 'asc' ? 'm4 8 4-4 4 4' : 'm4 14 4 4 4-4'} />
+      <path d="M16 20V6" />
+      <path d={dir === 'asc' ? 'm20 16-4 4-4-4' : 'm20 10-4-4-4 4'} />
+    </svg>
+  );
+}
+function RefreshIcon({ spinning }) {
+  return (
+    <svg viewBox="0 0 24 24" className={`h-4 w-4 ${spinning ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20 11a8 8 0 0 0-14.8-4.2" />
+      <path d="M5 3v4h4" />
+      <path d="M4 13a8 8 0 0 0 14.8 4.2" />
+      <path d="M19 21v-4h-4" />
+    </svg>
+  );
 }
 
 const GOOGLE_DARK_MAP = [

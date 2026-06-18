@@ -68,7 +68,7 @@ export async function fetchConcerts(artist, source = 'live', window = 'week', { 
 // Each sort has a key getter and a sensible default direction (numbers high→low,
 // text A→Z). The UI lets you flip direction; `dir` is just the starting point.
 export const C_SORTS = {
-  date: { label: 'Date', get: (c) => timeSortKey(c), dir: 'desc' },
+  date: { label: 'Date', get: (c) => timeSortKey(c), dir: 'asc' },
   capacity: { label: 'Attendance (capacity)', get: (c) => c.capacity ?? -1, dir: 'desc' },
   popularity: { label: 'Popularity', get: (c) => c.popularity ?? -1, dir: 'desc' },
   songs: { label: 'Songs played', get: (c) => c.songCount ?? 0, dir: 'desc' },
@@ -97,7 +97,7 @@ export function sortConcerts(list, key, dir) {
   });
 }
 
-function timeSortKey(c) {
+export function timeSortKey(c) {
   return c?.startDate || c?.date || '';
 }
 

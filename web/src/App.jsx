@@ -15,13 +15,13 @@ const NAV = [
   { id: 'discover', label: 'Discover' },
   { id: 'live', label: 'Live Rooms' },
   { id: 'archive', label: 'Archive' },
+  { id: 'settings', label: 'Settings' },
 ];
 
 const ARCHIVE_TABS = [
   { id: 'globe', label: 'Globe' },
   { id: 'show', label: 'Show' },
   { id: 'library', label: 'Library' },
-  { id: 'dev', label: 'Dev' },
 ];
 
 export default function App() {
@@ -137,8 +137,23 @@ export default function App() {
                     </div>
                   ))}
                 {archiveTab === 'library' && <LibraryView />}
-                {archiveTab === 'dev' && <ControlRoom />}
               </>
+            )}
+
+            {view === 'settings' && (
+              <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+                <ControlRoom />
+                <aside className="cohear-panel h-fit p-5">
+                  <p className="cohear-label">Settings</p>
+                  <h2 className="mt-2 text-xl font-semibold text-white">App controls</h2>
+                  <p className="mt-2 text-sm leading-6 text-zinc-500">
+                    Developer diagnostics and API checks live here so Archive can stay focused on past shows and saved concert material.
+                  </p>
+                  <button className="cohear-secondary mt-4 w-full justify-center" onClick={() => setByocOpen(true)}>
+                    BYOC keys
+                  </button>
+                </aside>
+              </section>
             )}
           </main>
         </div>
