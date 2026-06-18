@@ -1,4 +1,4 @@
-# Cohear — find the biggest concerts, then join the live crowd
+# Cohear — listen together, be here anywhere
 
 > **New session? Read [STATUS.md](STATUS.md)** — the living handoff doc: current state, API key status, what's next, and gotchas. Deploy steps: [DEPLOY.md](DEPLOY.md).
 
@@ -162,4 +162,4 @@ Open `http://localhost:5173`. The Vite dev server is exposed on the LAN
 Add a key to `api-gateway/.env`, restart, and the "Go live" toggle unlocks for
 that service. Services with no key are locked to mock data.
 
-> Keys were shared in chat during setup — rotate them after the hackathon.
+
