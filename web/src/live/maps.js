@@ -32,7 +32,7 @@ export function loadGoogleMaps() {
     };
 
     const s = document.createElement('script');
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=marker&v=weekly&callback=${callbackName}`;
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=marker&v=weekly&loading=async&callback=${callbackName}`;
     s.async = true;
     s.onerror = () => {
       window.clearTimeout(timeout);

@@ -4,39 +4,16 @@ import LiveRoom from './live/LiveRoom.jsx';
 import { PlayerProvider } from './live/player.jsx';
 import BottomPlayer from './live/BottomPlayer.jsx';
 import { resolveEvent } from './live/liveApi.js';
-import TourView from './components/TourView.jsx';
 import ConcertsView from './components/ConcertsView.jsx';
-import ShowView from './components/ShowView.jsx';
-import ControlRoom from './components/ControlRoom.jsx';
-import LibraryView from './components/LibraryView.jsx';
-import BYOCModal, { getByocKey } from './components/BYOCModal.jsx';
 
 const NAV = [
   { id: 'discover', label: 'Discover' },
   { id: 'live', label: 'Live Rooms' },
-  { id: 'archive', label: 'Archive' },
-  { id: 'settings', label: 'Settings' },
-];
-
-const ARCHIVE_TABS = [
-  { id: 'globe', label: 'Globe' },
-  { id: 'show', label: 'Show' },
-  { id: 'library', label: 'Library' },
 ];
 
 export default function App() {
   const [view, setView] = useState('discover');
   const [liveEvent, setLiveEvent] = useState(null);
-  const [archiveTab, setArchiveTab] = useState('globe');
-  const [show, setShow] = useState(null);
-  const [byocOpen, setByocOpen] = useState(false);
-  const [, setByocKey] = useState(getByocKey());
-
-  function enterShow(stop) {
-    setShow(stop);
-    setArchiveTab('show');
-    setView('archive');
-  }
 
   async function syncLive(concert) {
     const ev = await resolveEvent({
@@ -81,37 +58,14 @@ export default function App() {
             </nav>
 
             <div className="hidden items-center gap-2 lg:flex">
-              {view === 'archive' && (
-                <button className="cohear-secondary" onClick={() => setByocOpen(true)}>
-                  BYOC
-                </button>
-              )}
               <button className="cohear-primary" onClick={() => setView('discover')}>
                 Browse concerts
               </button>
             </div>
           </header>
 
-          {view === 'archive' && (
-            <nav className="mt-4 flex flex-wrap gap-2" aria-label="Archive navigation">
-              {ARCHIVE_TABS.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => setArchiveTab(item.id)}
-                  className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
-                    archiveTab === item.id
-                      ? 'border-white/20 bg-white text-zinc-950'
-                      : 'border-white/10 bg-white/[0.035] text-zinc-400 hover:text-zinc-100'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </nav>
-          )}
-
           <main className="mt-5 flex-1">
-            {view === 'discover' && <ConcertsView onEnterShow={enterShow} onSyncLive={syncLive} />}
+            {view === 'discover' && <ConcertsView onSyncLive={syncLive} />}
 
             {view === 'live' &&
               (liveEvent ? (
@@ -121,43 +75,8 @@ export default function App() {
                   <LiveLanding onJoin={setLiveEvent} />
                 </section>
               ))}
-
-            {view === 'archive' && (
-              <>
-                {archiveTab === 'globe' && <TourView onEnterShow={enterShow} />}
-                {archiveTab === 'show' &&
-                  (show ? (
-                    <ShowView show={show} onBack={() => setArchiveTab('globe')} onOpenByoc={() => setByocOpen(true)} />
-                  ) : (
-                    <div className="cohear-panel flex h-80 flex-col items-center justify-center gap-3 text-center text-sm text-zinc-500">
-                      <span>No show selected yet.</span>
-                      <button onClick={() => setArchiveTab('globe')} className="cohear-primary">
-                        Pick one from the Globe
-                      </button>
-                    </div>
-                  ))}
-                {archiveTab === 'library' && <LibraryView />}
-              </>
-            )}
-
-            {view === 'settings' && (
-              <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-                <ControlRoom />
-                <aside className="cohear-panel h-fit p-5">
-                  <p className="cohear-label">Settings</p>
-                  <h2 className="mt-2 text-xl font-semibold text-white">App controls</h2>
-                  <p className="mt-2 text-sm leading-6 text-zinc-500">
-                    Developer diagnostics and API checks live here so Archive can stay focused on past shows and saved concert material.
-                  </p>
-                  <button className="cohear-secondary mt-4 w-full justify-center" onClick={() => setByocOpen(true)}>
-                    BYOC keys
-                  </button>
-                </aside>
-              </section>
-            )}
           </main>
         </div>
-        <BYOCModal open={byocOpen} onClose={() => setByocOpen(false)} onSaved={setByocKey} />
         <BottomPlayer />
       </div>
     </PlayerProvider>

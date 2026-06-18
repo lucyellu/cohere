@@ -15,6 +15,14 @@ import * as rapid from './rapid.js';
 const router = express.Router();
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const ADMIN_TOKEN = process.env.COHER_ADMIN_TOKEN || process.env.COHEAR_ADMIN_TOKEN || process.env.ADMIN_TOKEN || '';
+
+function isAdminRequest(req) {
+  if (!ADMIN_TOKEN) return false;
+  const header = req.get('authorization') || '';
+  const bearer = header.startsWith('Bearer ') ? header.slice(7) : '';
+  return bearer === ADMIN_TOKEN || req.get('x-admin-token') === ADMIN_TOKEN;
+}
 
 // --- Health: config + live usage snapshot for the monitor panel ---------
 router.get('/health', (_req, res) => {
@@ -41,6 +49,7 @@ router.get('/health', (_req, res) => {
 
 // --- Toggle a service between mock and live at runtime -------------------
 router.post('/config/mock', express.json(), (req, res) => {
+  if (!isAdminRequest(req)) return res.status(403).json({ error: 'admin token required' });
   const { id, useMock } = req.body || {};
   if (!SERVICE_IDS.includes(id)) return res.status(400).json({ error: 'unknown service id' });
   if (typeof useMock !== 'boolean' && useMock !== null) {

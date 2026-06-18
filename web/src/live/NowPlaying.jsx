@@ -99,7 +99,7 @@ function PlayButton({ artist, song }) {
     <button
       onClick={() => player?.playSong(artist, song)}
       className="mt-1 shrink-0 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-zinc-100 hover:bg-white/20"
-      title="Play this song in the bottom player"
+      title="Play this song in the video panel"
     >
       ▶ Play
     </button>
