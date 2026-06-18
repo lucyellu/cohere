@@ -2,7 +2,7 @@
 // normalized, deduped list spanning PAST (setlist.fm) + UPCOMING (JamBase)
 // shows. The List / Map / Calendar views all render off this same array.
 
-const CACHE_TTL_MS = 10 * 60 * 1000;
+const CACHE_TTL_MS = 8 * 60 * 60 * 1000;
 const memoryCache = new Map();
 const pending = new Map();
 
@@ -23,6 +23,10 @@ function readCached(key) {
     /* ignore bad cache entries */
   }
   return null;
+}
+
+export function getCachedConcerts(artist, source = 'live', window = 'week') {
+  return readCached(cacheKey(artist, source, window));
 }
 
 function writeCached(key, value) {
@@ -64,7 +68,7 @@ export async function fetchConcerts(artist, source = 'live', window = 'week', { 
 // Each sort has a key getter and a sensible default direction (numbers high→low,
 // text A→Z). The UI lets you flip direction; `dir` is just the starting point.
 export const C_SORTS = {
-  date: { label: 'Date', get: (c) => c.date || '', dir: 'desc' },
+  date: { label: 'Date', get: (c) => timeSortKey(c), dir: 'desc' },
   capacity: { label: 'Attendance (capacity)', get: (c) => c.capacity ?? -1, dir: 'desc' },
   popularity: { label: 'Popularity', get: (c) => c.popularity ?? -1, dir: 'desc' },
   songs: { label: 'Songs played', get: (c) => c.songCount ?? 0, dir: 'desc' },
@@ -85,9 +89,16 @@ export function sortConcerts(list, key, dir) {
     const bv = s.get(b);
     if (av < bv) return -1 * mult;
     if (av > bv) return 1 * mult;
-    // Stable tiebreak by date so equal keys don't jump around.
-    return (b.date || '').localeCompare(a.date || '');
+    const tieA = `${timeSortKey(a)}|${a.artist || ''}|${a.venue || ''}`.toLowerCase();
+    const tieB = `${timeSortKey(b)}|${b.artist || ''}|${b.venue || ''}`.toLowerCase();
+    if (tieA < tieB) return -1 * mult;
+    if (tieA > tieB) return 1 * mult;
+    return 0;
   });
+}
+
+function timeSortKey(c) {
+  return c?.startDate || c?.date || '';
 }
 
 // Spotify artist popularity/followers/art. Credentials live in the gateway.

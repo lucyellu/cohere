@@ -47,6 +47,7 @@ export default function App() {
       country: concert.country,
       lat: concert.lat,
       lng: concert.lng,
+      tz: concert.timeZone,
       mode: concert.when === 'upcoming' ? 'live' : 'replay',
     });
     if (ev) {

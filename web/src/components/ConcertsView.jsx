@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { fetchConcerts, sortConcerts, filterWhen, spotifyArtist, C_SORTS, defaultDir } from '../concerts.js';
+import { fetchConcerts, getCachedConcerts, sortConcerts, filterWhen, spotifyArtist, C_SORTS, defaultDir } from '../concerts.js';
 import { fmtCapacity, fmtDate } from '../tour.js';
 import { loadGoogleMaps, hasMapsKey } from '../live/maps.js';
 
@@ -24,6 +24,7 @@ const WHEN = [
 
 const SORT_KEYS = ['capacity', 'popularity', 'date', 'artist', 'venue', 'city'];
 const USER_ZONE_KEY = 'cohear_user_timezone';
+const DISCOVER_STATE_KEY = 'cohear_discover_state_v1';
 const DETECTED_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Vancouver';
 const USER_TIME_ZONES = withDetectedZone([
   { zone: 'America/Vancouver', city: 'Vancouver', label: 'Vancouver / Pacific' },
@@ -38,19 +39,51 @@ const USER_TIME_ZONES = withDetectedZone([
   { zone: 'Australia/Sydney', city: 'Sydney', label: 'Sydney' },
 ]);
 
+function readDiscoverState() {
+  const fallback = {
+    query: '',
+    artist: '',
+    location: '',
+    windowKey: 'week',
+    concerts: getCachedConcerts('', 'live', 'week')?.concerts || [],
+    sources: getCachedConcerts('', 'live', 'week')?.sources || {},
+    mode: 'list',
+    sortKey: 'capacity',
+    dir: 'desc',
+    when: 'all',
+    selectedId: null,
+  };
+  try {
+    const parsed = JSON.parse(sessionStorage.getItem(DISCOVER_STATE_KEY) || 'null');
+    if (!parsed || !Array.isArray(parsed.concerts)) return fallback;
+    return { ...fallback, ...parsed };
+  } catch {
+    return fallback;
+  }
+}
+
+function writeDiscoverState(state) {
+  try {
+    sessionStorage.setItem(DISCOVER_STATE_KEY, JSON.stringify(state));
+  } catch {
+    /* session storage can be unavailable */
+  }
+}
+
 export default function ConcertsView({ onEnterShow, onSyncLive }) {
-  const [query, setQuery] = useState('');
-  const [artist, setArtist] = useState('');
-  const [location, setLocation] = useState('');
-  const [windowKey, setWindowKey] = useState('week');
-  const [concerts, setConcerts] = useState([]);
-  const [sources, setSources] = useState({});
+  const initialState = useMemo(() => readDiscoverState(), []);
+  const [query, setQuery] = useState(initialState.query);
+  const [artist, setArtist] = useState(initialState.artist);
+  const [location, setLocation] = useState(initialState.location);
+  const [windowKey, setWindowKey] = useState(initialState.windowKey);
+  const [concerts, setConcerts] = useState(initialState.concerts);
+  const [sources, setSources] = useState(initialState.sources);
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState('list');
-  const [sortKey, setSortKey] = useState('capacity');
-  const [dir, setDir] = useState('desc');
-  const [when, setWhen] = useState('all');
-  const [selectedId, setSelectedId] = useState(null);
+  const [mode, setMode] = useState(initialState.mode);
+  const [sortKey, setSortKey] = useState(initialState.sortKey);
+  const [dir, setDir] = useState(initialState.dir);
+  const [when, setWhen] = useState(initialState.when);
+  const [selectedId, setSelectedId] = useState(initialState.selectedId);
   const [spotify, setSpotify] = useState(null);
   const [saved, setSaved] = useState(() => new Set(JSON.parse(localStorage.getItem('cohear_saved_shows') || '[]')));
   const [userZone, setUserZoneState] = useState(() => localStorage.getItem(USER_ZONE_KEY) || DETECTED_TIME_ZONE);
@@ -58,35 +91,68 @@ export default function ConcertsView({ onEnterShow, onSyncLive }) {
 
   const browse = !artist;
 
-  async function loadBrowse(win = windowKey) {
+  async function loadBrowse(win = windowKey, { force = false, reset = true } = {}) {
+    const cached = !force ? getCachedConcerts('', 'live', win) : null;
+    if (cached?.concerts?.length) {
+      setArtist('');
+      setWindowKey(win);
+      setConcerts(cached.concerts);
+      setSources(cached.sources || {});
+      if (reset) {
+        setSortKey('capacity');
+        setDir('desc');
+        setWhen('all');
+      }
+      setSelectedId(cached.concerts[0]?.id || null);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
-      const out = await fetchConcerts('', 'live', win);
+      const out = await fetchConcerts('', 'live', win, { force });
       setArtist('');
       setWindowKey(win);
       setConcerts(out.concerts);
       setSources(out.sources);
-      setSortKey('capacity');
-      setDir('desc');
-      setWhen('all');
+      if (reset) {
+        setSortKey('capacity');
+        setDir('desc');
+        setWhen('all');
+      }
       setSelectedId(out.concerts[0]?.id || null);
     } finally {
       setLoading(false);
     }
   }
 
-  async function loadArtist(name) {
+  async function loadArtist(name, { force = false, reset = true } = {}) {
     const clean = name.trim();
     if (!clean) return;
+    const cached = !force ? getCachedConcerts(clean, 'live') : null;
+    if (cached?.concerts?.length) {
+      setArtist(clean);
+      setConcerts(cached.concerts);
+      setSources(cached.sources || {});
+      if (reset) {
+        setSortKey('date');
+        setDir('desc');
+        setWhen('all');
+      }
+      setSelectedId(cached.concerts[0]?.id || null);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
-      const out = await fetchConcerts(clean, 'live');
+      const out = await fetchConcerts(clean, 'live', undefined, { force });
       setArtist(clean);
       setConcerts(out.concerts);
       setSources(out.sources);
-      setSortKey('date');
-      setDir('desc');
-      setWhen('all');
+      if (reset) {
+        setSortKey('date');
+        setDir('desc');
+        setWhen('all');
+      }
       setSelectedId(out.concerts[0]?.id || null);
     } finally {
       setLoading(false);
@@ -94,9 +160,13 @@ export default function ConcertsView({ onEnterShow, onSyncLive }) {
   }
 
   useEffect(() => {
-    loadBrowse('week');
+    if (!concerts.length) loadBrowse(windowKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    writeDiscoverState({ query, artist, location, windowKey, concerts, sources, mode, sortKey, dir, when, selectedId });
+  }, [artist, concerts, dir, location, mode, query, selectedId, sortKey, sources, when, windowKey]);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30_000);
@@ -117,8 +187,17 @@ export default function ConcertsView({ onEnterShow, onSyncLive }) {
   }, [artist]);
 
   function pickSort(key) {
+    if (sortKey === key) {
+      setDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+      return;
+    }
     setSortKey(key);
     setDir(defaultDir(key));
+  }
+
+  function refreshConcerts() {
+    if (artist) loadArtist(artist, { force: true, reset: false });
+    else loadBrowse(windowKey, { force: true, reset: false });
   }
 
   function toggleSave(id) {
@@ -195,6 +274,7 @@ export default function ConcertsView({ onEnterShow, onSyncLive }) {
         setWhen={setWhen}
         loading={loading}
         onArtistSearch={() => loadArtist(query)}
+        onRefresh={refreshConcerts}
       />
 
       {loading ? (
@@ -208,7 +288,20 @@ export default function ConcertsView({ onEnterShow, onSyncLive }) {
       ) : (
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
           <main className="min-w-0">
-            {mode === 'list' && <ConcertTable rows={visible} selectedId={selected?.id} onSelect={setSelectedId} saved={saved} userZone={userZone} now={now} onSyncLive={onSyncLive} />}
+            {mode === 'list' && (
+              <ConcertTable
+                rows={visible}
+                selectedId={selected?.id}
+                onSelect={setSelectedId}
+                saved={saved}
+                userZone={userZone}
+                now={now}
+                sortKey={sortKey}
+                dir={dir}
+                onSort={pickSort}
+                onSyncLive={onSyncLive}
+              />
+            )}
             {mode === 'map' && <ConcertMap rows={visible} selectedId={selected?.id} onSelect={setSelectedId} />}
             {mode === 'calendar' && <ConcertCalendar rows={visible} selectedId={selected?.id} onSelect={setSelectedId} />}
           </main>
@@ -280,8 +373,12 @@ function DiscoverHeader({ artist, browse, biggest, loading, stats, spotify, user
         <div>
           <p className="cohear-label">Coverage</p>
           <div className="mt-3 grid grid-cols-2 gap-3">
-            <MetricBlock label="Shows" value={loading ? '...' : stats.count.toLocaleString()} />
-            <MetricBlock label="Known seats" value={fmtCapacity(stats.totalCap)} />
+            <MetricBlock label="Visible shows" value={loading ? '...' : stats.count.toLocaleString()} />
+            <MetricBlock
+              label="Known capacity"
+              value={fmtCapacity(stats.totalCap)}
+              title="Sum of venue capacity for the currently visible shows. It is not confirmed attendance or tickets sold."
+            />
           </div>
         </div>
         {spotify && (
@@ -305,7 +402,7 @@ function DiscoverHeader({ artist, browse, biggest, loading, stats, spotify, user
 function ControlSurface(props) {
   const {
     browse, query, setQuery, location, setLocation, userZone, setUserZone, windowKey, setWindowKey,
-    mode, setMode, sortKey, pickSort, dir, setDir, when, setWhen, loading, onArtistSearch,
+    mode, setMode, sortKey, pickSort, dir, setDir, when, setWhen, loading, onArtistSearch, onRefresh,
   } = props;
 
   return (
@@ -360,12 +457,15 @@ function ControlSurface(props) {
         <button className="cohear-icon-button w-auto px-3 text-xs" onClick={() => setDir((d) => (d === 'asc' ? 'desc' : 'asc'))}>
           {dir === 'asc' ? 'Ascending' : 'Descending'}
         </button>
+        <button className="cohear-secondary min-h-9 px-3 text-xs" onClick={onRefresh} disabled={loading} title="Bypass the 8-hour concert cache and reload this view">
+          {loading ? 'Refreshing...' : 'Refresh concerts'}
+        </button>
       </div>
     </section>
   );
 }
 
-function ConcertTable({ rows, selectedId, onSelect, saved, userZone, now, onSyncLive }) {
+function ConcertTable({ rows, selectedId, onSelect, saved, userZone, now, sortKey, dir, onSort, onSyncLive }) {
   const [syncingId, setSyncingId] = useState(null);
   async function join(c) {
     if (!onSyncLive || syncingId) return;
@@ -381,11 +481,11 @@ function ConcertTable({ rows, selectedId, onSelect, saved, userZone, now, onSync
     <div className="cohear-panel overflow-hidden">
       <div className="grid grid-cols-[56px_minmax(170px,1.05fr)_minmax(170px,1fr)_120px_190px_90px_92px] border-b border-white/10 px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-zinc-500 max-lg:hidden">
         <span>Rank</span>
-        <span>Artist</span>
-        <span>Venue</span>
-        <span>City</span>
-        <span>Time</span>
-        <span className="text-right">Seats</span>
+        <SortHeader id="artist" label="Artist" sortKey={sortKey} dir={dir} onSort={onSort} />
+        <SortHeader id="venue" label="Venue" sortKey={sortKey} dir={dir} onSort={onSort} />
+        <SortHeader id="city" label="City" sortKey={sortKey} dir={dir} onSort={onSort} />
+        <SortHeader id="date" label="Time" sortKey={sortKey} dir={dir} onSort={onSort} />
+        <SortHeader id="capacity" label="Seats" align="right" sortKey={sortKey} dir={dir} onSort={onSort} />
         <span className="text-right">Live</span>
       </div>
       <ol className="max-h-[660px] overflow-y-auto">
@@ -426,6 +526,23 @@ function ConcertTable({ rows, selectedId, onSelect, saved, userZone, now, onSync
         ))}
       </ol>
     </div>
+  );
+}
+
+function SortHeader({ id, label, sortKey, dir, onSort, align = 'left' }) {
+  const active = sortKey === id;
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(id)}
+      className={`min-w-0 text-xs font-semibold uppercase tracking-[0.12em] transition hover:text-zinc-200 ${align === 'right' ? 'text-right' : 'text-left'} ${active ? 'text-white' : 'text-zinc-500'}`}
+      title={`Sort by ${label}`}
+    >
+      <span className="inline-flex items-center gap-1">
+        <span>{label}</span>
+        {active && <span className="text-[10px] text-cyan-200">{dir === 'asc' ? 'up' : 'down'}</span>}
+      </span>
+    </button>
   );
 }
 
@@ -790,9 +907,9 @@ function Metric({ label, value, tone }) {
   );
 }
 
-function MetricBlock({ label, value, tone }) {
+function MetricBlock({ label, value, tone, title }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+    <div className="rounded-lg border border-white/10 bg-black/20 p-3" title={title}>
       <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-600">{label}</div>
       <div className={`mt-2 truncate text-base font-semibold tabular-nums ${metricTone(tone)}`}>{value}</div>
     </div>

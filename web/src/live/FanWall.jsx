@@ -28,6 +28,8 @@ export default function FanWall({ event, np, clips, onClipsChanged }) {
   const [platform, setPlatform] = useState('all');
   const [sort, setSort] = useState('recent');
   const [scope, setScope] = useState('all'); // 'all' | songIndex
+  const [columns, setColumns] = useState(3);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [yt, setYt] = useState({ items: [], error: null, loading: true });
   const [social, setSocial] = useState({ items: [], loading: true });
   const cache = useRef({});
@@ -54,7 +56,7 @@ export default function FanWall({ event, np, clips, onClipsChanged }) {
     return () => {
       cancelled = true;
     };
-  }, [query]);
+  }, [query, refreshKey]);
 
   // TikTok / Instagram / X feed (RapidAPI), fetched in parallel + cached.
   useEffect(() => {
@@ -72,7 +74,7 @@ export default function FanWall({ event, np, clips, onClipsChanged }) {
     return () => {
       cancelled = true;
     };
-  }, [socialQ, event.artist]);
+  }, [socialQ, event.artist, refreshKey]);
 
   // Unified list: YouTube auto items + crowd-submitted clips, normalized.
   const items = useMemo(() => {
@@ -132,9 +134,27 @@ export default function FanWall({ event, np, clips, onClipsChanged }) {
             {scopeSong ? <>Footage of <span className="text-fuchsia-300">“{scopeSong}”</span></> : 'Every platform, one feed'}
           </p>
         </div>
-        <select value={sort} onChange={(e) => setSort(e.target.value)} className="rounded-lg border border-white/10 bg-black/40 px-2.5 py-1.5 text-xs text-zinc-300 outline-none">
-          {SORTS.map((s) => <option key={s.id} value={s.id}>Sort: {s.label}</option>)}
-        </select>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/40 px-2.5 py-1.5 text-xs text-zinc-400">
+            Per row
+            <input type="range" min="1" max="12" value={columns} onChange={(e) => setColumns(Number(e.target.value))} className="w-20 accent-fuchsia-400" />
+            <span className="w-4 text-right text-zinc-100">{columns}</span>
+          </label>
+          <button
+            className="rounded-lg border border-white/10 bg-black/40 px-2.5 py-1.5 text-xs font-medium text-zinc-300 hover:bg-white/10"
+            onClick={() => {
+              delete cache.current[query];
+              delete socialCache.current[socialQ];
+              setRefreshKey((n) => n + 1);
+            }}
+            disabled={yt.loading || social.loading}
+          >
+            {yt.loading || social.loading ? 'Refreshing...' : 'Refresh media'}
+          </button>
+          <select value={sort} onChange={(e) => setSort(e.target.value)} className="rounded-lg border border-white/10 bg-black/40 px-2.5 py-1.5 text-xs text-zinc-300 outline-none">
+            {SORTS.map((s) => <option key={s.id} value={s.id}>Sort: {s.label}</option>)}
+          </select>
+        </div>
       </div>
 
       {/* Platform filter */}
@@ -170,7 +190,7 @@ export default function FanWall({ event, np, clips, onClipsChanged }) {
         </p>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
             {items.slice(0, 18).map((it) => (
               <FeedCard key={it.key} it={it} event={event} onVote={onClipsChanged} />
             ))}

@@ -110,6 +110,34 @@ async function fetchDurations(artist, songs) {
   return out;
 }
 
+async function fetchTopTracks(artist) {
+  const key = process.env.MUSIXMATCH_API_KEY;
+  if (!key || !artist) return [];
+  const start = Date.now();
+  try {
+    const p = new URLSearchParams({ apikey: key, q_artist: artist, s_track_rating: 'desc', page_size: '15' });
+    const r = await fetch(`https://api.musixmatch.com/ws/1.1/track.search?${p.toString()}`);
+    const d = await r.json().catch(() => ({}));
+    record('musixmatch', { status: r.status, latencyMs: Date.now() - start, bytes: 0, mode: 'live', error: r.ok ? null : `HTTP ${r.status}` });
+    if (!r.ok) return [];
+    const wanted = artist.toLowerCase();
+    const seen = new Set();
+    const out = [];
+    for (const item of d?.message?.body?.track_list || []) {
+      const t = item.track || {};
+      const name = t.track_name;
+      if (!name || seen.has(name.toLowerCase())) continue;
+      if (t.artist_name && !t.artist_name.toLowerCase().includes(wanted)) continue;
+      seen.add(name.toLowerCase());
+      out.push(name);
+    }
+    return out.slice(0, 12);
+  } catch (e) {
+    record('musixmatch', { status: 0, latencyMs: Date.now() - start, bytes: 0, mode: 'live', error: e.message });
+    return [];
+  }
+}
+
 // Live performances run longer than the studio cut (extended intros/outros,
 // crowd moments), so scale the recorded length up a touch for the prediction.
 const LIVE_FACTOR = 1.15;
@@ -375,8 +403,9 @@ export async function resolveEvent({ artist, date, venue, city, country, lat, ln
   if (!artist) throw new Error('artist required');
   const zone = tz || 'America/New_York';
   const sf = await fetchSetlist(artist, { date, cityPref: city }).catch(() => null);
-  const songs = sf?.songs?.length ? sf.songs : [];
-  if (!songs.length) return null; // no setlist anywhere -> caller falls back to top tracks
+  const topTracks = sf?.songs?.length ? [] : await fetchTopTracks(artist).catch(() => []);
+  const songs = sf?.songs?.length ? sf.songs : topTracks;
+  if (!songs.length) return null;
 
   let startUTC;
   if (mode === 'replay' && (sf?.date || date)) {
@@ -400,7 +429,7 @@ export async function resolveEvent({ artist, date, venue, city, country, lat, ln
     startUTC,
     mode,
     songs,
-    songsSource: 'setlistfm',
+    songsSource: sf?.songs?.length ? 'setlistfm' : 'fallback',
     setlistDate: sf?.date || null,
     exact: mode === 'replay', // a chosen past show IS that show's real setlist
     watchDateDmy: mode === 'live' ? dmyToday(zone) : null,
