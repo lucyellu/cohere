@@ -5,6 +5,207 @@
 html, body, #root { height: 100%; }
 body {
   margin: 0;
-  background: #0a0a0f;
+  background: #07080b;
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+button, input, select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+.bg-cohear {
+  background:
+    radial-gradient(circle at 18% -10%, rgba(245, 158, 11, 0.10), transparent 34rem),
+    radial-gradient(circle at 78% 4%, rgba(34, 211, 238, 0.08), transparent 30rem),
+    linear-gradient(180deg, #08090d 0%, #07080b 48%, #050609 100%);
+}
+
+.cohear-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(12, 14, 19, 0.82);
+  backdrop-filter: blur(16px);
+  border-radius: 10px;
+  padding: 0.75rem;
+  box-shadow: 0 20px 70px rgba(0, 0, 0, 0.28);
+}
+
+.cohear-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
+  padding: 0.25rem;
+}
+
+.cohear-nav button {
+  min-height: 2.25rem;
+  border-radius: 6px;
+  padding: 0 0.9rem;
+  color: rgb(161 161 170);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  transition: color 160ms ease, background 160ms ease;
+}
+
+.cohear-nav button:hover {
+  color: white;
+}
+
+.cohear-nav button.active {
+  background: white;
+  color: #09090b;
+}
+
+.cohear-panel {
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(13, 15, 20, 0.78);
+  border-radius: 10px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.22);
+}
+
+.cohear-label {
+  color: rgb(113 113 122);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.cohear-primary,
+.cohear-secondary {
+  display: inline-flex;
+  min-height: 2.5rem;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 8px;
+  padding: 0 1rem;
+  font-size: 0.875rem;
+  font-weight: 800;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, opacity 160ms ease;
+}
+
+.cohear-primary {
+  border: 1px solid rgba(251, 191, 36, 0.36);
+  background: linear-gradient(180deg, #f5c04a, #d78a16);
+  color: #17110a;
+  box-shadow: 0 12px 30px rgba(217, 119, 6, 0.16);
+}
+
+.cohear-primary:hover {
+  transform: translateY(-1px);
+}
+
+.cohear-primary:disabled {
+  opacity: 0.48;
+  transform: none;
+}
+
+.cohear-secondary {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgb(228 228 231);
+}
+
+.cohear-secondary:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.cohear-icon-button {
+  display: inline-grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.22);
+  color: rgb(212 212 216);
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
+}
+
+.cohear-icon-button:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.07);
+  color: white;
+}
+
+.cohear-field {
+  display: flex;
+  min-height: 2.75rem;
+  align-items: center;
+  gap: 0.65rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.24);
+  padding: 0 0.85rem;
+  color: rgb(113 113 122);
+}
+
+.cohear-field:focus-within {
+  border-color: rgba(34, 211, 238, 0.42);
+  color: rgb(165 243 252);
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.08);
+}
+
+.cohear-field input,
+.cohear-field select {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: white;
+  outline: none;
+  font-size: 0.875rem;
+}
+
+.cohear-field select {
+  cursor: pointer;
+}
+
+.cohear-field option {
+  background: #09090b;
+  color: white;
+}
+
+.cohear-field input::placeholder {
+  color: rgb(82 82 91);
+}
+
+.cohear-link {
+  color: rgb(165 243 252);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.cohear-link:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 760px) {
+  .cohear-topbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .cohear-nav {
+    width: 100%;
+  }
+
+  .cohear-nav button {
+    flex: 1;
+  }
 }

@@ -178,6 +178,7 @@ const dmyToIso = (dmy) => {
   const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(dmy || '');
   return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
 };
+const PAST_DISCOVERY_ARTISTS = ['Bruno Mars', 'Coldplay', 'Olivia Rodrigo', 'Sabrina Carpenter', 'Post Malone', 'Taylor Swift', 'Billie Eilish', 'Bad Bunny'];
 
 function normJambase(events) {
   return (events || []).map((e) => {
@@ -196,6 +197,7 @@ function normJambase(events) {
       country: schemaTxt(addr.addressCountry),
       lat, lng,
       date: (e.startDate || '').slice(0, 10),
+      startDate: e.startDate || '',
       capacity: numOrNull(loc.maximumAttendeeCapacity ?? loc.capacity),
       setlist,
       songCount: setlist.length,
@@ -220,6 +222,7 @@ function normSetlistfm(setlists) {
       lat: numOrNull(coords.lat),
       lng: numOrNull(coords.long),
       date: dmyToIso(s.eventDate),
+      startDate: '',
       capacity: null, // setlist.fm has no capacity
       setlist: songs,
       songCount: songs.length,
@@ -260,6 +263,16 @@ function mergeConcerts(list) {
   }));
 }
 
+async function fetchRecentSetlistsByArtist(artist) {
+  if (isMock('setlistfm')) return { setlists: [], mode: 'nokey' };
+  const r = await callLive(
+    'setlistfm',
+    `https://api.setlist.fm/rest/1.0/search/setlists?artistName=${encodeURIComponent(artist)}&p=1`,
+    { headers: { 'x-api-key': process.env.SETLISTFM_API_KEY, Accept: 'application/json' } }
+  );
+  return { setlists: r.data?.setlist || [], mode: r.ok ? 'live' : 'error' };
+}
+
 router.get('/concerts', async (req, res) => {
   const artist = String(req.query.artist || '').trim();
   const source = String(req.query.source || '');
@@ -272,10 +285,15 @@ router.get('/concerts', async (req, res) => {
   let dateFrom, dateTo;
   if (browse) {
     const today = new Date().toISOString().slice(0, 10);
-    dateFrom = today;
-    if (windowKey === 'tonight') dateTo = today;
-    else if (windowKey === 'week') dateTo = addDaysIso(today, 7);
-    else dateTo = addDaysIso(today, 60); // 'upcoming'
+    if (windowKey === 'past') {
+      dateFrom = addDaysIso(today, -60);
+      dateTo = addDaysIso(today, -1);
+    } else {
+      dateFrom = today;
+      if (windowKey === 'tonight') dateTo = today;
+      else if (windowKey === 'week') dateTo = addDaysIso(today, 7);
+      else dateTo = addDaysIso(today, 60); // 'upcoming'
+    }
   }
 
   // Upcoming (JamBase) — artist-filtered, or the whole window when browsing.
@@ -289,25 +307,32 @@ router.get('/concerts', async (req, res) => {
 
   // Past (setlist.fm) — only when an artist is named (it's artist-centric).
   if (artist && source !== 'mock' && !isMock('setlistfm')) {
-    const r = await callLive(
-      'setlistfm',
-      `https://api.setlist.fm/rest/1.0/search/setlists?artistName=${encodeURIComponent(artist)}&p=1`,
-      { headers: { 'x-api-key': process.env.SETLISTFM_API_KEY, Accept: 'application/json' } }
-    );
-    if (r.ok) {
-      collected.push(...normSetlistfm(r.data?.setlist));
-      sources.setlistfm = 'live';
+    const sf = await fetchRecentSetlistsByArtist(artist);
+    if (sf.mode === 'live') {
+      collected.push(...normSetlistfm(sf.setlists));
+      sources.setlistfm = sf.mode;
     } else {
-      sources.setlistfm = 'error';
+      sources.setlistfm = sf.mode;
     }
+  } else if (browse && windowKey === 'past' && source !== 'mock' && !isMock('setlistfm')) {
+    const results = await Promise.allSettled(PAST_DISCOVERY_ARTISTS.map((name) => fetchRecentSetlistsByArtist(name)));
+    let anyLive = false;
+    for (const r of results) {
+      if (r.status !== 'fulfilled') continue;
+      if (r.value.mode === 'live') anyLive = true;
+      collected.push(...normSetlistfm(r.value.setlists));
+    }
+    sources.setlistfm = anyLive ? 'live' : 'error';
   } else {
     sources.setlistfm = artist ? (isMock('setlistfm') ? 'nokey' : 'mock') : 'na';
   }
 
   // Browse defaults to biggest-first (the discovery framing); artist view to recency.
-  const merged = mergeConcerts(collected);
+  const merged = mergeConcerts(collected).filter((c) => !(browse && windowKey === 'past') || c.when === 'past');
   const concerts = browse
-    ? merged.sort((a, b) => (b.popularity ?? -1) - (a.popularity ?? -1))
+    ? (windowKey === 'past'
+        ? merged.sort((a, b) => b.date.localeCompare(a.date))
+        : merged.sort((a, b) => (b.popularity ?? -1) - (a.popularity ?? -1)))
     : merged.sort((a, b) => b.date.localeCompare(a.date));
   res.json({ ok: true, artist, browse, window: browse ? windowKey : null, concerts, sources });
 });
@@ -473,6 +498,7 @@ router.get('/spotify/artist', async (req, res) => {
     return res.json({ ok: true, mode: 'mock', artist: { name, popularity: 55 + hashNum(name, 40), followers: 100000 + hashNum(name, 5_000_000), genres: ['pop'], image: null } });
   }
   const r = await spotifyGet(`/search?q=${encodeURIComponent(name)}&type=artist&limit=1`);
+  if (!r.ok) return res.status(502).json({ ok: false, error: `spotify search failed (HTTP ${r.status || 'unknown'})` });
   const a = r.data?.artists?.items?.[0];
   if (!a) return res.json({ ok: false, error: 'artist not found' });
   res.json({ ok: true, mode: 'live', artist: { id: a.id, name: a.name, popularity: a.popularity, followers: a.followers?.total, genres: a.genres || [], image: a.images?.[0]?.url || null, url: a.external_urls?.spotify } });
@@ -488,6 +514,7 @@ router.get('/spotify/track', async (req, res) => {
   }
   const q = artist ? `track:${track} artist:${artist}` : `track:${track}`;
   const r = await spotifyGet(`/search?q=${encodeURIComponent(q)}&type=track&limit=1`);
+  if (!r.ok) return res.status(502).json({ ok: false, error: `spotify search failed (HTTP ${r.status || 'unknown'})` });
   const t = r.data?.tracks?.items?.[0];
   if (!t) return res.json({ ok: false, error: 'track not found' });
   res.json({ ok: true, mode: 'live', track: { id: t.id, name: t.name, popularity: t.popularity, album: t.album?.name, art: t.album?.images?.[0]?.url || null, preview: t.preview_url, url: t.external_urls?.spotify } });

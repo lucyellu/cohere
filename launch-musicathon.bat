@@ -11,19 +11,19 @@ set APIUP=
 netstat -ano | findstr ":%WEB% " | findstr LISTENING >nul 2>&1 && set WEBUP=1
 netstat -ano | findstr ":%API% " | findstr LISTENING >nul 2>&1 && set APIUP=1
 if defined WEBUP if defined APIUP (
-    echo Cohere already running. Opening...
+    echo Cohear already running. Opening...
     goto open
 )
 
-rem --- Otherwise clean up stale/partial Cohere processes so they don't pile up.
+rem --- Otherwise clean up stale/partial Cohear processes so they don't pile up.
 rem Matches ONLY this project's dev stack; spares qmd and any other node app.
-echo Cleaning up old Cohere processes...
+echo Cleaning up old Cohear processes...
 powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter 'name=''node.exe''' | Where-Object { $_.CommandLine -and ($_.CommandLine -match 'musicathon|concurrently|dev:gateway|dev:web|api-gateway|server\.js') -and ($_.CommandLine -notmatch 'qmd') } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }" >nul 2>&1
 
 rem Free the ports too, in case something else parked on them.
 for %%P in (%WEB% %API%) do for /f "tokens=5" %%K in ('netstat -ano ^| findstr ":%%P " ^| findstr LISTENING') do taskkill /PID %%K /F >nul 2>&1
 
-echo Starting Cohere dev stack ^(gateway :%API% + web :%WEB%^)...
+echo Starting Cohear dev stack ^(gateway :%API% + web :%WEB%^)...
 start /min "" cmd /c "cd /d %DIR% && npm run dev"
 
 rem --- Wait until the web server actually accepts connections (no fixed sleep) -

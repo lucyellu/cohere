@@ -6,3 +6,4 @@ dist/
 npm-debug.log*
 .cyanite-cache.json
 .lalalai-cache.json
+tmp/

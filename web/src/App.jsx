@@ -11,26 +11,21 @@ import ControlRoom from './components/ControlRoom.jsx';
 import LibraryView from './components/LibraryView.jsx';
 import BYOCModal, { getByocKey } from './components/BYOCModal.jsx';
 
-// Cohere — be in the crowd, from anywhere.
-// Three top-level surfaces: Live (the synchronized concert clock), Discover
-// (browse/search every concert, past + upcoming), and the original Archive
-// (globe / show / library / dev).
-
-const TABS = [
-  { id: 'live', label: '🔴 Live', active: 'bg-rose-500 text-white' },
-  { id: 'concerts', label: '🧭 Discover', active: 'bg-fuchsia-500 text-white' },
-  { id: 'archive', label: '📼 Archive', active: 'bg-indigo-500 text-white' },
+const NAV = [
+  { id: 'discover', label: 'Discover' },
+  { id: 'live', label: 'Live Rooms' },
+  { id: 'archive', label: 'Archive' },
 ];
 
 const ARCHIVE_TABS = [
-  { id: 'globe', label: '🌍 Globe' },
-  { id: 'show', label: '🎤 Show' },
-  { id: 'library', label: '🎵 Library' },
-  { id: 'dev', label: '🎛️ Dev' },
+  { id: 'globe', label: 'Globe' },
+  { id: 'show', label: 'Show' },
+  { id: 'library', label: 'Library' },
+  { id: 'dev', label: 'Dev' },
 ];
 
 export default function App() {
-  const [view, setView] = useState('live'); // 'live' | 'concerts' | 'archive'
+  const [view, setView] = useState('discover');
   const [liveEvent, setLiveEvent] = useState(null);
   const [archiveTab, setArchiveTab] = useState('globe');
   const [show, setShow] = useState(null);
@@ -40,11 +35,9 @@ export default function App() {
   function enterShow(stop) {
     setShow(stop);
     setArchiveTab('show');
-    setView('archive'); // Show lives under Archive; jump there from anywhere
+    setView('archive');
   }
 
-  // From the Concerts browser: spin a past show up as a synchronized Live replay
-  // room (real setlist.fm setlist), then jump to the Live tab.
   async function syncLive(concert) {
     const ev = await resolveEvent({
       artist: concert.artist,
@@ -64,88 +57,92 @@ export default function App() {
 
   return (
     <PlayerProvider>
-    <div className="mx-auto min-h-full max-w-6xl px-4 py-8 pb-28 text-zinc-100">
-      <header className="mb-6">
-        <div className="flex items-baseline gap-3">
-          <h1 className="text-2xl font-bold tracking-tight">
-            <span className="bg-gradient-to-r from-rose-400 to-fuchsia-400 bg-clip-text text-transparent">Cohere</span>
-          </h1>
-          <p className="text-sm text-zinc-500">Be in the crowd, from anywhere — same song, same second.</p>
-        </div>
+      <div className="min-h-full bg-cohear text-zinc-100">
+        <div className="mx-auto flex min-h-screen w-full max-w-[1480px] flex-col px-4 py-5 pb-28 sm:px-6 lg:px-8">
+          <header className="cohear-topbar">
+            <button className="flex min-w-0 items-center gap-3 text-left" onClick={() => setView('discover')} aria-label="Open Discover">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-amber-200/20 bg-amber-200/10 text-sm font-black text-amber-100">
+                C
+              </span>
+              <span className="min-w-0">
+                <span className="block text-lg font-semibold tracking-tight text-white">Cohear</span>
+                <span className="block truncate text-xs text-zinc-500">Find the biggest concerts happening now.</span>
+              </span>
+            </button>
 
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <nav className="inline-flex rounded-xl border border-white/10 bg-white/5 p-1">
-            {TABS.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setView(t.id)}
-                className={`rounded-lg px-4 py-2 text-sm font-medium transition ${view === t.id ? t.active : 'text-zinc-400 hover:text-zinc-200'}`}
-              >
-                {t.label}
+            <nav className="cohear-nav" aria-label="Primary navigation">
+              {NAV.map((item) => (
+                <button key={item.id} onClick={() => setView(item.id)} className={view === item.id ? 'active' : ''}>
+                  {item.label}
+                </button>
+              ))}
+            </nav>
+
+            <div className="hidden items-center gap-2 lg:flex">
+              {view === 'archive' && (
+                <button className="cohear-secondary" onClick={() => setByocOpen(true)}>
+                  BYOC
+                </button>
+              )}
+              <button className="cohear-primary" onClick={() => setView('discover')}>
+                Browse concerts
               </button>
-            ))}
-          </nav>
+            </div>
+          </header>
 
           {view === 'archive' && (
-            <button
-              onClick={() => setByocOpen(true)}
-              className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-zinc-400 transition hover:text-zinc-200"
-              title="Bring Your Own Compute"
-            >
-              ✨ BYOC
-            </button>
-          )}
-        </div>
-
-        {view === 'archive' && (
-          <nav className="mt-3 inline-flex rounded-xl border border-white/10 bg-white/5 p-1">
-            {ARCHIVE_TABS.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setArchiveTab(t.id)}
-                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${archiveTab === t.id ? 'bg-white/10 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'}`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </nav>
-        )}
-      </header>
-
-      {/* LIVE */}
-      {view === 'live' &&
-        (liveEvent ? (
-          <LiveRoom event={liveEvent} onBack={() => setLiveEvent(null)} />
-        ) : (
-          <LiveLanding onJoin={setLiveEvent} />
-        ))}
-
-      {/* DISCOVER — browse/search every concert, past + upcoming */}
-      {view === 'concerts' && <ConcertsView onEnterShow={enterShow} onSyncLive={syncLive} />}
-
-      {/* ARCHIVE */}
-      {view === 'archive' && (
-        <>
-          {archiveTab === 'globe' && <TourView onEnterShow={enterShow} />}
-          {archiveTab === 'show' &&
-            (show ? (
-              <ShowView show={show} onBack={() => setArchiveTab('globe')} onOpenByoc={() => setByocOpen(true)} />
-            ) : (
-              <div className="flex h-80 flex-col items-center justify-center gap-3 rounded-2xl border border-white/10 bg-black/40 text-center text-sm text-zinc-500">
-                <span>No show selected yet.</span>
-                <button onClick={() => setArchiveTab('globe')} className="rounded-lg bg-indigo-500 px-4 py-2 font-semibold text-white">
-                  Pick one from the Globe →
+            <nav className="mt-4 flex flex-wrap gap-2" aria-label="Archive navigation">
+              {ARCHIVE_TABS.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => setArchiveTab(item.id)}
+                  className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                    archiveTab === item.id
+                      ? 'border-white/20 bg-white text-zinc-950'
+                      : 'border-white/10 bg-white/[0.035] text-zinc-400 hover:text-zinc-100'
+                  }`}
+                >
+                  {item.label}
                 </button>
-              </div>
-            ))}
-          {archiveTab === 'library' && <LibraryView />}
-          {archiveTab === 'dev' && <ControlRoom />}
-        </>
-      )}
+              ))}
+            </nav>
+          )}
 
-      <BYOCModal open={byocOpen} onClose={() => setByocOpen(false)} onSaved={setByocKey} />
-    </div>
-    <BottomPlayer />
+          <main className="mt-5 flex-1">
+            {view === 'discover' && <ConcertsView onEnterShow={enterShow} onSyncLive={syncLive} />}
+
+            {view === 'live' &&
+              (liveEvent ? (
+                <LiveRoom event={liveEvent} onBack={() => setLiveEvent(null)} />
+              ) : (
+                <section className="cohear-panel p-5">
+                  <LiveLanding onJoin={setLiveEvent} />
+                </section>
+              ))}
+
+            {view === 'archive' && (
+              <>
+                {archiveTab === 'globe' && <TourView onEnterShow={enterShow} />}
+                {archiveTab === 'show' &&
+                  (show ? (
+                    <ShowView show={show} onBack={() => setArchiveTab('globe')} onOpenByoc={() => setByocOpen(true)} />
+                  ) : (
+                    <div className="cohear-panel flex h-80 flex-col items-center justify-center gap-3 text-center text-sm text-zinc-500">
+                      <span>No show selected yet.</span>
+                      <button onClick={() => setArchiveTab('globe')} className="cohear-primary">
+                        Pick one from the Globe
+                      </button>
+                    </div>
+                  ))}
+                {archiveTab === 'library' && <LibraryView />}
+                {archiveTab === 'dev' && <ControlRoom />}
+              </>
+            )}
+          </main>
+        </div>
+        <BYOCModal open={byocOpen} onClose={() => setByocOpen(false)} onSaved={setByocKey} />
+        <BottomPlayer />
+      </div>
     </PlayerProvider>
   );
 }

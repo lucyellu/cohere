@@ -3,12 +3,14 @@ Add-Type -AssemblyName System.Drawing
 $Dir       = $PSScriptRoot
 $IconPath  = Join-Path $Dir 'cohere.ico'
 $BatPath   = Join-Path $Dir 'launch-musicathon.bat'
-$LinkName  = 'Cohere.lnk'
+$LinkName  = 'Cohear.lnk'
 $LinkPath  = Join-Path ([Environment]::GetFolderPath('Desktop')) $LinkName
 
-# Remove the old Reverb shortcut (the app was renamed to Cohere).
-$OldLink = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Reverb.lnk'
-if (Test-Path $OldLink) { Remove-Item $OldLink -Force -EA SilentlyContinue }
+# Remove old shortcuts from earlier names.
+foreach ($OldName in @('Reverb.lnk', 'Cohere.lnk', 'Musicathon.lnk')) {
+    $OldLink = Join-Path ([Environment]::GetFolderPath('Desktop')) $OldName
+    if (Test-Path $OldLink) { Remove-Item $OldLink -Force -EA SilentlyContinue }
+}
 
 # -- Draw 256x256 icon: equalizer bars (concert / audio dashboard) --
 $size = 256
@@ -28,7 +30,7 @@ $path.CloseFigure()
 $g.FillPath((New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(255, 10, 10, 15))), $path)
 $g.DrawPath((New-Object System.Drawing.Pen ([System.Drawing.Color]::FromArgb(255, 244, 63, 94), 6)), $path)
 
-# Concentric "in sync" rings — a shared pulse radiating from one point (Cohere).
+# Concentric "in sync" rings — a shared pulse radiating from one point (Cohear).
 $rose    = [System.Drawing.Color]::FromArgb(255, 244, 63, 94)
 $fuchsia = [System.Drawing.Color]::FromArgb(255, 217, 70, 239)
 $cx = 128; $cy = 128
@@ -65,7 +67,7 @@ $lnk = $ws.CreateShortcut($LinkPath)
 $lnk.TargetPath       = $BatPath
 $lnk.WorkingDirectory = $Dir
 $lnk.IconLocation     = "$IconPath,0"
-$lnk.Description      = 'Launch Cohere (gateway + web) — be in the crowd, from anywhere'
+$lnk.Description      = 'Launch Cohear (gateway + web) — find the biggest concerts'
 $lnk.WindowStyle      = 7
 $lnk.Save()
 
