@@ -1,4 +1,4 @@
-# Netlify build for Cohere's web app (Vite SPA).
+# Netlify build for Cohear's web app (Vite SPA).
 # The web app is static; the gateway (Express, holds the secret partner keys)
 # must run somewhere reachable — see DEPLOY.md.
 

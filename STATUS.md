@@ -1,11 +1,11 @@
-# Cohere (formerly Reverb) — Status & Handoff
+# Cohear (formerly Cohere/Reverb) — Status & Handoff
 
 > Living doc for cross-session continuity. Update it as things change.
 > Last updated: 2026-06-17 (big feature session). Hackathon: **Musicathon 2026, June 15–21**.
 >
-> **Checkpoint:** all work committed + **pushed to `github.com/lucyellu/cohere.git`
-> (`main`)**; a **`dev` branch** was cut from this point for continued work. App
-> runs via `npm run dev` / the Cohere desktop shortcut. `.env` + `*-cache.json`
+> **Checkpoint:** active repo is `github.com/lucyellu/cohear.git`; current work
+> is on the **`dev` branch**. App
+> runs via `npm run dev` / the Cohear desktop shortcut. `.env` + `*-cache.json`
 > are gitignored (never pushed — keys were shared in chat, rotate after the
 > hackathon). Safe to start fresh.
 >
@@ -20,14 +20,15 @@
 >   via `youTubeTrackEnqueue` (ingests the song's YouTube source on Cyanite's
 >   side; disk-cached). **LALAL.AI LIVE** — Suno-track karaoke/instrumental
 >   (Library). **Open-Meteo weather LIVE** — venue conditions (current for live,
->   archive for replays). **Spotify BUILT but mock** — needs
->   `SPOTIFY_CLIENT_SECRET` in `.env` (id set) to light up the Discover
->   popularity chip.
+>   archive for replays). **Spotify is wired with credentials**, but the current
+>   local credential check returns **HTTP 403** from Spotify search, so the
+>   Discover popularity chip stays hidden until the Spotify app can read Web API
+>   search.
 > - **X/Twitter fan posts fixed** — text cards instead of broken `twitframe`
 >   iframes. **Desktop launcher fixed** — root cause was a **node process pileup**
 >   (fire-and-forget never cleaned up → ~45 orphans); launcher now self-heals.
 >
-> **TODO next:** (1) paste `SPOTIFY_CLIENT_SECRET`. (2) optional experiments
+> **TODO next:** (1) resolve Spotify Web API search 403 for the configured app. (2) optional experiments
 > offered: Google **Translation** (multilingual fan wall), **Static-Maps**
 > thumbnails on Discover cards, official **Twitter widgets.js** click-to-load
 > embed. (3) the live timeline is still a **labeled prediction** (real Musixmatch
@@ -40,7 +41,7 @@
 > setlist swap closes that gap. Keep these in separate trust domains in any "is
 > this real?" UI.
 
-## 🔴 Cohere — live sync pivot (added 2026-06-16)
+## 🔴 Cohear — live sync pivot (added 2026-06-16)
 
 **The pivot:** from an *asynchronous* tour archive ("relive a past show") to a
 *synchronous* "**be in the crowd, from anywhere**" experience — one shared UTC
@@ -163,7 +164,7 @@ leaked a `concurrently → npm → npm --prefix → vite/gateway` process tree. 
 the machine is starved). Killed the stale ones surgically (matched
 `musicathon|concurrently|dev:gateway|dev:web|api-gateway|server.js`, **spared
 qmd**). Rewrote the launcher to **self-heal**: fast-path opens the browser if
-BOTH ports are already up; otherwise it kills stale Cohere node procs (PowerShell
+BOTH ports are already up; otherwise it kills stale Cohear node procs (PowerShell
 `Get-CimInstance Win32_Process`, qmd-spared) + frees the ports, starts ONE fresh
 stack, polls until `:5173` listens, then opens. No more pileup. NB: `node --watch`
 + killing by-port-only (kills the listener, not the `concurrently`/`npm`
@@ -193,7 +194,7 @@ wrappers) is what leaked during dev testing too.
 - **"Biggest concert tonight"** is now answerable in-app (Discover › Tonight,
   sorted by capacity).
 
-**Added 2026-06-17 — Weather (live) + Spotify (pending secret):**
+**Added 2026-06-17 — Weather (live) + Spotify (wired, search 403):**
 - **Open-Meteo weather — LIVE, keyless.** `GET /api/weather?lat=&lng=&date=`
   (`routes.js`): no date / today → **current** conditions; past date → **archive**
   at ~9pm local. WMO code → emoji+label. New keyless service `openmeteo`. Wired
@@ -201,14 +202,16 @@ wrappers) is what leaked during dev testing too.
   `getWeather` in `liveApi.js`) — current for a live show, "that night" for a
   replay (great for open-air Rogers Stadium). Verified: Toronto 🌧️ 15°C live;
   Vancouver archive ☁️ 9.1°C @ 21:00.
-- **Spotify — BUILT, needs the secret.** Service `spotify` (`live`, gates on
-  `SPOTIFY_CLIENT_SECRET`). `SPOTIFY_CLIENT_ID=ab89f102…` set; **secret still
-  blank → runs mock.** Client-Credentials token (cached ~1h) + `/api/spotify/
-  artist?name=` and `/api/spotify/track?artist=&track=` → popularity (0-100),
-  followers, genres, album/artist art. (Spotify deprecated audio-features for new
-  apps — Cyanite covers mood, so we use Spotify for popularity + art only.) Wired:
-  **SpotifyChip** in the Concerts header (popularity + followers + artist image),
-  mock until the secret lands. **TODO: paste SPOTIFY_CLIENT_SECRET into `.env`.**
+- **Spotify — wired, but search returns 403.** Service `spotify` (`live`, gates
+  on `SPOTIFY_CLIENT_ID` + `SPOTIFY_CLIENT_SECRET`). Both are present in the local
+  gateway `.env`. Client-Credentials token is cached ~1h, then `/api/spotify/
+  artist?name=` and `/api/spotify/track?artist=&track=` can return popularity
+  (0-100), followers, genres, artist art, Spotify URLs, track popularity, album
+  art, and preview URLs where available. Spotify deprecated audio-features for
+  new apps, so Cyanite covers mood and Spotify is popularity + art only. Current
+  local check reaches Spotify but search responds **HTTP 403**, so the
+  **SpotifyChip** stays hidden until the app credentials are allowed to read Web
+  API search.
 
 **Added 2026-06-16 (second batch):**
 - **Accurate map** — `VenueMap` now **geocodes the venue by name** (`Geocoder`)
@@ -233,7 +236,7 @@ wrappers) is what leaked during dev testing too.
   a song plays its **YouTube top result** with a **Live/Music** toggle (cached in
   localStorage to spare the ~100/day quota).
 
-**How to run / try Cohere:** `npm run dev` from repo root (or the **Cohere**
+**How to run / try Cohear:** `npm run dev` from repo root (or the **Cohear**
 desktop shortcut) → gateway **:5001**, web **:5173**. Then in the app:
 1. **🔴 Live** tab (the home) → two featured cards: **Post Malone** (live tonight,
    Rogers Stadium) + **Madison Beer** (replay of a real past Vancouver show).
@@ -247,14 +250,14 @@ desktop shortcut) → gateway **:5001**, web **:5173**. Then in the app:
 5. Click any song → it plays in the **persistent bottom player** (Live/Music).
 6. **📼 Archive** tab = the original Reverb (globe / show / library / dev).
 
-**Repo:** `https://github.com/lucyellu/cohere.git` (origin, push to `main`).
+**Repo:** `https://github.com/lucyellu/cohear.git` (origin, current branch `dev`).
 
 **Deploy for judges:** see **[DEPLOY.md](DEPLOY.md)** — web → Netlify
 (`netlify.toml` present), gateway → Render/Railway/Fly/tunnel, then point the
 `/api/*` redirect at it. **Set in the relevant host's env** (not committed):
 `VITE_GOOGLE_MAPS_KEY`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (web/Netlify)
 and all `api-gateway/.env` keys incl. `RAPIDAPI_KEY` (gateway host). Local run
-always works (Cohere desktop shortcut).
+always works (Cohear desktop shortcut).
 
 **Open follow-ups / ideas (none blocking):**
 - **Rotate keys** after the hackathon — `RAPIDAPI_KEY` + the Google/partner keys
@@ -442,5 +445,5 @@ This session added three layers to the gateway + a Library tab. **What actually 
 - **Suno generation** (only if wanted) — integrate a paid third-party Suno REST API (~$0.02/song) for real programmatic gen + the audio-seed pipeline stage. No free clean path exists.
 
 ## Links
-- Repo: https://github.com/lucyellu/musicathon
+- Repo: https://github.com/lucyellu/cohear
 - Cross-session memory also lives in Claude's project memory (`musicathon-project`).

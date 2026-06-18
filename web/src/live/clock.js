@@ -1,4 +1,4 @@
-// Cohere's shared clock.
+// Cohear's shared clock.
 //
 // Everything anchors to one absolute UTC instant per song, so the stadium and
 // the bedroom are on the same moment. Two jobs:

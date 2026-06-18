@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchConcerts, sortConcerts, filterWhen, spotifyArtist, C_SORTS, defaultDir } from '../concerts.js';
 import { fmtCapacity, fmtDate } from '../tour.js';
+import { loadGoogleMaps, hasMapsKey } from '../live/maps.js';
 
 const VIEW_MODES = [
   { id: 'list', label: 'List' },
@@ -207,7 +208,7 @@ export default function ConcertsView({ onEnterShow, onSyncLive }) {
       ) : (
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
           <main className="min-w-0">
-            {mode === 'list' && <ConcertTable rows={visible} selectedId={selected?.id} onSelect={setSelectedId} saved={saved} userZone={userZone} now={now} />}
+            {mode === 'list' && <ConcertTable rows={visible} selectedId={selected?.id} onSelect={setSelectedId} saved={saved} userZone={userZone} now={now} onSyncLive={onSyncLive} />}
             {mode === 'map' && <ConcertMap rows={visible} selectedId={selected?.id} onSelect={setSelectedId} />}
             {mode === 'calendar' && <ConcertCalendar rows={visible} selectedId={selected?.id} onSelect={setSelectedId} />}
           </main>
@@ -364,25 +365,40 @@ function ControlSurface(props) {
   );
 }
 
-function ConcertTable({ rows, selectedId, onSelect, saved, userZone, now }) {
+function ConcertTable({ rows, selectedId, onSelect, saved, userZone, now, onSyncLive }) {
+  const [syncingId, setSyncingId] = useState(null);
+  async function join(c) {
+    if (!onSyncLive || syncingId) return;
+    setSyncingId(c.id);
+    try {
+      await onSyncLive(c);
+    } finally {
+      setSyncingId(null);
+    }
+  }
+
   return (
     <div className="cohear-panel overflow-hidden">
-      <div className="grid grid-cols-[56px_minmax(190px,1.15fr)_minmax(180px,1fr)_130px_190px_90px] border-b border-white/10 px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-zinc-500 max-lg:hidden">
+      <div className="grid grid-cols-[56px_minmax(170px,1.05fr)_minmax(170px,1fr)_120px_190px_90px_92px] border-b border-white/10 px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-zinc-500 max-lg:hidden">
         <span>Rank</span>
         <span>Artist</span>
         <span>Venue</span>
         <span>City</span>
         <span>Time</span>
         <span className="text-right">Seats</span>
+        <span className="text-right">Live</span>
       </div>
       <ol className="max-h-[660px] overflow-y-auto">
         {rows.map((c, i) => (
-          <li key={c.id}>
+          <li
+            key={c.id}
+            className={`grid gap-3 border-b border-white/[0.06] px-4 py-4 last:border-b-0 lg:grid-cols-[56px_minmax(170px,1.05fr)_minmax(170px,1fr)_120px_190px_90px_92px] lg:items-center ${
+              c.id === selectedId ? 'bg-cyan-300/[0.08]' : 'hover:bg-white/[0.035]'
+            }`}
+          >
             <button
               onClick={() => onSelect(c.id)}
-              className={`grid w-full gap-3 border-b border-white/[0.06] px-4 py-4 text-left transition last:border-b-0 lg:grid-cols-[56px_minmax(190px,1.15fr)_minmax(180px,1fr)_130px_190px_90px] lg:items-center ${
-                c.id === selectedId ? 'bg-cyan-300/[0.08]' : 'hover:bg-white/[0.035]'
-              }`}
+              className="contents text-left"
             >
               <span className="flex items-center gap-3 text-sm font-semibold text-zinc-300">
                 <span className="w-7 tabular-nums text-zinc-500">{String(i + 1).padStart(2, '0')}</span>
@@ -398,6 +414,13 @@ function ConcertTable({ rows, selectedId, onSelect, saved, userZone, now }) {
               <span className="hidden truncate text-sm text-zinc-400 lg:block">{[c.city, c.country].filter(Boolean).join(', ')}</span>
               <TimeStack concert={c} userZone={userZone} now={now} />
               <span className="text-left text-sm font-semibold tabular-nums text-amber-200 lg:text-right">{fmtCapacity(c.capacity)}</span>
+            </button>
+            <button
+              className="cohear-primary min-h-9 justify-center px-3 text-xs lg:justify-self-end"
+              onClick={() => join(c)}
+              disabled={syncingId === c.id}
+            >
+              {syncingId === c.id ? 'Opening' : 'Join'}
             </button>
           </li>
         ))}
@@ -425,9 +448,16 @@ function ConcertInspector({ concert, saved, sources, userZone, now, onSave, onEn
         <div className="flex h-full flex-col justify-between">
           <div className="flex items-center justify-between">
             <StatusPill when={concert.when} />
-            <button className="cohear-icon-button" onClick={onSave} title={saved ? 'Remove saved concert' : 'Save concert'}>
-              <BookmarkIcon filled={saved} />
-            </button>
+            <div className="flex items-center gap-2">
+              {onSyncLive && (
+                <button className="cohear-primary min-h-9 px-3 text-xs" onClick={sync} disabled={syncing}>
+                  {syncing ? 'Opening' : 'Join live'}
+                </button>
+              )}
+              <button className="cohear-icon-button" onClick={onSave} title={saved ? 'Remove saved concert' : 'Save concert'}>
+                <BookmarkIcon filled={saved} />
+              </button>
+            </div>
           </div>
           <div>
             <div className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-500">Selected concert</div>
@@ -465,11 +495,6 @@ function ConcertInspector({ concert, saved, sources, userZone, now, onSave, onEn
         <MiniMap concert={concert} />
 
         <div className="grid gap-2">
-          {onSyncLive && (
-            <button className="cohear-primary w-full justify-center" onClick={sync} disabled={syncing}>
-              {syncing ? 'Opening live room...' : 'Join live room'}
-            </button>
-          )}
           {onEnterShow && (
             <button className="cohear-secondary w-full justify-center" onClick={() => onEnterShow(concert)}>
               Open archive replay
@@ -507,34 +532,165 @@ function ConcertInspector({ concert, saved, sources, userZone, now, onSave, onEn
 }
 
 function ConcertMap({ rows, selectedId, onSelect }) {
+  const mapRef = useRef(null);
+  const stateRef = useRef({ map: null, maps: null, markers: new Map(), fittedKey: '' });
+  const [err, setErr] = useState(hasMapsKey() ? null : 'missing-key');
+  const [mapReady, setMapReady] = useState(false);
   const mappable = rows.filter((c) => c.lat != null && c.lng != null);
+
+  useEffect(() => {
+    if (!hasMapsKey()) return;
+    let cancelled = false;
+    loadGoogleMaps()
+      .then((maps) => {
+        if (cancelled || !mapRef.current) return;
+        stateRef.current.maps = maps;
+        const map = new maps.Map(mapRef.current, {
+          center: { lat: 25, lng: 0 },
+          zoom: 2,
+          mapTypeId: 'roadmap',
+          disableDefaultUI: true,
+          zoomControl: true,
+          gestureHandling: 'greedy',
+          backgroundColor: '#09090b',
+          styles: GOOGLE_DARK_MAP,
+        });
+        stateRef.current.map = map;
+        setMapReady(true);
+        setErr(null);
+        window.setTimeout(() => {
+          if (cancelled || !mapRef.current) return;
+          const rendered = mapRef.current.querySelector('.gm-style, img, canvas');
+          if (!rendered) {
+            setMapReady(false);
+            setErr('maps render timed out');
+          }
+        }, 4000);
+      })
+      .catch((e) => {
+        setMapReady(false);
+        setErr(e.message || 'map failed');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const { map, maps, markers } = stateRef.current;
+    if (!map || !maps) return;
+    const ids = new Set(mappable.map((c) => c.id));
+    for (const [id, marker] of markers) {
+      if (!ids.has(id)) {
+        marker.setMap(null);
+        markers.delete(id);
+      }
+    }
+    const bounds = new maps.LatLngBounds();
+    for (const c of mappable) {
+      const position = { lat: Number(c.lat), lng: Number(c.lng) };
+      bounds.extend(position);
+      const scale = Math.max(6, Math.min(24, Math.sqrt(c.capacity || 4000) / 28));
+      const icon = {
+        path: maps.SymbolPath.CIRCLE,
+        scale: c.id === selectedId ? scale + 4 : scale,
+        fillColor: c.id === selectedId ? '#67e8f9' : '#fbbf24',
+        fillOpacity: c.id === selectedId ? 0.95 : 0.74,
+        strokeColor: '#ffffff',
+        strokeWeight: c.id === selectedId ? 2 : 0.8,
+      };
+      let marker = markers.get(c.id);
+      if (!marker) {
+        marker = new maps.Marker({ position, map, title: `${c.artist} - ${c.venue}` });
+        marker.addListener('click', () => onSelect(c.id));
+        markers.set(c.id, marker);
+      }
+      marker.setPosition(position);
+      marker.setIcon(icon);
+      marker.setZIndex(c.id === selectedId ? 1000 : 1);
+    }
+    const fittedKey = mappable.map((c) => c.id).join('|');
+    if (mappable.length && stateRef.current.fittedKey !== fittedKey) {
+      map.fitBounds(bounds, 72);
+      stateRef.current.fittedKey = fittedKey;
+    }
+  }, [mappable, onSelect, selectedId]);
+
+  useEffect(() => {
+    const { map } = stateRef.current;
+    const selected = rows.find((c) => c.id === selectedId);
+    if (map && selected?.lat != null && selected?.lng != null) {
+      map.panTo({ lat: Number(selected.lat), lng: Number(selected.lng) });
+    }
+  }, [rows, selectedId]);
+
+  if (err) {
+    return <FallbackMap rows={mappable} selectedId={selectedId} onSelect={onSelect} reason={err} />;
+  }
+
   return (
     <div className="cohear-panel overflow-hidden">
       <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
         <div>
           <h3 className="text-sm font-semibold text-white">Concert map</h3>
-          <p className="mt-1 text-xs text-zinc-500">Dot size follows known attendance capacity.</p>
+          <p className="mt-1 text-xs text-zinc-500">Google Maps markers sized by known attendance capacity.</p>
         </div>
         <span className="text-xs text-zinc-500">{mappable.length} mapped</span>
       </div>
-      <div className="relative h-[620px] overflow-hidden bg-[linear-gradient(135deg,#0a0d12,#111827_45%,#07110f)]">
-        <div className="absolute inset-6 rounded-lg border border-white/10 bg-[radial-gradient(circle_at_20%_20%,rgba(34,211,238,.08),transparent_20%),radial-gradient(circle_at_70%_45%,rgba(245,158,11,.09),transparent_24%)]" />
-        {mappable.map((c) => {
-          const x = ((Number(c.lng) + 180) / 360) * 100;
-          const y = ((90 - Number(c.lat)) / 180) * 100;
-          const size = Math.max(8, Math.min(30, Math.sqrt(c.capacity || 3000) / 18));
-          return (
-            <button
-              key={c.id}
-              onClick={() => onSelect(c.id)}
-              className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full border transition hover:scale-125 ${
-                c.id === selectedId ? 'border-white bg-cyan-300 shadow-[0_0_24px_rgba(34,211,238,.45)]' : 'border-amber-100/70 bg-amber-300/80'
-              }`}
-              style={{ left: `${x}%`, top: `${y}%`, width: size, height: size }}
-              title={`${c.artist} at ${c.venue}`}
-            />
-          );
-        })}
+      <div className="relative">
+        <div ref={mapRef} aria-label="Concert location map" className="h-[620px] w-full bg-zinc-950" />
+        {!mapReady && (
+          <div className="pointer-events-none absolute inset-0 grid place-items-center bg-zinc-950/80 text-sm text-zinc-400">
+            Loading Google Maps...
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FallbackMap({ rows, selectedId, onSelect, reason }) {
+  const plotted = rows.slice(0, 80).map((c) => ({
+    ...c,
+    point: projectMapPoint(Number(c.lat), Number(c.lng)),
+    size: Math.max(12, Math.min(34, Math.sqrt(c.capacity || 4000) / 12)),
+  }));
+  const reasonText =
+    reason === 'missing-key'
+      ? 'Google Maps key is missing, so Cohear is showing its built-in coordinate map.'
+      : `Google Maps did not finish loading (${reason}), so Cohear is showing its built-in coordinate map.`;
+
+  return (
+    <div className="cohear-panel overflow-hidden">
+      <div className="flex items-center justify-between gap-4 border-b border-white/10 px-5 py-4">
+        <div>
+          <h3 className="text-sm font-semibold text-white">Concert map</h3>
+          <p className="mt-1 text-xs text-zinc-500">{reasonText}</p>
+        </div>
+        <span className="shrink-0 text-xs text-zinc-500">{plotted.length} mapped</span>
+      </div>
+      <div
+        aria-label="Concert location map"
+        className="relative h-[620px] overflow-hidden bg-[radial-gradient(circle_at_30%_20%,rgba(34,211,238,.18),transparent_30%),linear-gradient(145deg,#09090b,#101216)]"
+      >
+        <div className="absolute inset-x-8 top-1/2 border-t border-white/10" />
+        <div className="absolute inset-y-8 left-1/2 border-l border-white/10" />
+        {plotted.map((c) => (
+          <button
+            key={c.id}
+            className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full border transition ${
+              c.id === selectedId ? 'z-20 border-white bg-cyan-300 shadow-[0_0_24px_rgba(103,232,249,.5)]' : 'z-10 border-white/70 bg-amber-300/80 hover:bg-amber-200'
+            }`}
+            style={{
+              left: `${c.point.x}%`,
+              top: `${c.point.y}%`,
+              width: c.size,
+              height: c.size,
+            }}
+            onClick={() => onSelect(c.id)}
+            title={`${c.artist} - ${c.venue}`}
+          />
+        ))}
       </div>
     </div>
   );
@@ -723,8 +879,14 @@ function showStartMs(concert) {
   if (!concert?.date) return null;
   const raw = concert.startDate || '';
   if (raw.includes('T')) {
-    const d = new Date(raw);
-    if (!Number.isNaN(d.getTime())) return d.getTime();
+    if (/[zZ]|[+-]\d{2}:?\d{2}$/.test(raw)) {
+      const d = new Date(raw);
+      if (!Number.isNaN(d.getTime())) return d.getTime();
+    }
+    const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(raw);
+    if (m) {
+      return zonedToUtc(venueTimeZone(concert), Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4]), Number(m[5]));
+    }
   }
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(concert.date);
   if (!m) return null;
@@ -732,6 +894,7 @@ function showStartMs(concert) {
 }
 
 function venueTimeZone(concert) {
+  if (concert?.timeZone) return concert.timeZone;
   const country = String(concert?.country || '').toLowerCase();
   const region = String(concert?.region || '').toUpperCase();
   const city = String(concert?.city || '').toLowerCase();
@@ -757,8 +920,28 @@ function venueTimeZone(concert) {
   if (/germany/.test(country)) return 'Europe/Berlin';
   if (/spain/.test(country)) return 'Europe/Madrid';
   if (/netherlands/.test(country)) return 'Europe/Amsterdam';
+  if (/belgium/.test(country)) return 'Europe/Brussels';
+  if (/switzerland/.test(country)) return 'Europe/Zurich';
+  if (/austria/.test(country)) return 'Europe/Vienna';
+  if (/poland/.test(country)) return 'Europe/Warsaw';
+  if (/czech/.test(country)) return 'Europe/Prague';
+  if (/hungary/.test(country)) return 'Europe/Budapest';
+  if (/lithuania/.test(country)) return 'Europe/Vilnius';
+  if (/latvia/.test(country)) return 'Europe/Riga';
+  if (/estonia/.test(country)) return 'Europe/Tallinn';
+  if (/denmark/.test(country)) return 'Europe/Copenhagen';
+  if (/norway/.test(country)) return 'Europe/Oslo';
+  if (/finland/.test(country)) return 'Europe/Helsinki';
   if (/sweden/.test(country)) return 'Europe/Stockholm';
+  if (/portugal/.test(country)) return 'Europe/Lisbon';
+  if (/greece/.test(country)) return 'Europe/Athens';
+  if (/turkey/.test(country)) return 'Europe/Istanbul';
   if (/japan/.test(country)) return 'Asia/Tokyo';
+  if (/south korea|korea/.test(country)) return 'Asia/Seoul';
+  if (/china/.test(country)) return 'Asia/Shanghai';
+  if (/singapore/.test(country)) return 'Asia/Singapore';
+  if (/india/.test(country)) return 'Asia/Kolkata';
+  if (/united arab emirates|uae/.test(country)) return 'Asia/Dubai';
   if (/australia/.test(country)) return city.includes('perth') ? 'Australia/Perth' : 'Australia/Sydney';
   if (/new zealand/.test(country)) return 'Pacific/Auckland';
   if (/mexico/.test(country)) return 'America/Mexico_City';
@@ -795,6 +978,17 @@ function tzOffsetMs(tz, utcMs) {
 function zonedToUtc(tz, y, mo, d, h, mi) {
   const guess = Date.UTC(y, mo - 1, d, h, mi);
   return guess - tzOffsetMs(tz, guess);
+}
+
+function projectMapPoint(lat, lng) {
+  const clampedLat = Math.max(-85, Math.min(85, lat));
+  const sin = Math.sin((clampedLat * Math.PI) / 180);
+  const x = ((lng + 180) / 360) * 100;
+  const y = (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI)) * 100;
+  return {
+    x: Math.max(4, Math.min(96, x)),
+    y: Math.max(5, Math.min(95, y)),
+  };
 }
 
 function SourceBadges({ sources }) {
@@ -844,3 +1038,14 @@ function ClockIcon() {
 function BookmarkIcon({ filled }) {
   return <svg viewBox="0 0 24 24" className="h-4 w-4" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2"><path d="M6 4.8A1.8 1.8 0 0 1 7.8 3h8.4A1.8 1.8 0 0 1 18 4.8V21l-6-3.4L6 21V4.8Z" /></svg>;
 }
+
+const GOOGLE_DARK_MAP = [
+  { elementType: 'geometry', stylers: [{ color: '#17191f' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#a1a1aa' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#09090b' }] },
+  { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#3f3f46' }] },
+  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#27272a' }] },
+  { featureType: 'road', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
+];

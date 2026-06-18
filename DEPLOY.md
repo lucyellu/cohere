@@ -1,6 +1,6 @@
-# Deploying Cohere (so judges can open a URL)
+# Deploying Cohear (so judges can open a URL)
 
-Cohere is two pieces:
+Cohear is two pieces:
 
 1. **web/** — the Vite SPA (Live room, map, fan wall). Static → **Netlify**.
 2. **api-gateway/** — Express server holding the **secret partner keys**
@@ -15,8 +15,9 @@ Cohere is two pieces:
 - **Root / start:** `node api-gateway/server.js` (or root dir `api-gateway`, start `npm start`).
 - **Env vars:** copy every key from `api-gateway/.env`
   (`SETLISTFM_API_KEY`, `YOUTUBE_API_KEY`, `MUSIXMATCH_API_KEY`, `JAMBASE_API_KEY`,
-  `USE_MOCK_DATA=false`, `PORT` → the host sets this).
-- Note the public URL, e.g. `https://cohere-gateway.onrender.com`.
+  `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `USE_MOCK_DATA=false`,
+  `PORT` -> the host sets this).
+- Note the public URL, e.g. `https://cohear-gateway.onrender.com`.
 
 > Quick demo alternative: run the gateway locally and expose it with a tunnel
 > (`npx localtunnel --port 5001` or `cloudflared tunnel --url http://localhost:5001`).
@@ -54,5 +55,5 @@ crowd beacons instead of a live viewer tally.
 ---
 
 ### Local run (always works, no deploy)
-Double-click the **Cohere** desktop shortcut, or `npm run dev` from the repo root
+Double-click the **Cohear** desktop shortcut, or `npm run dev` from the repo root
 → gateway on :5001, web on :5173 (LAN-exposed for phones/iPad).

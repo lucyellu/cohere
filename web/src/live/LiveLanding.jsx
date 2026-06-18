@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getFeaturedList, resolveEvent } from './liveApi.js';
 
-// The door into Cohere. A featured live show (Post Malone @ Rogers Stadium) you
+// The door into Cohear. A featured live show (Post Malone @ Rogers Stadium) you
 // can join in one tap, plus a search to summon any artist as a live room or a
 // synced replay of their most recent show.
 
@@ -32,7 +32,7 @@ export default function LiveLanding({ onJoin }) {
       <div className="text-center">
         <h2 className="text-3xl font-bold text-zinc-50">Be in the crowd, from anywhere.</h2>
         <p className="mx-auto mt-2 max-w-xl text-sm text-zinc-400">
-          Cohere locks you to the same moment as everyone at the show — same song, same second.
+          Cohear locks you to the same moment as everyone at the show — same song, same second.
           50,000 people in the stadium and you on your couch, in sync.
         </p>
       </div>

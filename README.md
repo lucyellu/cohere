@@ -1,14 +1,18 @@
-# Cohere — be in the crowd, from anywhere
+# Cohear — find the biggest concerts, then join the live crowd
 
 > **New session? Read [STATUS.md](STATUS.md)** — the living handoff doc: current state, API key status, what's next, and gotchas. Deploy steps: [DEPLOY.md](DEPLOY.md).
 
-**Concept (the pivot, 2026-06-16):** Cohere turns a concert into a **shared
+**Concept:** Cohear is a concert discovery and live-room app. It opens on the
+biggest concerts happening now or soon, ranked by known venue capacity, then lets
+you search by artist/city/venue, sort by attendance/popularity/date/alphabet, and
+join a synchronized live room for a selected show.
+
+The live-room idea is still the core: Cohear turns a concert into a **shared
 synchronized clock**. Everyone locks to the same absolute (UTC) instant, so the
-50,000 people in the stadium and you on your couch are on the **same song at the
-same second**. Pick the featured live show (Post Malone @ Rogers Stadium, Toronto)
-or summon any artist → a synced Live Room with a satellite venue map, a live
-now-playing + setlist timeline, crowd **tap-to-sync** drift correction, and a fan
-footage wall (fresh YouTube uploads + livestreams + crowd-curated clips).
+50,000 people in the stadium and you on your couch can follow the **same song at
+the same second**. Pick a featured live show or summon any artist -> a synced
+Live Room with a venue map, now-playing + setlist timeline, crowd **tap-to-sync**
+drift correction, and a fan footage wall.
 
 **How the live timecode works** (no API streams "now playing", so 3 layers):
 1. **Predict** — start time + real setlist order (setlist.fm) + a duration model.
@@ -34,10 +38,10 @@ Songstats, Cyanite, JamBase, N8N, Replit.
 
 ## This repo so far
 
-Three top-level tabs: **🔴 Live** (the home — Cohere), **🧭 Discover** (browse &
-search every concert), and **📼 Archive** (the original Reverb).
+Three top-level tabs: **Live Rooms**, **Discover** (browse & search every
+concert), and **Archive** (the original Reverb-style replay surface).
 
-### 🔴 Live (Cohere)
+### Live Rooms (Cohear)
 - **Landing** — a featured **live** show (Post Malone @ Rogers Stadium, Toronto)
   and a featured **replay** (Madison Beer's real past Vancouver show), plus a box
   to summon any artist as a live or replay room from their real setlist.
@@ -68,11 +72,24 @@ search every concert), and **📼 Archive** (the original Reverb).
 Browse **every concert, past + upcoming, with no search needed**. Opens on what's
 on this week, sorted **biggest-first** by venue capacity ("the biggest concert
 tonight"), pulled live from JamBase. Three lenses over one list — **List / Map /
-Calendar** — with sort by date, attendance (capacity), popularity, songs, artist,
-venue, or city. Type an artist to switch to *their* past (setlist.fm) + upcoming
-(JamBase) shows; each show can **Relive** (Archive) or **Sync in the Live room**.
-A Spotify popularity/followers chip shows for a searched artist (once
-`SPOTIFY_CLIENT_SECRET` is set).
+Calendar** — with sort by date, attendance (capacity), popularity, artist, venue,
+or city. Type an artist to switch to *their* past (setlist.fm) + upcoming
+(JamBase) shows; each show can open an archive replay or **Join** a Live Room.
+
+Every show displays both the concert-city local time and the user's selected
+city time, plus a countdown based on the venue's timezone. Results are cached in
+memory and localStorage for 10 minutes so repeated browse reloads do not keep
+hammering the live APIs. The Map view prefers Google Maps when the configured key
+loads, and falls back to a built-in coordinate map if Google stalls.
+
+Spotify is wired through the gateway with server-side Client Credentials. The
+endpoints are ready for:
+- artist popularity score (0-100), follower count, genres, artist image, Spotify URL
+- track popularity score, album name, album art, preview URL when Spotify provides one
+
+Current local credential check: Spotify auth is configured, but `/api/spotify/*`
+is returning `HTTP 403` from Spotify search, so the UI hides the Spotify chip
+until the app credentials are allowed to read Web API search.
 
 ### 📼 Archive (Reverb)
 
@@ -95,7 +112,7 @@ A Spotify popularity/followers chip shows for a searched artist (once
   and a per-service mock⇄live toggle. Mock-first: the UI never blocks on missing keys.
 
 ```
-musicathon/
+cohear/
 ├── api-gateway/        Express proxy (port 5001) — keys, mocks, usage, routing
 │   ├── .env            ← real keys (gitignored)
 │   └── src/
@@ -134,7 +151,7 @@ Open `http://localhost:5173`. The Vite dev server is exposed on the LAN
 | **Cyanite** | 🟢 live | GraphQL mood/energy/BPM. `youTubeTrackEnqueue` → poll → `audioAnalysisV6`; results disk-cached (`.cyanite-cache.json`). Drives the Live-room **Room mood**. (Spotify-catalog analysis is `NotAuthorized` on this tier — YouTube enqueue is the path.) |
 | **LALAL.AI** | 🟢 live | Stem separation. `Authorization: license <key>`; upload → split → poll. **Scoped to Suno tracks** (rights-clear audio) → Library **🎤 Karaoke**. Disk-cached (`.lalalai-cache.json`); ~287 processing min on the key. |
 | **Open-Meteo** | 🟢 live (keyless) | Venue weather — current (live shows) + archive (replays). No key, no cost. |
-| **Spotify** | 🟠 id set, **needs secret** | Client-Credentials (id + **secret**). Paste `SPOTIFY_CLIENT_SECRET` in `.env` for real popularity/followers/art (Discover chip). Audio-features are deprecated for new apps — Cyanite covers mood, so Spotify is popularity + art only. |
+| **Spotify** | 🟠 wired, search currently 403 | Client-Credentials id + secret are configured server-side. Routes: `/api/spotify/artist?name=` and `/api/spotify/track?artist=&track=`. Once Spotify allows Web API search for the app, Cohear can show popularity, followers, genres, artist art, track popularity, album art, and preview URLs. Audio-features are deprecated for new apps — Cyanite covers mood, so Spotify is popularity + art only. |
 | ElevenLabs | ⚪ no key | Mock-only until a key is added to `.env` (planned: AI hype-host TTS) |
 
 > JamBase note: artist *search* is jam-band-heavy on the trial, but **browse

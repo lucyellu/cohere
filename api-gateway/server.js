@@ -22,11 +22,11 @@ app.use((req, res, next) => {
 app.use('/api', routes);
 
 app.get('/', (_req, res) => {
-  res.json({ name: 'Musicathon API Gateway', health: '/api/health' });
+  res.json({ name: 'Cohear API Gateway', health: '/api/health' });
 });
 
 app.listen(PORT, () => {
-  console.log(`\n  🎛️  Musicathon API Gateway`);
+  console.log(`\n  🎛️  Cohear API Gateway`);
   console.log(`  ➜  http://localhost:${PORT}`);
   console.log(`  ➜  health: http://localhost:${PORT}/api/health`);
   console.log(`  ➜  mock default: ${String(process.env.USE_MOCK_DATA).toLowerCase() !== 'false' ? 'ON' : 'OFF'}\n`);

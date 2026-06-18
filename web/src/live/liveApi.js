@@ -1,11 +1,11 @@
-// Cohere gateway client (same-origin via the Vite proxy) + anonymous identity.
+// Cohear gateway client (same-origin via the Vite proxy) + anonymous identity.
 
 // --- Anonymous guest identity -------------------------------------------
 // Zero-friction: a judge opens the URL and is instantly "in the crowd". We mint
 // a stable guest id (localStorage) and let them optionally set a display name.
 // (Supabase anonymous auth layers on top of this in the presence module.)
-const ID_KEY = 'cohere_uid';
-const NAME_KEY = 'cohere_name';
+const ID_KEY = 'cohear_uid';
+const NAME_KEY = 'cohear_name';
 
 function randomId() {
   const a = new Uint8Array(8);
@@ -127,7 +127,7 @@ export async function analyzeMood({ song, artist, videoId } = {}) {
 // --- YouTube top result for a song (drives the persistent player) --------
 // Cached in localStorage by query so re-plays don't re-spend the ~100/day quota.
 export async function youtubeTop(query) {
-  const key = `cohere_yt_${query}`;
+  const key = `cohear_yt_${query}`;
   const cached = localStorage.getItem(key);
   if (cached) {
     try {

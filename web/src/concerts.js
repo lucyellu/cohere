@@ -2,15 +2,63 @@
 // normalized, deduped list spanning PAST (setlist.fm) + UPCOMING (JamBase)
 // shows. The List / Map / Calendar views all render off this same array.
 
-// No artist => DISCOVER everything in a date window ('tonight'|'week'|'upcoming').
+const CACHE_TTL_MS = 10 * 60 * 1000;
+const memoryCache = new Map();
+const pending = new Map();
+
+function cacheKey(artist, source, window) {
+  return `cohear_concerts_v4:${artist || 'browse'}:${source || 'default'}:${window || 'default'}`;
+}
+
+function readCached(key) {
+  const mem = memoryCache.get(key);
+  if (mem && Date.now() - mem.ts < CACHE_TTL_MS) return mem.value;
+  try {
+    const parsed = JSON.parse(localStorage.getItem(key) || 'null');
+    if (parsed && Date.now() - parsed.ts < CACHE_TTL_MS) {
+      memoryCache.set(key, parsed);
+      return parsed.value;
+    }
+  } catch {
+    /* ignore bad cache entries */
+  }
+  return null;
+}
+
+function writeCached(key, value) {
+  const entry = { ts: Date.now(), value };
+  memoryCache.set(key, entry);
+  try {
+    localStorage.setItem(key, JSON.stringify(entry));
+  } catch {
+    /* storage can be full or unavailable */
+  }
+}
+
+// No artist => DISCOVER everything in a date window ('tonight'|'week'|'upcoming'|'past').
 // An artist => that artist's past (setlist.fm) + upcoming (JamBase).
-export async function fetchConcerts(artist, source = 'live', window = 'week') {
+export async function fetchConcerts(artist, source = 'live', window = 'week', { force = false } = {}) {
   const p = new URLSearchParams();
   if (artist) p.set('artist', artist);
   if (source) p.set('source', source);
   if (!artist && window) p.set('window', window);
-  const r = await fetch(`/api/concerts?${p.toString()}`).then((x) => x.json()).catch(() => null);
-  return { concerts: r?.concerts || [], sources: r?.sources || {}, browse: Boolean(r?.browse), window: r?.window, ok: Boolean(r?.ok) };
+  const key = cacheKey(artist, source, window);
+  if (!force) {
+    const cached = readCached(key);
+    if (cached) return { ...cached, cached: true };
+    if (pending.has(key)) return pending.get(key);
+  }
+  const request = fetch(`/api/concerts?${p.toString()}`)
+    .then((x) => x.json())
+    .then((r) => {
+      const value = { concerts: r?.concerts || [], sources: r?.sources || {}, browse: Boolean(r?.browse), window: r?.window, ok: Boolean(r?.ok), cached: false };
+      if (value.ok) writeCached(key, value);
+      return value;
+    })
+    .catch(() => ({ concerts: [], sources: {}, browse: false, window, ok: false, cached: false }))
+    .finally(() => pending.delete(key));
+  pending.set(key, request);
+  return request;
 }
 
 // Each sort has a key getter and a sensible default direction (numbers high→low,
@@ -42,7 +90,7 @@ export function sortConcerts(list, key, dir) {
   });
 }
 
-// Spotify artist popularity/followers/art (mock until SPOTIFY_CLIENT_SECRET set).
+// Spotify artist popularity/followers/art. Credentials live in the gateway.
 export async function spotifyArtist(name) {
   if (!name) return null;
   const r = await fetch(`/api/spotify/artist?name=${encodeURIComponent(name)}`).then((x) => x.json()).catch(() => null);

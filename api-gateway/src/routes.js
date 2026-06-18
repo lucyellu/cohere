@@ -179,6 +179,7 @@ const dmyToIso = (dmy) => {
   return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
 };
 const PAST_DISCOVERY_ARTISTS = ['Bruno Mars', 'Coldplay', 'Olivia Rodrigo', 'Sabrina Carpenter', 'Post Malone', 'Taylor Swift', 'Billie Eilish', 'Bad Bunny'];
+const FEATURED_DISCOVERY_ARTISTS = ['Harry Styles'];
 
 function normJambase(events) {
   return (events || []).map((e) => {
@@ -195,6 +196,7 @@ function normJambase(events) {
       city: addr.addressLocality || '',
       region: schemaTxt(addr.addressRegion),
       country: schemaTxt(addr.addressCountry),
+      timeZone: schemaTxt(addr['x-timezone'] || loc['x-timezone']),
       lat, lng,
       date: (e.startDate || '').slice(0, 10),
       startDate: e.startDate || '',
@@ -246,6 +248,7 @@ function mergeConcerts(list) {
       lng: prev.lng ?? c.lng,
       region: prev.region || c.region,
       country: prev.country || c.country,
+      timeZone: prev.timeZone || c.timeZone,
       tour: prev.tour || c.tour,
       setlist: (c.setlist?.length || 0) > (prev.setlist?.length || 0) ? c.setlist : prev.setlist,
       songCount: Math.max(prev.songCount || 0, c.songCount || 0),
@@ -303,6 +306,17 @@ router.get('/concerts', async (req, res) => {
     sources.jambase = jb.mode;
   } catch (e) {
     sources.jambase = 'error';
+  }
+
+  // Some major residencies do not surface reliably in JamBase's broad browse
+  // page even though artist-specific lookup finds them. Fill those into browse.
+  if (browse && windowKey !== 'past' && source !== 'mock') {
+    const fills = await Promise.allSettled(
+      FEATURED_DISCOVERY_ARTISTS.map((name) => fetchJambaseEvents({ artist: name, source, dateFrom, dateTo, perPage: 20 }))
+    );
+    for (const f of fills) {
+      if (f.status === 'fulfilled' && f.value.mode === 'live') collected.push(...normJambase(f.value.events));
+    }
   }
 
   // Past (setlist.fm) — only when an artist is named (it's artist-centric).
@@ -705,7 +719,7 @@ router.post('/pollinations/generate', express.json({ limit: '64kb' }), async (re
     `https://image.pollinations.ai/prompt/${encoded}` +
     `?width=${width}&height=${height}&model=${model}&seed=${seed}&nologo=true&enhance=true`;
 
-  const result = await generateImageLive('pollinations', url, { headers: { 'User-Agent': 'musicathon/0.1' } });
+  const result = await generateImageLive('pollinations', url, { headers: { 'User-Agent': 'cohear/0.1' } });
   if (!result.ok) {
     return res.status(502).json({ ok: false, mode: 'live', error: result.error, image: placeholderScene(label) });
   }
@@ -746,7 +760,7 @@ router.get('/pollinations/probe', async (_req, res) => {
   const url =
     `https://image.pollinations.ai/prompt/${encodeURIComponent('a glowing neon concert stage')}` +
     `?width=512&height=512&model=flux&seed=${seed}&nologo=true`;
-  const result = await generateImageLive('pollinations', url, { headers: { 'User-Agent': 'musicathon/0.1' } });
+  const result = await generateImageLive('pollinations', url, { headers: { 'User-Agent': 'cohear/0.1' } });
   res.status(result.ok ? 200 : 502).json({ ok: result.ok, mode: 'live', bytes: result.bytes || 0, error: result.ok ? null : result.error });
 });
 

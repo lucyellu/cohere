@@ -1,8 +1,8 @@
 {
-  "name": "musicathon",
+  "name": "cohear",
   "private": true,
   "version": "0.1.0",
-  "description": "Musicathon 2026 — concert tour archive with BYOC generation. Central API gateway + monitor.",
+  "description": "Cohear — discover the biggest concerts, compare local start times, and join shared live rooms.",
   "scripts": {
     "dev": "concurrently -n gateway,web -c cyan,magenta \"npm:dev:gateway\" \"npm:dev:web\"",
     "dev:gateway": "npm --prefix api-gateway run dev",

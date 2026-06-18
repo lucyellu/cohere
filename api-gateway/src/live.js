@@ -1,6 +1,6 @@
-// Cohere — the live engine.
+// Cohear — the live engine.
 //
-// Cohere turns a concert into a SHARED SYNCHRONIZED CLOCK: everyone on earth
+// Cohear turns a concert into a SHARED SYNCHRONIZED CLOCK: everyone on earth
 // locks to the same absolute (UTC) instant, so the 50k people in the stadium and
 // the person watching from their bedroom are on the same song at the same moment.
 //
