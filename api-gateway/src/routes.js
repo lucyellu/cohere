@@ -2,6 +2,7 @@
 // (mock vs live) and either serves a local mock payload or proxies the real API.
 
 import express from 'express';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { SERVICES, SERVICE_IDS, hasKey, isMock, getOverride, setOverride } from './services.js';
 import { snapshot, record } from './usage.js';
 import { callLive, serveMock } from './proxy.js';
@@ -130,6 +131,187 @@ router.get('/jambase/events', async (req, res) => {
   res.status(result.ok ? 200 : 502).json(result);
 });
 
+// --- Unified concert browser: past + upcoming, one normalized list -------
+// Merges two complementary free sources so a single list/map/calendar can show
+// a whole career arc:
+//   • JamBase  -> UPCOMING dates (real venue capacity + lat/lng)
+//   • setlist.fm -> PAST shows (the real setlist + city coordinates; no capacity)
+// We dedupe by date+venue, keeping capacity/geo from whichever source has it and
+// the richer setlist, then tag each show past/upcoming and derive a popularity
+// proxy. Degrades gracefully: if a key is missing that source is just skipped.
+async function fetchJambaseEvents({ artist, source, dateFrom, dateTo, perPage = 40 }) {
+  const useMock = source === 'mock' || (source !== 'live' && isMock('jambase'));
+  if (useMock) {
+    const m = await serveMock('jambase');
+    return { events: m.data?.events || [], mode: 'mock' };
+  }
+  let artistId = null;
+  if (artist) {
+    const lookup = await callLive('jambase', `${JB_BASE}/artists?artistName=${encodeURIComponent(artist)}&perPage=10`, jbAuth());
+    const arts = lookup.data?.artists || [];
+    const exact = arts.find((a) => a.name?.toLowerCase() === artist.toLowerCase());
+    artistId = (exact || arts[0])?.identifier || null;
+  }
+  const params = new URLSearchParams({ perPage: String(perPage) });
+  if (artistId) params.set('artistId', artistId);
+  else if (artist) params.set('artistName', artist);
+  // Date window — drives query-less BROWSE (e.g. "everything tonight").
+  if (dateFrom) params.set('eventDateFrom', dateFrom);
+  if (dateTo) params.set('eventDateTo', dateTo);
+  const result = await callLive('jambase', `${JB_BASE}/events?${params.toString()}`, jbAuth());
+  return { events: result.data?.events || [], mode: result.ok ? 'live' : 'error' };
+}
+
+function addDaysIso(iso, days) {
+  const d = new Date(iso + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+const numOrNull = (v) => {
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  return Number.isNaN(n) ? null : n;
+};
+const schemaTxt = (v) => (!v ? '' : typeof v === 'string' ? v : v.name || v.identifier || '');
+const dmyToIso = (dmy) => {
+  const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(dmy || '');
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
+};
+
+function normJambase(events) {
+  return (events || []).map((e) => {
+    const loc = e.location || {};
+    const addr = loc.address || {};
+    const geo = loc.geo || {};
+    const lat = numOrNull(geo.latitude);
+    const lng = numOrNull(geo.longitude);
+    const setlist = Array.isArray(e.setlist) ? e.setlist : [];
+    return {
+      id: e.identifier || `${loc.name}-${(e.startDate || '').slice(0, 10)}`,
+      artist: e.performer?.[0]?.name || '',
+      venue: loc.name || 'Unknown venue',
+      city: addr.addressLocality || '',
+      region: schemaTxt(addr.addressRegion),
+      country: schemaTxt(addr.addressCountry),
+      lat, lng,
+      date: (e.startDate || '').slice(0, 10),
+      capacity: numOrNull(loc.maximumAttendeeCapacity ?? loc.capacity),
+      setlist,
+      songCount: setlist.length,
+      tour: e.name || '',
+      source: 'jambase',
+    };
+  });
+}
+
+function normSetlistfm(setlists) {
+  return (setlists || []).map((s) => {
+    const songs = extractSetlistSongs(s);
+    const city = s.venue?.city || {};
+    const coords = city.coords || {};
+    return {
+      id: `setlistfm:${s.id || `${s.eventDate}-${s.venue?.name || ''}`}`,
+      artist: s.artist?.name || '',
+      venue: s.venue?.name || 'Unknown venue',
+      city: city.name || '',
+      region: schemaTxt(city.stateCode || city.state),
+      country: city.country?.name || '',
+      lat: numOrNull(coords.lat),
+      lng: numOrNull(coords.long),
+      date: dmyToIso(s.eventDate),
+      capacity: null, // setlist.fm has no capacity
+      setlist: songs,
+      songCount: songs.length,
+      tour: s.tour?.name || '',
+      source: 'setlistfm',
+    };
+  });
+}
+
+function mergeConcerts(list) {
+  const byKey = new Map();
+  for (const c of list) {
+    if (!c.date) continue;
+    const key = `${c.date}|${(c.venue || '').toLowerCase().trim()}`;
+    const prev = byKey.get(key);
+    if (!prev) { byKey.set(key, c); continue; }
+    byKey.set(key, {
+      ...prev,
+      capacity: prev.capacity ?? c.capacity,
+      lat: prev.lat ?? c.lat,
+      lng: prev.lng ?? c.lng,
+      region: prev.region || c.region,
+      country: prev.country || c.country,
+      tour: prev.tour || c.tour,
+      setlist: (c.setlist?.length || 0) > (prev.setlist?.length || 0) ? c.setlist : prev.setlist,
+      songCount: Math.max(prev.songCount || 0, c.songCount || 0),
+      source: prev.source === c.source ? prev.source : 'merged',
+    });
+  }
+  const todayIso = new Date().toISOString().slice(0, 10);
+  return [...byKey.values()].map((c) => ({
+    ...c,
+    when: c.date >= todayIso ? 'upcoming' : 'past',
+    // Popularity proxy: real venue capacity when known (bigger room = more
+    // demand), else setlist richness. True per-show popularity isn't exposed by
+    // any free API, so the UI labels this a heuristic.
+    popularity: c.capacity != null ? c.capacity : (c.songCount ? c.songCount * 2500 : 0),
+  }));
+}
+
+router.get('/concerts', async (req, res) => {
+  const artist = String(req.query.artist || '').trim();
+  const source = String(req.query.source || '');
+  const windowKey = String(req.query.window || 'week').trim(); // browse window when no artist
+  const browse = !artist; // no artist -> DISCOVER everything happening
+  const sources = { jambase: null, setlistfm: null };
+  const collected = [];
+
+  // Browse mode: date-filter JamBase to "what's on" (tonight / this week / upcoming).
+  let dateFrom, dateTo;
+  if (browse) {
+    const today = new Date().toISOString().slice(0, 10);
+    dateFrom = today;
+    if (windowKey === 'tonight') dateTo = today;
+    else if (windowKey === 'week') dateTo = addDaysIso(today, 7);
+    else dateTo = addDaysIso(today, 60); // 'upcoming'
+  }
+
+  // Upcoming (JamBase) — artist-filtered, or the whole window when browsing.
+  try {
+    const jb = await fetchJambaseEvents({ artist, source, dateFrom, dateTo, perPage: browse ? 80 : 40 });
+    collected.push(...normJambase(jb.events));
+    sources.jambase = jb.mode;
+  } catch (e) {
+    sources.jambase = 'error';
+  }
+
+  // Past (setlist.fm) — only when an artist is named (it's artist-centric).
+  if (artist && source !== 'mock' && !isMock('setlistfm')) {
+    const r = await callLive(
+      'setlistfm',
+      `https://api.setlist.fm/rest/1.0/search/setlists?artistName=${encodeURIComponent(artist)}&p=1`,
+      { headers: { 'x-api-key': process.env.SETLISTFM_API_KEY, Accept: 'application/json' } }
+    );
+    if (r.ok) {
+      collected.push(...normSetlistfm(r.data?.setlist));
+      sources.setlistfm = 'live';
+    } else {
+      sources.setlistfm = 'error';
+    }
+  } else {
+    sources.setlistfm = artist ? (isMock('setlistfm') ? 'nokey' : 'mock') : 'na';
+  }
+
+  // Browse defaults to biggest-first (the discovery framing); artist view to recency.
+  const merged = mergeConcerts(collected);
+  const concerts = browse
+    ? merged.sort((a, b) => (b.popularity ?? -1) - (a.popularity ?? -1))
+    : merged.sort((a, b) => b.date.localeCompare(a.date));
+  res.json({ ok: true, artist, browse, window: browse ? windowKey : null, concerts, sources });
+});
+
 // --- YouTube: crowd-sourced concert video search -------------------------
 router.get('/youtube/search', async (req, res) => {
   const q = req.query.q || 'coldplay live';
@@ -201,6 +383,115 @@ function isoToDmy(iso) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
   return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
 }
+
+// --- Open-Meteo: venue weather at showtime (free, keyless) ---------------
+// "Be in the crowd" extends to the air: for a LIVE show we show current
+// conditions at the venue; for a REPLAY we pull the ARCHIVE for that date at
+// ~9pm local ("it was 12°C and raining that night"). Especially good for the
+// open-air Rogers Stadium featured show. No key, no cost.
+const WMO = {
+  0: { label: 'Clear', emoji: '☀️' },
+  1: { label: 'Mainly clear', emoji: '🌤️' }, 2: { label: 'Partly cloudy', emoji: '⛅' }, 3: { label: 'Overcast', emoji: '☁️' },
+  45: { label: 'Fog', emoji: '🌫️' }, 48: { label: 'Rime fog', emoji: '🌫️' },
+  51: { label: 'Light drizzle', emoji: '🌦️' }, 53: { label: 'Drizzle', emoji: '🌦️' }, 55: { label: 'Heavy drizzle', emoji: '🌦️' },
+  61: { label: 'Light rain', emoji: '🌧️' }, 63: { label: 'Rain', emoji: '🌧️' }, 65: { label: 'Heavy rain', emoji: '🌧️' },
+  66: { label: 'Freezing rain', emoji: '🌧️' }, 67: { label: 'Freezing rain', emoji: '🌧️' },
+  71: { label: 'Light snow', emoji: '🌨️' }, 73: { label: 'Snow', emoji: '🌨️' }, 75: { label: 'Heavy snow', emoji: '❄️' }, 77: { label: 'Snow grains', emoji: '🌨️' },
+  80: { label: 'Rain showers', emoji: '🌦️' }, 81: { label: 'Rain showers', emoji: '🌧️' }, 82: { label: 'Violent showers', emoji: '⛈️' },
+  85: { label: 'Snow showers', emoji: '🌨️' }, 86: { label: 'Snow showers', emoji: '🌨️' },
+  95: { label: 'Thunderstorm', emoji: '⛈️' }, 96: { label: 'Thunderstorm + hail', emoji: '⛈️' }, 99: { label: 'Thunderstorm + hail', emoji: '⛈️' },
+};
+const wmo = (code) => WMO[code] || { label: '—', emoji: '🌡️' };
+
+router.get('/weather', async (req, res) => {
+  const lat = Number(req.query.lat);
+  const lng = Number(req.query.lng);
+  const date = String(req.query.date || '').slice(0, 10);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return res.status(400).json({ ok: false, error: 'lat,lng required' });
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const isPast = date && date < todayIso;
+
+  try {
+    if (isPast) {
+      const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lng}&start_date=${date}&end_date=${date}` +
+        `&hourly=temperature_2m,weather_code,wind_speed_10m,precipitation&timezone=auto`;
+      const r = await callLive('openmeteo', url);
+      const h = r.data?.hourly;
+      if (!h?.time?.length) return res.json({ ok: false, error: 'no archive data' });
+      let i = h.time.findIndex((t) => t.endsWith('21:00'));
+      if (i < 0) i = Math.floor(h.time.length / 2);
+      const code = h.weather_code?.[i];
+      const w = wmo(code);
+      return res.json({ ok: true, mode: 'historical', date, tempC: h.temperature_2m?.[i], code, label: w.label, emoji: w.emoji, windKph: h.wind_speed_10m?.[i], precip: h.precipitation?.[i], time: h.time[i] });
+    }
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
+      `&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,precipitation,relative_humidity_2m&timezone=auto`;
+    const r = await callLive('openmeteo', url);
+    const c = r.data?.current;
+    if (!c) return res.json({ ok: false, error: 'no current data' });
+    const w = wmo(c.weather_code);
+    return res.json({ ok: true, mode: 'live', tempC: c.temperature_2m, feelsLike: c.apparent_temperature, code: c.weather_code, label: w.label, emoji: w.emoji, windKph: c.wind_speed_10m, precip: c.precipitation, humidity: c.relative_humidity_2m, time: c.time });
+  } catch (e) {
+    res.status(502).json({ ok: false, error: e.message });
+  }
+});
+
+// --- Spotify: track/artist popularity + art (Client-Credentials flow) -----
+// App-level catalog data (no user login). Token cached ~1h. NOTE: Spotify
+// deprecated audio-features/recommendations for new apps — we use it only for
+// popularity (0-100), followers, genres, and album/artist art (Cyanite already
+// covers mood/energy). Needs SPOTIFY_CLIENT_ID + SECRET; mock until the secret
+// is set.
+let spotifyTok = { value: null, exp: 0 };
+async function spotifyAuth() {
+  const id = process.env.SPOTIFY_CLIENT_ID;
+  const secret = process.env.SPOTIFY_CLIENT_SECRET;
+  if (!id || !secret) return null;
+  if (spotifyTok.value && Date.now() < spotifyTok.exp - 30000) return spotifyTok.value;
+  const r = await callLive('spotify', 'https://accounts.spotify.com/api/token', {
+    method: 'POST',
+    headers: { Authorization: `Basic ${Buffer.from(`${id}:${secret}`).toString('base64')}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'grant_type=client_credentials',
+  });
+  const tok = r.data?.access_token;
+  if (!tok) return null;
+  spotifyTok = { value: tok, exp: Date.now() + (r.data.expires_in || 3600) * 1000 };
+  return tok;
+}
+async function spotifyGet(path) {
+  const tok = await spotifyAuth();
+  if (!tok) return { ok: false, data: null };
+  return callLive('spotify', `https://api.spotify.com/v1${path}`, { headers: { Authorization: `Bearer ${tok}` } });
+}
+const hashNum = (s, mod) => [...String(s)].reduce((a, c) => a + c.charCodeAt(0), 0) % mod;
+
+router.get('/spotify/artist', async (req, res) => {
+  const name = String(req.query.name || '').trim();
+  if (!name) return res.status(400).json({ ok: false, error: 'name required' });
+  if (isMock('spotify')) {
+    record('spotify', { status: 200, latencyMs: 0, bytes: name.length, mode: 'mock', error: null });
+    return res.json({ ok: true, mode: 'mock', artist: { name, popularity: 55 + hashNum(name, 40), followers: 100000 + hashNum(name, 5_000_000), genres: ['pop'], image: null } });
+  }
+  const r = await spotifyGet(`/search?q=${encodeURIComponent(name)}&type=artist&limit=1`);
+  const a = r.data?.artists?.items?.[0];
+  if (!a) return res.json({ ok: false, error: 'artist not found' });
+  res.json({ ok: true, mode: 'live', artist: { id: a.id, name: a.name, popularity: a.popularity, followers: a.followers?.total, genres: a.genres || [], image: a.images?.[0]?.url || null, url: a.external_urls?.spotify } });
+});
+
+router.get('/spotify/track', async (req, res) => {
+  const artist = String(req.query.artist || '').trim();
+  const track = String(req.query.track || '').trim();
+  if (!track) return res.status(400).json({ ok: false, error: 'track required' });
+  if (isMock('spotify')) {
+    record('spotify', { status: 200, latencyMs: 0, bytes: track.length, mode: 'mock', error: null });
+    return res.json({ ok: true, mode: 'mock', track: { name: track, popularity: 40 + hashNum(track, 55), art: null } });
+  }
+  const q = artist ? `track:${track} artist:${artist}` : `track:${track}`;
+  const r = await spotifyGet(`/search?q=${encodeURIComponent(q)}&type=track&limit=1`);
+  const t = r.data?.tracks?.items?.[0];
+  if (!t) return res.json({ ok: false, error: 'track not found' });
+  res.json({ ok: true, mode: 'live', track: { id: t.id, name: t.name, popularity: t.popularity, album: t.album?.name, art: t.album?.images?.[0]?.url || null, preview: t.preview_url, url: t.external_urls?.spotify } });
+});
 
 // --- Pinterest: extract a style-seed image from a public Pin/board URL ----
 // Uses Open Graph meta tags (same as a link preview) — no API key or OAuth.
@@ -541,8 +832,267 @@ for (const id of ['cerebras', 'groq']) {
   });
 }
 
+// --- Cyanite: real mood / energy / BPM for the actual setlist song -------
+// Cyanite is GraphQL and analyzes AUDIO — but it ingests a YouTube source on
+// ITS side, so we never host or split the master (unlike a stem API). Flow:
+//   youTubeTrackEnqueue(videoUrl) -> libraryTrack.id -> poll audioAnalysisV6.
+// Analysis is async (~45s) and costs a credit per distinct song, so results are
+// cached to disk: `node --watch` restarts (and replays) never re-spend. The
+// client calls this repeatedly for the current song; we enqueue once, then each
+// call polls until FINISHED.
+const CYANITE_GQL = 'https://api.cyanite.ai/graphql';
+const CYANITE_CACHE_FILE = new URL('../.cyanite-cache.json', import.meta.url);
+
+function loadCyaniteCache() {
+  try { return new Map(Object.entries(JSON.parse(readFileSync(CYANITE_CACHE_FILE, 'utf8')))); }
+  catch { return new Map(); }
+}
+const cyaniteCache = loadCyaniteCache(); // 'artist|song' -> { status, trackId, result }
+function saveCyaniteCache() {
+  try { writeFileSync(CYANITE_CACHE_FILE, JSON.stringify(Object.fromEntries(cyaniteCache))); } catch { /* ignore */ }
+}
+
+async function cyaniteGql(query, variables) {
+  return callLive('cyanite', CYANITE_GQL, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${process.env.CYANITE_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, variables }),
+  });
+}
+
+// Resolve a song to a YouTube videoId (Cyanite's ingestion source). Reuses the
+// YouTube key; cached implicitly because we only call it once per new song.
+async function youtubeVideoId(q) {
+  const key = process.env.YOUTUBE_API_KEY;
+  if (!key) return null;
+  const r = await callLive('youtube', `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=1&q=${encodeURIComponent(q)}&key=${key}`);
+  return r.data?.items?.[0]?.id?.videoId || null;
+}
+
+// Russell circumplex -> a room accent color (valence/arousal in ~[-1,1]).
+function moodColor(valence, arousal) {
+  if (valence == null) return '#a78bfa';
+  if (valence >= 0.2 && (arousal ?? 0) >= 0) return '#fb7185'; // happy + energetic
+  if (valence >= 0.2) return '#f59e0b'; // warm / content
+  if (valence < -0.1 && (arousal ?? 0) >= 0.1) return '#f43f5e'; // tense / intense
+  if (valence < -0.1) return '#6366f1'; // sad / calm
+  return '#a78bfa'; // neutral
+}
+
+function simplifyMood(r) {
+  if (!r) return null;
+  return {
+    valence: r.valence ?? null,
+    arousal: r.arousal ?? null,
+    bpm: Math.round(r.bpmRangeAdjusted || 0) || null,
+    energyLevel: r.energyLevel || null,
+    moodTags: r.moodTags || [],
+    genreTags: r.genreTags || [],
+    characterTags: r.characterTags || [],
+    movementTags: r.movementTags || [],
+    caption: r.transformerCaption || '',
+    color: moodColor(r.valence, r.arousal),
+  };
+}
+
+const CYANITE_ENQUEUE = `mutation Enqueue($input: YouTubeTrackEnqueueInput!) {
+  youTubeTrackEnqueue(input: $input) {
+    __typename
+    ... on YouTubeTrackEnqueueSuccess { enqueuedLibraryTrack { id } }
+    ... on YouTubeTrackEnqueueError { message code }
+  }
+}`;
+const CYANITE_ANALYSIS = `query Analysis($id: ID!) {
+  libraryTrack(id: $id) {
+    __typename
+    ... on LibraryTrack {
+      id
+      audioAnalysisV6 {
+        __typename
+        ... on AudioAnalysisV6Finished {
+          result { valence arousal bpmRangeAdjusted energyLevel moodTags genreTags characterTags movementTags transformerCaption }
+        }
+      }
+    }
+  }
+}`;
+
+// Deterministic mock so the feature renders identically with no key / in mock mode.
+function mockMood(song) {
+  const h = [...String(song)].reduce((a, c) => a + c.charCodeAt(0), 0);
+  const valence = ((h % 200) - 100) / 100; // -1..1
+  const arousal = (((h * 7) % 200) - 100) / 100;
+  const energy = ['low', 'medium', 'high'][h % 3];
+  const moods = [['uplifting', 'happy'], ['romantic', 'sad'], ['energetic', 'powerful'], ['dreamy', 'chilled']][h % 4];
+  return {
+    valence, arousal, bpm: 80 + (h % 80), energyLevel: energy,
+    moodTags: moods, genreTags: ['pop'], characterTags: ['warm'], movementTags: ['flowing'],
+    caption: `${energy} ${moods[0]} track (demo mood — set CYANITE_API_KEY for real analysis)`,
+    color: moodColor(valence, arousal),
+  };
+}
+
+router.post('/cyanite/analyze', express.json(), async (req, res) => {
+  const song = String(req.body?.song || '').trim();
+  const artist = String(req.body?.artist || '').trim();
+  let videoId = String(req.body?.videoId || '').trim();
+  if (!song) return res.status(400).json({ ok: false, error: 'song required' });
+  const ck = `${artist}|${song}`.toLowerCase();
+
+  if (isMock('cyanite')) {
+    record('cyanite', { status: 200, latencyMs: 0, bytes: song.length, mode: 'mock', error: null });
+    return res.json({ ok: true, mode: 'mock', status: 'finished', result: mockMood(song) });
+  }
+
+  const entry = cyaniteCache.get(ck) || {};
+  if (entry.status === 'finished' && entry.result) {
+    return res.json({ ok: true, mode: 'live', status: 'finished', result: entry.result, cached: true });
+  }
+
+  // Enqueue once (needs a YouTube source).
+  let trackId = entry.trackId;
+  if (!trackId) {
+    if (!videoId) videoId = await youtubeVideoId(`${artist} ${song} official audio`);
+    if (!videoId) return res.json({ ok: false, status: 'error', error: 'no youtube source for song' });
+    const enq = await cyaniteGql(CYANITE_ENQUEUE, { input: { videoUrl: `https://www.youtube.com/watch?v=${videoId}` } });
+    const out = enq.data?.data?.youTubeTrackEnqueue;
+    if (out?.__typename !== 'YouTubeTrackEnqueueSuccess') {
+      return res.status(502).json({ ok: false, status: 'error', error: out?.message || enq.data?.errors?.[0]?.message || 'enqueue failed' });
+    }
+    trackId = out.enqueuedLibraryTrack.id;
+    cyaniteCache.set(ck, { status: 'pending', trackId });
+    saveCyaniteCache();
+  }
+
+  // Poll once; the client re-calls until finished.
+  const pr = await cyaniteGql(CYANITE_ANALYSIS, { id: trackId });
+  const a = pr.data?.data?.libraryTrack?.audioAnalysisV6;
+  if (a?.__typename === 'AudioAnalysisV6Finished') {
+    const result = simplifyMood(a.result);
+    cyaniteCache.set(ck, { status: 'finished', trackId, result });
+    saveCyaniteCache();
+    return res.json({ ok: true, mode: 'live', status: 'finished', result });
+  }
+  if (a && /Failed|NotAuthorized|NotFound/.test(a.__typename)) {
+    cyaniteCache.set(ck, { status: 'error', trackId });
+    saveCyaniteCache();
+    return res.json({ ok: false, mode: 'live', status: 'error', error: a.__typename });
+  }
+  return res.json({ ok: true, mode: 'live', status: 'pending', trackId });
+});
+
+// --- LALAL.AI: stem separation (Suno tracks -> karaoke instrumental) ------
+// Async, metered API (charges processing minutes). Flow:
+//   upload bytes -> /split (stem) -> poll /check until task.state === success.
+// Auth header is `Authorization: license <key>`. We only feed RIGHTS-CLEAR audio
+// we host (Suno `audio_url`), never a copyrighted master. Results disk-cached by
+// audioUrl+stem so re-runs don't re-spend minutes.
+const LALAL_BASE = 'https://www.lalal.ai/api';
+const LALAL_CACHE_FILE = new URL('../.lalalai-cache.json', import.meta.url);
+function loadLalalCache() {
+  try { return new Map(Object.entries(JSON.parse(readFileSync(LALAL_CACHE_FILE, 'utf8')))); }
+  catch { return new Map(); }
+}
+const lalalCache = loadLalalCache(); // 'audioUrl|stem' -> { status, fileId, stems }
+function saveLalalCache() {
+  try { writeFileSync(LALAL_CACHE_FILE, JSON.stringify(Object.fromEntries(lalalCache))); } catch { /* ignore */ }
+}
+const lalalAuth = () => `license ${process.env.LALALAI_API_KEY}`;
+
+async function lalalUpload(audioUrl, filename) {
+  const a = await fetch(audioUrl, { headers: { 'User-Agent': BROWSER_UA } });
+  if (!a.ok) return { ok: false, error: `fetch audio failed (HTTP ${a.status})` };
+  const buf = Buffer.from(await a.arrayBuffer());
+  const start = Date.now();
+  const r = await fetch(`${LALAL_BASE}/upload/`, {
+    method: 'POST',
+    headers: {
+      Authorization: lalalAuth(),
+      'Content-Type': a.headers.get('content-type') || 'application/octet-stream',
+      'Content-Disposition': `attachment; filename="${(filename || 'track.mp3').replace(/[^\w.\- ]/g, '_')}"`,
+    },
+    body: buf,
+  });
+  const d = await r.json().catch(() => ({}));
+  const ok = r.ok && d.status === 'success';
+  record('lalalai', { status: r.status, latencyMs: Date.now() - start, bytes: buf.length, mode: 'live', error: ok ? null : (d.error || `HTTP ${r.status}`) });
+  return ok ? { ok: true, id: d.id, duration: d.duration } : { ok: false, error: d.error || `upload failed (HTTP ${r.status})` };
+}
+
+async function lalalSplit(fileId, stem) {
+  const params = JSON.stringify([{ id: fileId, stem, splitter: 'phoenix', enhanced_processing_enabled: false, noise_cancelling_level: 0, dereverb_enabled: false }]);
+  const r = await fetch(`${LALAL_BASE}/split/`, {
+    method: 'POST',
+    headers: { Authorization: lalalAuth(), 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ params }),
+  });
+  const d = await r.json().catch(() => ({}));
+  record('lalalai', { status: r.status, latencyMs: 0, bytes: 0, mode: 'live', error: d.status === 'success' ? null : (d.error || `HTTP ${r.status}`) });
+  return d.status === 'success' ? { ok: true } : { ok: false, error: d.error || `split failed (HTTP ${r.status})` };
+}
+
+async function lalalCheck(fileId) {
+  const r = await fetch(`${LALAL_BASE}/check/`, {
+    method: 'POST',
+    headers: { Authorization: lalalAuth(), 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ id: fileId }),
+  });
+  return r.json().catch(() => ({}));
+}
+
+router.post('/lalalai/split', express.json(), async (req, res) => {
+  const audioUrl = String(req.body?.audioUrl || '').trim();
+  const title = String(req.body?.title || 'track').slice(0, 80);
+  const stem = String(req.body?.stem || 'vocals'); // 'vocals' -> isolates vocals; back_track = instrumental
+  if (!/^https?:\/\//i.test(audioUrl)) return res.status(400).json({ ok: false, error: 'valid audioUrl required' });
+  const ck = `${audioUrl}|${stem}`;
+
+  if (isMock('lalalai')) {
+    const m = await serveMock('lalalai');
+    const split = m.data?.task?.split || {};
+    return res.json({ ok: true, mode: 'mock', status: 'done', stems: { vocals: split.vocals_url, instrumental: split.instrumental_url } });
+  }
+
+  const entry = lalalCache.get(ck) || {};
+  if (entry.status === 'done' && entry.stems) {
+    return res.json({ ok: true, mode: 'live', status: 'done', stems: entry.stems, cached: true });
+  }
+
+  // Upload + kick off the split once (this is what spends minutes).
+  let fileId = entry.fileId;
+  if (!fileId) {
+    const up = await lalalUpload(audioUrl, `${title}.mp3`);
+    if (!up.ok) return res.status(502).json({ ok: false, status: 'error', error: up.error });
+    fileId = up.id;
+    const sp = await lalalSplit(fileId, stem);
+    if (!sp.ok) return res.status(502).json({ ok: false, status: 'error', error: sp.error });
+    lalalCache.set(ck, { status: 'pending', fileId });
+    saveLalalCache();
+  }
+
+  // Poll; the client re-calls until done.
+  const d = await lalalCheck(fileId);
+  const t = d?.result?.[fileId];
+  const state = t?.task?.state;
+  if (state === 'success' && t.split) {
+    // stem_track = the isolated stem (vocals); back_track = the remainder (instrumental).
+    const stems = stem === 'vocals'
+      ? { vocals: t.split.stem_track, instrumental: t.split.back_track }
+      : { [stem]: t.split.stem_track, rest: t.split.back_track };
+    lalalCache.set(ck, { status: 'done', fileId, stems });
+    saveLalalCache();
+    return res.json({ ok: true, mode: 'live', status: 'done', stems });
+  }
+  if (state === 'error' || state === 'cancelled') {
+    lalalCache.set(ck, { status: 'error', fileId });
+    saveLalalCache();
+    return res.json({ ok: false, mode: 'live', status: 'error', error: t?.task?.error || state });
+  }
+  return res.json({ ok: true, mode: 'live', status: 'pending', progress: t?.task?.progress ?? 0 });
+});
+
 // --- Stub services (mock only until keys arrive) -------------------------
-for (const id of ['cyanite', 'lalalai', 'elevenlabs']) {
+for (const id of ['elevenlabs']) {
   router.get(`/${id}/ping`, async (_req, res) => {
     const result = await serveMock(id);
     res.json(result);

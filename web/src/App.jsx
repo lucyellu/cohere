@@ -3,15 +3,24 @@ import LiveLanding from './live/LiveLanding.jsx';
 import LiveRoom from './live/LiveRoom.jsx';
 import { PlayerProvider } from './live/player.jsx';
 import BottomPlayer from './live/BottomPlayer.jsx';
+import { resolveEvent } from './live/liveApi.js';
 import TourView from './components/TourView.jsx';
+import ConcertsView from './components/ConcertsView.jsx';
 import ShowView from './components/ShowView.jsx';
 import ControlRoom from './components/ControlRoom.jsx';
 import LibraryView from './components/LibraryView.jsx';
 import BYOCModal, { getByocKey } from './components/BYOCModal.jsx';
 
 // Cohere — be in the crowd, from anywhere.
-// Live is the home (a shared synchronized concert clock). The original tour
-// archive (globe / show / library / dev) lives on under "Archive".
+// Three top-level surfaces: Live (the synchronized concert clock), Discover
+// (browse/search every concert, past + upcoming), and the original Archive
+// (globe / show / library / dev).
+
+const TABS = [
+  { id: 'live', label: '🔴 Live', active: 'bg-rose-500 text-white' },
+  { id: 'concerts', label: '🧭 Discover', active: 'bg-fuchsia-500 text-white' },
+  { id: 'archive', label: '📼 Archive', active: 'bg-indigo-500 text-white' },
+];
 
 const ARCHIVE_TABS = [
   { id: 'globe', label: '🌍 Globe' },
@@ -21,7 +30,7 @@ const ARCHIVE_TABS = [
 ];
 
 export default function App() {
-  const [view, setView] = useState('live'); // 'live' | 'archive'
+  const [view, setView] = useState('live'); // 'live' | 'concerts' | 'archive'
   const [liveEvent, setLiveEvent] = useState(null);
   const [archiveTab, setArchiveTab] = useState('globe');
   const [show, setShow] = useState(null);
@@ -31,6 +40,26 @@ export default function App() {
   function enterShow(stop) {
     setShow(stop);
     setArchiveTab('show');
+    setView('archive'); // Show lives under Archive; jump there from anywhere
+  }
+
+  // From the Concerts browser: spin a past show up as a synchronized Live replay
+  // room (real setlist.fm setlist), then jump to the Live tab.
+  async function syncLive(concert) {
+    const ev = await resolveEvent({
+      artist: concert.artist,
+      date: concert.date,
+      venue: concert.venue,
+      city: concert.city,
+      country: concert.country,
+      lat: concert.lat,
+      lng: concert.lng,
+      mode: concert.when === 'upcoming' ? 'live' : 'replay',
+    });
+    if (ev) {
+      setLiveEvent(ev);
+      setView('live');
+    }
   }
 
   return (
@@ -46,18 +75,15 @@ export default function App() {
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <nav className="inline-flex rounded-xl border border-white/10 bg-white/5 p-1">
-            <button
-              onClick={() => setView('live')}
-              className={`rounded-lg px-4 py-2 text-sm font-medium transition ${view === 'live' ? 'bg-rose-500 text-white' : 'text-zinc-400 hover:text-zinc-200'}`}
-            >
-              🔴 Live
-            </button>
-            <button
-              onClick={() => setView('archive')}
-              className={`rounded-lg px-4 py-2 text-sm font-medium transition ${view === 'archive' ? 'bg-indigo-500 text-white' : 'text-zinc-400 hover:text-zinc-200'}`}
-            >
-              📼 Archive
-            </button>
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setView(t.id)}
+                className={`rounded-lg px-4 py-2 text-sm font-medium transition ${view === t.id ? t.active : 'text-zinc-400 hover:text-zinc-200'}`}
+              >
+                {t.label}
+              </button>
+            ))}
           </nav>
 
           {view === 'archive' && (
@@ -93,6 +119,9 @@ export default function App() {
         ) : (
           <LiveLanding onJoin={setLiveEvent} />
         ))}
+
+      {/* DISCOVER — browse/search every concert, past + upcoming */}
+      {view === 'concerts' && <ConcertsView onEnterShow={enterShow} onSyncLive={syncLive} />}
 
       {/* ARCHIVE */}
       {view === 'archive' && (

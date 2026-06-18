@@ -1,32 +1,44 @@
 # Cohere (formerly Reverb) — Status & Handoff
 
 > Living doc for cross-session continuity. Update it as things change.
-> Last updated: 2026-06-16 (checkpoint refresh). Hackathon: **Musicathon 2026, June 15–21**.
+> Last updated: 2026-06-17 (big feature session). Hackathon: **Musicathon 2026, June 15–21**.
 >
-> **Checkpoint:** all work committed + pushed to `github.com/lucyellu/cohere.git`
-> (`main`). App runs locally via `npm run dev` / the Cohere desktop shortcut.
-> The live timeline is a **labeled prediction** (real durations + setlist order)
-> that auto-swaps to tonight's real setlist when setlist.fm logs it — it is NOT
-> claimed to be second-accurate. Nothing is mid-edit; safe to start fresh.
-> ("Cohere" is the product as of the 2026-06-16 pivot; the repo/folder is still
-> "musicathon". Desktop shortcut renamed **Reverb → Cohere**. We kept "Cohear"
-> (co + *hear*) as a possible later rename.)
+> **Checkpoint:** all work committed + **pushed to `github.com/lucyellu/cohere.git`
+> (`main`)**; a **`dev` branch** was cut from this point for continued work. App
+> runs via `npm run dev` / the Cohere desktop shortcut. `.env` + `*-cache.json`
+> are gitignored (never pushed — keys were shared in chat, rotate after the
+> hackathon). Safe to start fresh.
 >
-> **This checkpoint = a no-code reasoning session** (clock/setlist math + trust
-> model walkthrough; no files changed). Two things worth carrying forward:
-> 1. **Predicting "now playing" by hand** matches the in-app math — compute
->    elapsed from 9pm-local start + opener offset, walk the `buildTimeline`
->    slots (real Musixmatch durations ×1.15, ~235s+35s gap fallback). For the
->    featured Posty show, ~10:25pm Toronto lands on the encore (rockstar →
->    Sunflower; Congratulations just before).
-> 2. **External livestream links (TikTok `/live`, etc.) are CONFIRM-layer
->    candidates, NOT ground truth.** A link "appearing in TikTok live search"
->    is a weak signal (stale fast; keyword-match ≠ in-venue), and a stream —
->    even if genuinely live — does **not** validate the timeline prediction.
->    Only the setlist.fm real-setlist swap (or, if ever re-enabled, a crowd
->    beacon) closes that gap. Keep these in separate trust domains in any
->    "is this real?" UI. The URL's own `search_id` prefix is a `YYYYMMDDHHMMSS`
->    timestamp — useful for sanity-checking a result against showtime.
+> **What changed this session (all detailed in the dated entries below):**
+> - **🧭 Discover** is a new **top-level tab** (was buried in Archive). Nav is now
+>   🔴 Live · 🧭 Discover · 📼 Archive. Discover is **query-less/browse-first**:
+>   `/api/concerts?window=tonight|week|upcoming` lists everything happening
+>   (JamBase, sorted biggest-by-capacity), with optional artist search →
+>   List/Map/Calendar. **Answers "biggest concert tonight."** Dave Matthews Band
+>   default removed everywhere (Globe opens on Coldplay demo).
+> - **Cyanite LIVE** — real per-song mood/energy in the Live room (`MoodBar`),
+>   via `youTubeTrackEnqueue` (ingests the song's YouTube source on Cyanite's
+>   side; disk-cached). **LALAL.AI LIVE** — Suno-track karaoke/instrumental
+>   (Library). **Open-Meteo weather LIVE** — venue conditions (current for live,
+>   archive for replays). **Spotify BUILT but mock** — needs
+>   `SPOTIFY_CLIENT_SECRET` in `.env` (id set) to light up the Discover
+>   popularity chip.
+> - **X/Twitter fan posts fixed** — text cards instead of broken `twitframe`
+>   iframes. **Desktop launcher fixed** — root cause was a **node process pileup**
+>   (fire-and-forget never cleaned up → ~45 orphans); launcher now self-heals.
+>
+> **TODO next:** (1) paste `SPOTIFY_CLIENT_SECRET`. (2) optional experiments
+> offered: Google **Translation** (multilingual fan wall), **Static-Maps**
+> thumbnails on Discover cards, official **Twitter widgets.js** click-to-load
+> embed. (3) the live timeline is still a **labeled prediction** (real Musixmatch
+> durations ×1.15 + setlist order; auto-swaps to tonight's real setlist.fm
+> setlist when logged) — NOT claimed second-accurate; keep that honest framing.
+>
+> **Trust-model note (carry forward):** external livestream links (TikTok `/live`
+> etc.) are CONFIRM-layer candidates, NOT ground truth — a keyword match ≠
+> in-venue, and a stream doesn't validate the timeline. Only the setlist.fm real-
+> setlist swap closes that gap. Keep these in separate trust domains in any "is
+> this real?" UI.
 
 ## 🔴 Cohere — live sync pivot (added 2026-06-16)
 
@@ -76,6 +88,127 @@ gitignored `web/.env` (`VITE_SUPABASE_URL` + publishable `VITE_SUPABASE_ANON_KEY
 `supabase.js` self-registers a Realtime **presence** channel per room (no tables/
 migration needed) → "N here now"; honest beacon fallback remains if env is blank.
 **For Netlify, set these two vars in the site env** (they're not committed).
+
+**Added 2026-06-17 — Concerts browser (past + upcoming, 3 views):**
+- New gateway route **`GET /api/concerts?artist=&source=`** (`routes.js`) merges
+  two free sources into one normalized, deduped list: **JamBase = UPCOMING**
+  (real venue capacity + lat/lng) + **setlist.fm = PAST** (real setlist + city
+  coords; no capacity). Dedupe by date+venue keeps capacity/geo from whichever
+  source has it and the richer setlist; each show is tagged `when: past|upcoming`
+  and given a `popularity` proxy (capacity when known, else setlist size — labeled
+  a heuristic, since no free API exposes true per-show popularity). Degrades per
+  source if a key is missing. Verified live: DMB → 43 shows (23 upcoming + 20
+  past), all geocoded; mock (Coldplay) path also works.
+- New **`ConcertsView`** (`web/src/components/ConcertsView.jsx`, data layer
+  `web/src/concerts.js`) added as the first **📼 Archive › 🗓️ Concerts** tab.
+  Three lenses over the same array: **List** (rank + capacity + setlist),
+  **Map** (Google Maps, dark style, markers colored past/upcoming + sized by
+  capacity, fit-bounds, click-to-select; reuses `maps.js`; degrades to a note if
+  no `VITE_GOOGLE_MAPS_KEY`), **Calendar** (6-week month grid, prev/next, dotted
+  per day). Sort by date / attendance (capacity) / popularity / songs / artist /
+  venue / city with a direction toggle, plus All/Upcoming/Past filter. Shared
+  detail panel → **▶ Relive (Archive ShowView)** and **🔴 Sync in Live room**
+  (`resolveEvent` via `App.syncLive`; replay for past, live for upcoming).
+
+**Added 2026-06-17 — Cyanite mood/energy LIVE (the "room mood"):**
+- **Cyanite is now `live: true`** (was mock). Key in gitignored `.env`
+  (`CYANITE_API_KEY`, JWT integration access token; `CYANITE_WEBHOOK_SECRET`
+  stored but unused — we **poll**, no public webhook needed). Cyanite is GraphQL
+  (`https://api.cyanite.ai/graphql`, Bearer auth) and analyzes AUDIO — but it
+  **ingests the song's YouTube source on Cyanite's side**, so we never host or
+  split a master (the reason this works where a stem API like LALAL.AI can't:
+  Cyanite reaches the *real* setlist song, we only pass a YouTube URL). NB: the
+  pre-analyzed Spotify catalog (`spotifyTrack`) returns `NotAuthorized` on this
+  tier — `youTubeTrackEnqueue` is the path that works.
+- **Flow** (`/api/cyanite/analyze`, `routes.js`): resolve song→YouTube videoId
+  (reuses YT key) → `youTubeTrackEnqueue(videoUrl)` → poll `libraryTrack.id`'s
+  `audioAnalysisV6` until `AudioAnalysisV6Finished` (~45s). Returns a simplified
+  `{ valence, arousal, bpm, energyLevel, moodTags, genreTags, characterTags,
+  movementTags, caption, color }` (color = Russell circumplex → room accent).
+  **Credit-conscious:** analysis costs ~1 credit per distinct song, so results
+  are **disk-cached** (`api-gateway/.cyanite-cache.json`, gitignored) — verified
+  to survive `node --watch` restarts + replays (`cached:true`, zero re-spend).
+  Mock branch returns a deterministic shaped result so it renders with no key.
+- **Live room UI** (`MoodBar.jsx` under `NowPlaying` in `LiveRoom.jsx`, client
+  `analyzeMood` in `liveApi.js`): for the current song only (conserves credits),
+  polls until finished, caches per title, then shows mood tags + energy + BPM +
+  caption and tints the card with the mood color. Verified live: Coldplay
+  "Yellow" → valence 0.05, energy medium, tags [romantic, sad, uplifting],
+  "mid-tempo pop rock song with male vocals."
+**Added 2026-06-17 — LALAL.AI stem separation LIVE (Suno karaoke):**
+- **LALAL.AI now `live: true`** (`LALALAI_API_KEY=544860d8d00e4210` in `.env`;
+  the license key IS the API credential, header `Authorization: license <key>`;
+  ~287 processing min). API access confirmed (the `/api/check/` probe accepted
+  the license and only rejected a bad file-id — not an auth failure).
+- **Route `/api/lalalai/split`** (`routes.js`): fetch the audio bytes → `POST
+  /api/upload/` → `POST /api/split/` (`params=[{id,stem,splitter:'phoenix',…}]`)
+  → poll `POST /api/check/` until `task.state==='success'`. Returns
+  `{ vocals: stem_track, instrumental: back_track }`. **Scoped to rights-clear
+  audio we host — Suno `audio_url` only** (never a copyrighted master; that's the
+  honest reason it can't touch the live concert songs, unlike Cyanite's YouTube
+  ingestion). **Minutes-conscious:** results disk-cached
+  (`api-gateway/.lalalai-cache.json`, gitignored) — verified `cached:true`, zero
+  re-spend. Verified live end-to-end on a 3s sample → real `…/vocals` +
+  `…/no_vocals` URLs.
+- **UI:** each Suno track in **Archive › 🎵 Library** (`LibraryView` SongCard)
+  has a **🎤 Karaoke** button → splits via LALAL.AI, then toggles the inline
+  player between original and the vocals-removed instrumental (client `splitStem`
+  in `api.js`). Mock branch returns the canned stem URLs so it renders keyless.
+
+**Fixed 2026-06-17 — desktop shortcut "wonky" = node process pileup.** Real
+root cause (not the 7s race): `launch-musicathon.bat` used fire-and-forget
+`start /min cmd /c npm run dev` and **never cleaned up**, so every double-click
+leaked a `concurrently → npm → npm --prefix → vite/gateway` process tree. Found
+**~45 orphaned node.exe** (one symptom: a fresh launch boots slow/fails because
+the machine is starved). Killed the stale ones surgically (matched
+`musicathon|concurrently|dev:gateway|dev:web|api-gateway|server.js`, **spared
+qmd**). Rewrote the launcher to **self-heal**: fast-path opens the browser if
+BOTH ports are already up; otherwise it kills stale Cohere node procs (PowerShell
+`Get-CimInstance Win32_Process`, qmd-spared) + frees the ports, starts ONE fresh
+stack, polls until `:5173` listens, then opens. No more pileup. NB: `node --watch`
++ killing by-port-only (kills the listener, not the `concurrently`/`npm`
+wrappers) is what leaked during dev testing too.
+
+**Added 2026-06-17 — Discover (query-less browse) + IA cleanup + X fix:**
+- **Discover is now a TOP-LEVEL tab** (🔴 Live · 🧭 Discover · 📼 Archive) —
+  ConcertsView moved OUT of Archive (it was confusingly buried there). `App.jsx`
+  nav driven by a `TABS` array; `enterShow` now also `setView('archive')` since
+  Show lives under Archive.
+- **Query-less browse** — `/api/concerts` now supports **no artist = DISCOVER
+  everything** via a date window: `?window=tonight|week|upcoming` date-filters
+  JamBase (`eventDateFrom/To`), sorted **biggest-first** by capacity. Verified:
+  browse returns 80 real shows (Bruno Mars @ Stade de France 80k, etc.); the
+  "jam-band-heavy" limit only affected artist *search*, not browse. ConcertsView
+  is **discover-first** (loads `window=week` on mount, no query): window chips
+  (🔥 Tonight / This week / Upcoming), a "Biggest right now" header line, and an
+  **optional** artist search that switches to that artist's past+upcoming with a
+  "← All concerts" back button. **Dave Matthews Band default removed everywhere**
+  (Discover needs no default; Globe opens on the Coldplay demo; Live + Globe
+  placeholders now say Bruno Mars/Coldplay).
+- **X/Twitter fan posts fixed.** Server returns tweets fine; the bug was the
+  client `twitframe` **iframe embed** (X blocks third-party tweet embeds → it
+  errored/blanked). `FanWall.embedFor` now returns null for X, and the fallback
+  is a proper **text card** (tweet text + author + "Open on X →") — also nicer
+  for any non-embeddable link.
+- **"Biggest concert tonight"** is now answerable in-app (Discover › Tonight,
+  sorted by capacity).
+
+**Added 2026-06-17 — Weather (live) + Spotify (pending secret):**
+- **Open-Meteo weather — LIVE, keyless.** `GET /api/weather?lat=&lng=&date=`
+  (`routes.js`): no date / today → **current** conditions; past date → **archive**
+  at ~9pm local. WMO code → emoji+label. New keyless service `openmeteo`. Wired
+  into the Live room (`Weather` chip under the venue map in `LiveRoom.jsx`, client
+  `getWeather` in `liveApi.js`) — current for a live show, "that night" for a
+  replay (great for open-air Rogers Stadium). Verified: Toronto 🌧️ 15°C live;
+  Vancouver archive ☁️ 9.1°C @ 21:00.
+- **Spotify — BUILT, needs the secret.** Service `spotify` (`live`, gates on
+  `SPOTIFY_CLIENT_SECRET`). `SPOTIFY_CLIENT_ID=ab89f102…` set; **secret still
+  blank → runs mock.** Client-Credentials token (cached ~1h) + `/api/spotify/
+  artist?name=` and `/api/spotify/track?artist=&track=` → popularity (0-100),
+  followers, genres, album/artist art. (Spotify deprecated audio-features for new
+  apps — Cyanite covers mood, so we use Spotify for popularity + art only.) Wired:
+  **SpotifyChip** in the Concerts header (popularity + followers + artist image),
+  mock until the secret lands. **TODO: paste SPOTIFY_CLIENT_SECRET into `.env`.**
 
 **Added 2026-06-16 (second batch):**
 - **Accurate map** — `VenueMap` now **geocodes the venue by name** (`Geocoder`)

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { sunoAccounts, sunoFeed, byocPool, synthesizePerformance } from '../api.js';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { sunoAccounts, sunoFeed, byocPool, synthesizePerformance, splitStem } from '../api.js';
 
 // Deterministic color per account for the badge dots.
 const DOTS = ['#818cf8', '#34d399', '#f472b6', '#fbbf24', '#22d3ee', '#a78bfa', '#fb7185', '#4ade80'];
@@ -175,6 +175,35 @@ function Chip({ active, onClick, label, color, error }) {
 }
 
 function SongCard({ c }) {
+  // Karaoke: split this Suno track into stems (LALAL.AI) and let the player
+  // toggle between the original and the vocals-removed instrumental.
+  const [karaoke, setKaraoke] = useState(null); // null | 'pending' | 'error' | { vocals, instrumental }
+  const [useInstrumental, setUseInstrumental] = useState(false);
+  const want = useRef(false);
+
+  async function makeKaraoke() {
+    if (karaoke && typeof karaoke === 'object') { setUseInstrumental((v) => !v); return; }
+    want.current = true;
+    setKaraoke('pending');
+    let tries = 0;
+    const tick = async () => {
+      if (!want.current) return;
+      const r = await splitStem({ audioUrl: c.audio_url, title: c.title || 'track', stem: 'vocals' });
+      if (!want.current) return;
+      if (r.status === 'done' && r.stems) {
+        setKaraoke(r.stems);
+        setUseInstrumental(true);
+      } else if (r.status === 'error' || tries++ > 18) {
+        setKaraoke('error');
+      } else {
+        setTimeout(tick, 5000); // metered: short Suno tracks finish in well under a minute
+      }
+    };
+    tick();
+  }
+
+  const src = useInstrumental && karaoke?.instrumental ? karaoke.instrumental : c.audio_url;
+
   return (
     <div className="group overflow-hidden rounded-xl border border-white/10 bg-black/40">
       <div className="relative aspect-square w-full bg-zinc-900">
@@ -199,7 +228,27 @@ function SongCard({ c }) {
           {c.model && <span className="truncate">{c.model}</span>}
         </div>
         {c.audio_url && (
-          <audio controls preload="none" src={c.audio_url} className="mt-2 h-8 w-full" />
+          <>
+            <audio key={src} controls preload="none" src={src} className="mt-2 h-8 w-full" />
+            <div className="mt-1 flex items-center justify-between">
+              <button
+                onClick={makeKaraoke}
+                disabled={karaoke === 'pending'}
+                className={`rounded-md px-2 py-1 text-[10px] font-medium transition ${
+                  useInstrumental ? 'bg-emerald-500/20 text-emerald-200' : 'bg-white/5 text-zinc-400 hover:text-zinc-200'
+                } disabled:opacity-50`}
+                title="Remove vocals (LALAL.AI) for a sing-along"
+              >
+                {karaoke === 'pending' ? 'Splitting…'
+                  : karaoke === 'error' ? '⚠ retry karaoke'
+                  : typeof karaoke === 'object' ? (useInstrumental ? '🎤 Instrumental ✓' : '🎙 Original')
+                  : '🎤 Karaoke'}
+              </button>
+              {typeof karaoke === 'object' && (
+                <span className="text-[9px] text-zinc-600">LALAL.AI</span>
+              )}
+            </div>
+          </>
         )}
       </div>
     </div>

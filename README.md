@@ -34,8 +34,8 @@ Songstats, Cyanite, JamBase, N8N, Replit.
 
 ## This repo so far
 
-The app has two top-level views: **🔴 Live** (the home — Cohere) and **📼 Archive**
-(the original Reverb).
+Three top-level tabs: **🔴 Live** (the home — Cohere), **🧭 Discover** (browse &
+search every concert), and **📼 Archive** (the original Reverb).
 
 ### 🔴 Live (Cohere)
 - **Landing** — a featured **live** show (Post Malone @ Rogers Stadium, Toronto)
@@ -50,12 +50,29 @@ The app has two top-level views: **🔴 Live** (the home — Cohere) and **📼 
     (toggle); auto-scrolls to "now".
   - **Tap-to-sync** — people at the show tap when a song starts; the median drift
     corrects the clock for everyone (the coordination core).
+  - **Room mood** (Cyanite) — real per-song mood/energy/BPM for the current song,
+    tinting the room. Cyanite ingests the song's YouTube source, so it reaches the
+    actual setlist track (disk-cached so credits aren't re-spent).
+  - **Venue weather** (Open-Meteo, keyless) — current conditions for a live show,
+    or that night's archive for a replay (great for the open-air Rogers Stadium).
   - **Crowd-sourced live feed** — YouTube + **TikTok + Instagram + X** footage of
     the actual event (via the free YouTube API + RapidAPI), embedded inline with
-    source badges, platform filter, sort, and per-song mapping.
+    source badges, platform filter, sort, and per-song mapping. (X renders as a
+    text card — X blocks third-party tweet iframes.)
   - **Persistent bottom player** — click any song to play its YouTube top result
     (Live/Music toggle); keeps playing across tabs.
   - **🎬 Demo time-warp** — jump the shared clock into the show at any real time.
+
+### 🧭 Discover
+
+Browse **every concert, past + upcoming, with no search needed**. Opens on what's
+on this week, sorted **biggest-first** by venue capacity ("the biggest concert
+tonight"), pulled live from JamBase. Three lenses over one list — **List / Map /
+Calendar** — with sort by date, attendance (capacity), popularity, songs, artist,
+venue, or city. Type an artist to switch to *their* past (setlist.fm) + upcoming
+(JamBase) shows; each show can **Relive** (Archive) or **Sync in the Live room**.
+A Spotify popularity/followers chip shows for a searched artist (once
+`SPOTIFY_CLIENT_SECRET` is set).
 
 ### 📼 Archive (Reverb)
 
@@ -114,7 +131,14 @@ Open `http://localhost:5173`. The Vite dev server is exposed on the LAN
 | **Pollinations** | 🟢 live (keyless) | Free FLUX **image gen**, no key. The live fallback for "✨ AI scene" — real images with zero setup. |
 | **HuggingFace (FLUX)** | 🟠 no key | FLUX.1-schnell image gen via HF Inference. Optional quality upgrade — set `HF_TOKEN` in `.env` (free ~$0.10/mo credit). |
 | **Cerebras** / **Groq** | 🟢 live (free tier) | OpenAI-compatible **text gen** (lore, prompt enrichment). Keys from `L:\Projects\ai-free`. Powers the "Enrich + synthesize" button. |
-| Cyanite / LALAL.AI / ElevenLabs | ⚪ no key | Mock-only until keys added to `.env` |
+| **Cyanite** | 🟢 live | GraphQL mood/energy/BPM. `youTubeTrackEnqueue` → poll → `audioAnalysisV6`; results disk-cached (`.cyanite-cache.json`). Drives the Live-room **Room mood**. (Spotify-catalog analysis is `NotAuthorized` on this tier — YouTube enqueue is the path.) |
+| **LALAL.AI** | 🟢 live | Stem separation. `Authorization: license <key>`; upload → split → poll. **Scoped to Suno tracks** (rights-clear audio) → Library **🎤 Karaoke**. Disk-cached (`.lalalai-cache.json`); ~287 processing min on the key. |
+| **Open-Meteo** | 🟢 live (keyless) | Venue weather — current (live shows) + archive (replays). No key, no cost. |
+| **Spotify** | 🟠 id set, **needs secret** | Client-Credentials (id + **secret**). Paste `SPOTIFY_CLIENT_SECRET` in `.env` for real popularity/followers/art (Discover chip). Audio-features are deprecated for new apps — Cyanite covers mood, so Spotify is popularity + art only. |
+| ElevenLabs | ⚪ no key | Mock-only until a key is added to `.env` (planned: AI hype-host TTS) |
+
+> JamBase note: artist *search* is jam-band-heavy on the trial, but **browse
+> (no artist) returns everything** incl. stadium pop acts — that's what powers Discover.
 
 > Notes: the key first given as "Musixmatch" was actually the **Songstats** key (that mislabel caused the early 401s). And JamBase Data uses a different host + Bearer auth than the legacy `jambase.com/jb-api` endpoint — that's why the trial key looked "invalid" at first.
 

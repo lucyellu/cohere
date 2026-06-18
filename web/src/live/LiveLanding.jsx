@@ -90,7 +90,7 @@ export default function LiveLanding({ onJoin }) {
             value={artist}
             onChange={(e) => setArtist(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && summon()}
-            placeholder="e.g. Olivia Rodrigo, Dave Matthews Band, Coldplay…"
+            placeholder="e.g. Bruno Mars, Olivia Rodrigo, Coldplay…"
             className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/40 px-3 py-2.5 text-sm text-zinc-200 placeholder-zinc-600 outline-none focus:border-indigo-400/50"
           />
           <div className="inline-flex rounded-lg border border-white/10 bg-white/5 p-0.5">

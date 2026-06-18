@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { getEvent } from './liveApi.js';
+import { getEvent, getWeather } from './liveApi.js';
 import { syncClock, syncedNow, nowPlaying, fmtClock, setWarpTo, clearWarp } from './clock.js';
 import { usePresence } from './presence.js';
 import VenueMap from './VenueMap.jsx';
 import NowPlaying from './NowPlaying.jsx';
+import MoodBar from './MoodBar.jsx';
 import SetlistTimeline from './SetlistTimeline.jsx';
 import FanWall from './FanWall.jsx';
 import Lyrics from './Lyrics.jsx';
@@ -85,7 +86,13 @@ export default function LiveRoom({ event: initial, onBack }) {
             <VenueMap venue={event.venue} city={event.city} lat={event.lat} lng={event.lng} live={isLive} viewers={presenceCount != null ? presenceCount : null} />
           </div>
 
+          <Weather event={event} />
+
+
           <NowPlaying np={np} event={event} syncedNow={now} />
+
+          {/* Real mood/energy of the current song (Cyanite) — tints the room */}
+          {np.song && <MoodBar artist={event.artist} song={np.song} />}
 
           {/* Demo time-warp */}
           <DemoWarp event={event} onWarp={warpToSong} />
@@ -134,6 +141,37 @@ function AccuracyBar({ event, presenceCount, synced }) {
       {!synced && <span className="text-zinc-600">· syncing clock…</span>}
     </div>
   );
+}
+
+// Venue weather — current for a live show, that night's archive for a replay.
+// Reinforces "be there": especially for the open-air Rogers Stadium show.
+function Weather({ event }) {
+  const [wx, setWx] = useState(null);
+  useEffect(() => {
+    if (event.lat == null || event.lng == null) return;
+    const date = event.mode === 'replay' && event.setlistDate ? dmyToIso(event.setlistDate) : null;
+    let alive = true;
+    getWeather({ lat: event.lat, lng: event.lng, date }).then((r) => alive && setWx(r));
+    return () => { alive = false; };
+  }, [event.id, event.lat, event.lng, event.mode, event.setlistDate]);
+
+  if (!wx) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-2 text-xs text-zinc-400">
+      <span className="text-base">{wx.emoji}</span>
+      <span className="font-medium text-zinc-200">{Math.round(wx.tempC)}°C</span>
+      <span>{wx.label}</span>
+      {wx.windKph != null && <span className="text-zinc-500">· 💨 {Math.round(wx.windKph)} km/h</span>}
+      {wx.precip > 0 && <span className="text-sky-300/80">· 🌧 {wx.precip} mm</span>}
+      <span className="ml-auto text-[11px] text-zinc-600">
+        {wx.mode === 'historical' ? `${event.city} · that night` : `${event.city} · now`}
+      </span>
+    </div>
+  );
+}
+function dmyToIso(dmy) {
+  const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(dmy || '');
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
 }
 
 function Clocks({ event, now }) {

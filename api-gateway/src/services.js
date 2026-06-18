@@ -47,6 +47,22 @@ export const SERVICES = {
     live: true,
     description: 'Real setlists (what was actually played)',
   },
+  spotify: {
+    label: 'Spotify',
+    category: 'data',
+    // Client-Credentials flow needs BOTH id + secret; the SECRET is the gating
+    // credential (id alone can't auth), so hasKey() tracks the secret.
+    envKey: 'SPOTIFY_CLIENT_SECRET',
+    live: true,
+    description: 'Track/artist popularity, followers, album & artist art',
+  },
+  openmeteo: {
+    label: 'Open-Meteo',
+    category: 'data',
+    keyless: true, // free, no API key — venue weather (live + historical)
+    live: true,
+    description: 'Venue weather at showtime (live + historical for replays)',
+  },
   suno: {
     label: 'Suno (6 accounts)',
     category: 'library',
@@ -101,15 +117,21 @@ export const SERVICES = {
     label: 'Cyanite',
     category: 'ai',
     envKey: 'CYANITE_API_KEY',
-    live: false,
-    description: 'AI mood / energy / BPM tagging',
+    live: true,
+    // GraphQL. Ingests a YouTube source on Cyanite's side (no audio hosting on
+    // ours) -> real mood/energy/BPM for the actual setlist song. Async: enqueue
+    // then poll; results disk-cached so credits aren't re-spent across restarts.
+    description: 'AI mood / energy / BPM tagging (via YouTube ingestion)',
   },
   lalalai: {
     label: 'LALAL.AI',
     category: 'audio',
     envKey: 'LALALAI_API_KEY',
-    live: false,
-    description: 'Stem separation (vocals / instrumental)',
+    live: true,
+    // Stem separation (upload -> split -> poll). Scoped to rights-clear audio we
+    // host (Suno library tracks) -> a karaoke/sing-along instrumental. Results
+    // disk-cached so the metered minutes aren't re-spent on repeats.
+    description: 'Stem separation (vocals / instrumental) — Suno tracks',
   },
   elevenlabs: {
     label: 'ElevenLabs',

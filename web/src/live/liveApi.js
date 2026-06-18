@@ -101,6 +101,29 @@ export async function socialSearch({ q, artist, platform = 'all' }) {
   return r?.items || [];
 }
 
+// --- Venue weather (Open-Meteo, keyless) ---------------------------------
+// Current conditions for a live show; historical (that date @ ~9pm) for a replay.
+export async function getWeather({ lat, lng, date } = {}) {
+  if (lat == null || lng == null) return null;
+  const p = new URLSearchParams({ lat, lng });
+  if (date) p.set('date', date);
+  const r = await fetch(`/api/weather?${p.toString()}`).then((x) => x.json()).catch(() => null);
+  return r?.ok ? r : null;
+}
+
+// --- Cyanite mood/energy/BPM for the current song ------------------------
+// Async on the server (enqueue a YouTube source -> poll). Returns
+// { status: 'pending'|'finished'|'error', result?, mode }. Call repeatedly for
+// the same song until status === 'finished'; the server caches so it's cheap.
+export async function analyzeMood({ song, artist, videoId } = {}) {
+  const r = await fetch('/api/cyanite/analyze', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ song, artist, videoId }),
+  }).then((x) => x.json()).catch(() => null);
+  return r || { status: 'error' };
+}
+
 // --- YouTube top result for a song (drives the persistent player) --------
 // Cached in localStorage by query so re-plays don't re-spend the ~100/day quota.
 export async function youtubeTop(query) {

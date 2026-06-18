@@ -3,8 +3,8 @@ import { fetchTour, sortStops, SORTS, fmtCapacity, fmtDate } from '../tour.js';
 import TourGlobe from './TourGlobe.jsx';
 
 export default function TourView({ onEnterShow }) {
-  const [artist, setArtist] = useState('Dave Matthews Band');
-  const [query, setQuery] = useState('Dave Matthews Band');
+  const [artist, setArtist] = useState('Coldplay');
+  const [query, setQuery] = useState('Coldplay');
   const [stops, setStops] = useState([]);
   const [mode, setMode] = useState(null);
   const [sortKey, setSortKey] = useState('date');
@@ -32,8 +32,10 @@ export default function TourView({ onEnterShow }) {
   }
 
   useEffect(() => {
-    // Open on a real, currently-touring artist so nothing fake shows by default.
-    load('Dave Matthews Band', 'live');
+    // Open on the curated Coldplay demo so the globe is populated immediately
+    // (Coldplay returns 0 on the live JamBase trial). Search any artist for
+    // their real dates, or use the Discover tab to browse all concerts.
+    load('Coldplay', 'mock');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -112,13 +114,10 @@ export default function TourView({ onEnterShow }) {
                   <span>No upcoming shows found for this artist.</span>
                   {mode === 'live' && (
                     <span className="text-xs text-zinc-600">
-                      They may not be touring right now. The JamBase trial is jam-band-heavy — try{' '}
-                      <button onClick={() => { setQuery('Dave Matthews Band'); setArtist('Dave Matthews Band'); load('Dave Matthews Band'); }} className="text-indigo-400 hover:underline">
-                        Dave Matthews Band
-                      </button>{' '}or{' '}
-                      <button onClick={() => { setQuery('Phish'); setArtist('Phish'); load('Phish'); }} className="text-indigo-400 hover:underline">
-                        Phish
-                      </button>.
+                      They may not be touring right now, or aren't in the JamBase trial. Try{' '}
+                      <button onClick={() => { setQuery('Bruno Mars'); setArtist('Bruno Mars'); load('Bruno Mars'); }} className="text-indigo-400 hover:underline">
+                        Bruno Mars
+                      </button>{' '}or browse the <span className="text-zinc-400">🧭 Discover</span> tab for everything happening.
                     </span>
                   )}
                 </>

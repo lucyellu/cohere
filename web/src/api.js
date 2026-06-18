@@ -199,6 +199,19 @@ export async function sunoFeed({ page = 0, pages = 1 } = {}) {
   return (await res?.json().catch(() => null)) || { ok: false, clips: [], accounts: [] };
 }
 
+// --- LALAL.AI stem separation (Suno tracks -> karaoke instrumental) ------
+// Async + metered on the server. Returns { status:'pending'|'done'|'error',
+// stems?: { vocals, instrumental } }. Call repeatedly for the same track until
+// done; the server caches so it won't re-spend processing minutes.
+export async function splitStem({ audioUrl, title, stem = 'vocals' }) {
+  const res = await fetch('/api/lalalai/split', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ audioUrl, title, stem }),
+  }).catch(() => null);
+  return (await res?.json().catch(() => null)) || { status: 'error', error: 'gateway unreachable' };
+}
+
 // --- BYOC pool -----------------------------------------------------------
 
 export async function byocPool(showId) {

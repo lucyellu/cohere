@@ -192,9 +192,14 @@ function FeedCard({ it, event, onVote }) {
       ) : e ? (
         <iframe className={`w-full ${e.tall ? 'h-[460px]' : 'h-[280px]'}`} src={e.src} title={it.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen scrolling="no" />
       ) : (
-        <a href={it.url} target="_blank" rel="noreferrer" className="flex aspect-video w-full flex-col items-center justify-center gap-1 bg-zinc-900 text-center hover:bg-zinc-800">
-          <span className="text-3xl">{ICON[it.source] || '🔗'}</span>
-          <span className="px-3 text-[11px] text-zinc-400">Open clip →</span>
+        // Text card — used for X (its third-party embeds are unreliable / blocked)
+        // and any non-embeddable link. Shows the actual post text + a link out.
+        <a href={it.url} target="_blank" rel="noreferrer" className="flex aspect-video w-full flex-col justify-between gap-2 bg-zinc-900 p-3 text-left hover:bg-zinc-800">
+          <p className="line-clamp-4 text-[12px] leading-snug text-zinc-200">{it.title}</p>
+          <span className="flex items-center justify-between text-[10px] text-zinc-500">
+            <span>{ICON[it.source] || '🔗'} {it.channel}</span>
+            <span className="text-indigo-300">Open on {it.source === 'x' ? 'X' : it.source === 'instagram' ? 'Instagram' : it.source === 'tiktok' ? 'TikTok' : 'site'} →</span>
+          </span>
         </a>
       )}
       <div className="flex items-center gap-2 px-2 py-1.5">
@@ -270,8 +275,9 @@ function embedFor(url) {
   if (tt) return { type: 'tiktok', src: `https://www.tiktok.com/player/v1/${tt[1]}`, tall: true };
   const ig = u.match(/instagram\.com\/(p|reel|tv|reels)\/([\w-]+)/);
   if (ig) return { type: 'instagram', src: `https://www.instagram.com/${ig[1] === 'reels' ? 'reel' : ig[1]}/${ig[2]}/embed`, tall: true };
-  const tw = u.match(/(?:twitter|x)\.com\/.+\/status\/(\d+)/);
-  if (tw) return { type: 'x', src: `https://twitframe.com/show?url=${encodeURIComponent(u)}`, tall: false };
+  // X/Twitter: don't iframe — third-party tweet embeds (twitframe, syndication)
+  // are blocked/broken often enough that they just error. Fall through to the
+  // text card, which reliably shows the post text + a link to X.
   return null;
 }
 function ytIdFrom(url) {
