@@ -51,6 +51,7 @@ function readDiscoverState() {
     sortKey: 'capacity',
     dir: 'desc',
     when: 'all',
+    hideEnded: false,
     selectedId: null,
   };
   try {
@@ -83,6 +84,7 @@ export default function ConcertsView({ onEnterShow, onSyncLive }) {
   const [sortKey, setSortKey] = useState(initialState.sortKey);
   const [dir, setDir] = useState(initialState.dir);
   const [when, setWhen] = useState(initialState.when);
+  const [hideEnded, setHideEnded] = useState(Boolean(initialState.hideEnded));
   const [selectedId, setSelectedId] = useState(initialState.selectedId);
   const [spotify, setSpotify] = useState(null);
   const [saved, setSaved] = useState(() => new Set(JSON.parse(localStorage.getItem('cohear_saved_shows') || '[]')));
@@ -165,8 +167,8 @@ export default function ConcertsView({ onEnterShow, onSyncLive }) {
   }, []);
 
   useEffect(() => {
-    writeDiscoverState({ query, artist, location, windowKey, concerts, sources, mode, sortKey, dir, when, selectedId });
-  }, [artist, concerts, dir, location, mode, query, selectedId, sortKey, sources, when, windowKey]);
+    writeDiscoverState({ query, artist, location, windowKey, concerts, sources, mode, sortKey, dir, when, hideEnded, selectedId });
+  }, [artist, concerts, dir, hideEnded, location, mode, query, selectedId, sortKey, sources, when, windowKey]);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30_000);
@@ -220,12 +222,13 @@ export default function ConcertsView({ onEnterShow, onSyncLive }) {
     const loc = location.trim().toLowerCase();
     const base = browse ? concerts : filterWhen(concerts, when);
     const filtered = base.filter((c) => {
+      if (hideEnded && showState(c, now).ended) return false;
       const haystack = [c.artist, c.venue, c.city, c.region, c.country].filter(Boolean).join(' ').toLowerCase();
       const locationText = [c.city, c.region, c.country, c.venue].filter(Boolean).join(' ').toLowerCase();
       return (!search || haystack.includes(search)) && (!loc || locationText.includes(loc));
     });
     return sortConcerts(filtered, sortKey, dir);
-  }, [artist, browse, concerts, dir, location, query, sortKey, when]);
+  }, [artist, browse, concerts, dir, hideEnded, location, now, query, sortKey, when]);
 
   useEffect(() => {
     if (!visible.length) return;
@@ -272,6 +275,8 @@ export default function ConcertsView({ onEnterShow, onSyncLive }) {
         setDir={setDir}
         when={when}
         setWhen={setWhen}
+        hideEnded={hideEnded}
+        setHideEnded={setHideEnded}
         loading={loading}
         onArtistSearch={() => loadArtist(query)}
         onRefresh={refreshConcerts}
@@ -402,7 +407,7 @@ function DiscoverHeader({ artist, browse, biggest, loading, stats, spotify, user
 function ControlSurface(props) {
   const {
     browse, query, setQuery, location, setLocation, userZone, setUserZone, windowKey, setWindowKey,
-    mode, setMode, sortKey, pickSort, dir, setDir, when, setWhen, loading, onArtistSearch, onRefresh,
+    mode, setMode, sortKey, pickSort, dir, setDir, when, setWhen, hideEnded, setHideEnded, loading, onArtistSearch, onRefresh,
   } = props;
 
   return (
@@ -443,6 +448,14 @@ function ControlSurface(props) {
           <SegmentedControl value={when} options={WHEN} onChange={setWhen} />
         )}
         <SegmentedControl value={mode} options={VIEW_MODES} onChange={setMode} />
+
+        <button
+          className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${hideEnded ? 'border-cyan-300/40 bg-cyan-300/[0.12] text-cyan-100' : 'border-white/10 bg-black/20 text-zinc-400 hover:text-zinc-100'}`}
+          onClick={() => setHideEnded((v) => !v)}
+          title="Hide shows whose estimated end time has passed"
+        >
+          {hideEnded ? 'Ended hidden' : 'Show ended'}
+        </button>
 
         <label className="ml-auto flex items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs font-medium text-zinc-400">
           Sort
@@ -489,41 +502,51 @@ function ConcertTable({ rows, selectedId, onSelect, saved, userZone, now, sortKe
         <span className="text-right">Live</span>
       </div>
       <ol className="max-h-[660px] overflow-y-auto">
-        {rows.map((c, i) => (
-          <li
-            key={c.id}
-            className={`grid gap-3 border-b border-white/[0.06] px-4 py-4 last:border-b-0 lg:grid-cols-[56px_minmax(170px,1.05fr)_minmax(170px,1fr)_120px_190px_90px_92px] lg:items-center ${
-              c.id === selectedId ? 'bg-cyan-300/[0.08]' : 'hover:bg-white/[0.035]'
-            }`}
-          >
-            <button
-              onClick={() => onSelect(c.id)}
-              className="contents text-left"
+        {rows.map((c, i) => {
+          const state = showState(c, now);
+          return (
+            <li
+              key={c.id}
+              className={`grid gap-3 border-b border-white/[0.06] px-4 py-4 last:border-b-0 lg:grid-cols-[56px_minmax(170px,1.05fr)_minmax(170px,1fr)_120px_190px_90px_92px] lg:items-center ${
+                c.id === selectedId
+                  ? 'bg-cyan-300/[0.08]'
+                  : state.current
+                    ? 'bg-emerald-300/[0.055] hover:bg-emerald-300/[0.09]'
+                    : state.recentlyEnded
+                      ? 'bg-rose-400/[0.04] hover:bg-rose-400/[0.07]'
+                      : 'hover:bg-white/[0.035]'
+              }`}
             >
-              <span className="flex items-center gap-3 text-sm font-semibold text-zinc-300">
-                <span className="w-7 tabular-nums text-zinc-500">{String(i + 1).padStart(2, '0')}</span>
-                {saved.has(c.id) && <span className="h-1.5 w-1.5 rounded-full bg-cyan-300" title="Saved" />}
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold text-white">{c.artist || 'Unknown artist'}</span>
-                <span className="mt-1 block text-xs text-zinc-500 lg:hidden">
-                  {c.venue} · {[c.city, c.country].filter(Boolean).join(', ')}
+              <button
+                onClick={() => onSelect(c.id)}
+                className="contents text-left"
+              >
+                <span className="flex items-center gap-3 text-sm font-semibold text-zinc-300">
+                  <span className="w-7 tabular-nums text-zinc-500">{String(i + 1).padStart(2, '0')}</span>
+                  {state.current && <span className="h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_14px_rgba(110,231,183,.8)]" title="Happening now" />}
+                  {saved.has(c.id) && <span className="h-1.5 w-1.5 rounded-full bg-cyan-300" title="Saved" />}
                 </span>
-              </span>
-              <span className="hidden min-w-0 truncate text-sm text-zinc-300 lg:block">{c.venue}</span>
-              <span className="hidden truncate text-sm text-zinc-400 lg:block">{[c.city, c.country].filter(Boolean).join(', ')}</span>
-              <TimeStack concert={c} userZone={userZone} now={now} />
-              <span className="text-left text-sm font-semibold tabular-nums text-amber-200 lg:text-right">{fmtCapacity(c.capacity)}</span>
-            </button>
-            <button
-              className="cohear-primary min-h-9 justify-center px-3 text-xs lg:justify-self-end"
-              onClick={() => join(c)}
-              disabled={syncingId === c.id}
-            >
-              {syncingId === c.id ? 'Opening' : 'Join'}
-            </button>
-          </li>
-        ))}
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold text-white">{c.artist || 'Unknown artist'}</span>
+                  <span className="mt-1 block text-xs text-zinc-500 lg:hidden">
+                    {c.venue} · {[c.city, c.country].filter(Boolean).join(', ')}
+                  </span>
+                </span>
+                <span className="hidden min-w-0 truncate text-sm text-zinc-300 lg:block">{c.venue}</span>
+                <span className="hidden truncate text-sm text-zinc-400 lg:block">{[c.city, c.country].filter(Boolean).join(', ')}</span>
+                <TimeStack concert={c} userZone={userZone} now={now} />
+                <span className="text-left text-sm font-semibold tabular-nums text-amber-200 lg:text-right">{fmtCapacity(c.capacity)}</span>
+              </button>
+              <button
+                className="cohear-primary min-h-9 justify-center px-3 text-xs lg:justify-self-end"
+                onClick={() => join(c)}
+                disabled={syncingId === c.id}
+              >
+                {syncingId === c.id ? 'Opening' : 'Join'}
+              </button>
+            </li>
+          );
+        })}
       </ol>
     </div>
   );
@@ -650,10 +673,17 @@ function ConcertInspector({ concert, saved, sources, userZone, now, onSave, onEn
 
 function ConcertMap({ rows, selectedId, onSelect }) {
   const mapRef = useRef(null);
-  const stateRef = useRef({ map: null, maps: null, markers: new Map(), fittedKey: '' });
+  const stateRef = useRef({ map: null, maps: null, markers: new Map(), trail: null, fittedKey: '' });
   const [err, setErr] = useState(hasMapsKey() ? null : 'missing-key');
   const [mapReady, setMapReady] = useState(false);
+  const [showLabels, setShowLabels] = useState(false);
+  const [trailArtist, setTrailArtist] = useState('');
   const mappable = rows.filter((c) => c.lat != null && c.lng != null);
+  const artists = useMemo(() => [...new Set(mappable.map((c) => c.artist).filter(Boolean))].sort((a, b) => a.localeCompare(b)), [mappable]);
+  const trailRows = useMemo(() => {
+    if (!trailArtist) return [];
+    return mappable.filter((c) => c.artist === trailArtist).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  }, [mappable, trailArtist]);
 
   useEffect(() => {
     if (!hasMapsKey()) return;
@@ -724,14 +754,29 @@ function ConcertMap({ rows, selectedId, onSelect }) {
       }
       marker.setPosition(position);
       marker.setIcon(icon);
+      marker.setLabel(showLabels ? { text: shortLabel(c.artist || c.venue), color: '#f4f4f5', fontSize: '11px', fontWeight: '700' } : null);
       marker.setZIndex(c.id === selectedId ? 1000 : 1);
+    }
+    if (stateRef.current.trail) {
+      stateRef.current.trail.setMap(null);
+      stateRef.current.trail = null;
+    }
+    if (trailRows.length > 1) {
+      stateRef.current.trail = new maps.Polyline({
+        path: trailRows.map((c) => ({ lat: Number(c.lat), lng: Number(c.lng) })),
+        geodesic: true,
+        strokeColor: '#67e8f9',
+        strokeOpacity: 0.8,
+        strokeWeight: 3,
+        map,
+      });
     }
     const fittedKey = mappable.map((c) => c.id).join('|');
     if (mappable.length && stateRef.current.fittedKey !== fittedKey) {
       map.fitBounds(bounds, 72);
       stateRef.current.fittedKey = fittedKey;
     }
-  }, [mappable, onSelect, selectedId]);
+  }, [mappable, onSelect, selectedId, showLabels, trailRows]);
 
   useEffect(() => {
     const { map } = stateRef.current;
@@ -742,18 +787,30 @@ function ConcertMap({ rows, selectedId, onSelect }) {
   }, [rows, selectedId]);
 
   if (err) {
-    return <FallbackMap rows={mappable} selectedId={selectedId} onSelect={onSelect} reason={err} />;
+    return (
+      <MapShell
+        count={mappable.length}
+        showLabels={showLabels}
+        setShowLabels={setShowLabels}
+        trailArtist={trailArtist}
+        setTrailArtist={setTrailArtist}
+        artists={artists}
+        fallbackReason={err}
+      >
+        <FallbackMap rows={mappable} selectedId={selectedId} onSelect={onSelect} showLabels={showLabels} trailRows={trailRows} />
+      </MapShell>
+    );
   }
 
   return (
-    <div className="cohear-panel overflow-hidden">
-      <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
-        <div>
-          <h3 className="text-sm font-semibold text-white">Concert map</h3>
-          <p className="mt-1 text-xs text-zinc-500">Google Maps markers sized by known attendance capacity.</p>
-        </div>
-        <span className="text-xs text-zinc-500">{mappable.length} mapped</span>
-      </div>
+    <MapShell
+      count={mappable.length}
+      showLabels={showLabels}
+      setShowLabels={setShowLabels}
+      trailArtist={trailArtist}
+      setTrailArtist={setTrailArtist}
+      artists={artists}
+    >
       <div className="relative">
         <div ref={mapRef} aria-label="Concert location map" className="h-[620px] w-full bg-zinc-950" />
         {!mapReady && (
@@ -762,39 +819,72 @@ function ConcertMap({ rows, selectedId, onSelect }) {
           </div>
         )}
       </div>
+    </MapShell>
+  );
+}
+
+function MapShell({ children, count, showLabels, setShowLabels, trailArtist, setTrailArtist, artists, fallbackReason }) {
+  const reasonText = fallbackReason
+    ? fallbackReason === 'missing-key'
+      ? 'Google Maps key is missing, so Cohear is showing its built-in coordinate map.'
+      : `Google Maps did not finish loading (${fallbackReason}), so Cohear is showing its built-in coordinate map.`
+    : 'Google Maps markers sized by known attendance capacity.';
+  return (
+    <div className="cohear-panel overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-4">
+        <div>
+          <h3 className="text-sm font-semibold text-white">Concert map</h3>
+          <p className="mt-1 text-xs text-zinc-500">{reasonText}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            className={`rounded-lg border px-3 py-2 text-xs font-semibold ${showLabels ? 'border-cyan-300/40 bg-cyan-300/[0.12] text-cyan-100' : 'border-white/10 bg-black/20 text-zinc-400 hover:text-zinc-100'}`}
+            onClick={() => setShowLabels((v) => !v)}
+          >
+            {showLabels ? 'Hide labels' : 'Show labels'}
+          </button>
+          <select value={trailArtist} onChange={(e) => setTrailArtist(e.target.value)} className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs text-zinc-300 outline-none">
+            <option value="">Tour trail: off</option>
+            {artists.map((a) => <option key={a} value={a}>{a}</option>)}
+          </select>
+          <span className="text-xs text-zinc-500">{count} mapped</span>
+        </div>
+      </div>
+      {children}
     </div>
   );
 }
 
-function FallbackMap({ rows, selectedId, onSelect, reason }) {
+function FallbackMap({ rows, selectedId, onSelect, showLabels, trailRows }) {
   const plotted = rows.slice(0, 80).map((c) => ({
     ...c,
     point: projectMapPoint(Number(c.lat), Number(c.lng)),
     size: Math.max(12, Math.min(34, Math.sqrt(c.capacity || 4000) / 12)),
   }));
-  const reasonText =
-    reason === 'missing-key'
-      ? 'Google Maps key is missing, so Cohear is showing its built-in coordinate map.'
-      : `Google Maps did not finish loading (${reason}), so Cohear is showing its built-in coordinate map.`;
+  const trailPoints = trailRows.map((c) => projectMapPoint(Number(c.lat), Number(c.lng)));
 
   return (
-    <div className="cohear-panel overflow-hidden">
-      <div className="flex items-center justify-between gap-4 border-b border-white/10 px-5 py-4">
-        <div>
-          <h3 className="text-sm font-semibold text-white">Concert map</h3>
-          <p className="mt-1 text-xs text-zinc-500">{reasonText}</p>
-        </div>
-        <span className="shrink-0 text-xs text-zinc-500">{plotted.length} mapped</span>
-      </div>
-      <div
-        aria-label="Concert location map"
-        className="relative h-[620px] overflow-hidden bg-[radial-gradient(circle_at_30%_20%,rgba(34,211,238,.18),transparent_30%),linear-gradient(145deg,#09090b,#101216)]"
-      >
-        <div className="absolute inset-x-8 top-1/2 border-t border-white/10" />
-        <div className="absolute inset-y-8 left-1/2 border-l border-white/10" />
-        {plotted.map((c) => (
+    <div
+      aria-label="Concert location map"
+      className="relative h-[620px] overflow-hidden bg-[radial-gradient(circle_at_30%_20%,rgba(34,211,238,.18),transparent_30%),linear-gradient(145deg,#09090b,#101216)]"
+    >
+      <div className="absolute inset-x-8 top-1/2 border-t border-white/10" />
+      <div className="absolute inset-y-8 left-1/2 border-l border-white/10" />
+      {trailPoints.length > 1 && (
+        <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <polyline
+            points={trailPoints.map((p) => `${p.x},${p.y}`).join(' ')}
+            vectorEffect="non-scaling-stroke"
+            fill="none"
+            stroke="#67e8f9"
+            strokeOpacity="0.85"
+            strokeWidth="0.7"
+          />
+        </svg>
+      )}
+      {plotted.map((c) => (
+        <div key={c.id} className="absolute" style={{ left: `${c.point.x}%`, top: `${c.point.y}%` }}>
           <button
-            key={c.id}
             className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full border transition ${
               c.id === selectedId ? 'z-20 border-white bg-cyan-300 shadow-[0_0_24px_rgba(103,232,249,.5)]' : 'z-10 border-white/70 bg-amber-300/80 hover:bg-amber-200'
             }`}
@@ -807,13 +897,29 @@ function FallbackMap({ rows, selectedId, onSelect, reason }) {
             onClick={() => onSelect(c.id)}
             title={`${c.artist} - ${c.venue}`}
           />
-        ))}
-      </div>
+          {showLabels && (
+            <button
+              onClick={() => onSelect(c.id)}
+              className="absolute left-2 top-1 z-20 max-w-28 truncate rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-semibold text-white"
+              title={`${c.artist} - ${c.venue}`}
+            >
+              {shortLabel(c.artist || c.venue)}
+            </button>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
 
 function ConcertCalendar({ rows, selectedId, onSelect }) {
+  const firstIso = rows.map((c) => c.date).filter(Boolean).sort()[0] || new Date().toISOString().slice(0, 10);
+  const [monthAnchor, setMonthAnchor] = useState(() => firstIso.slice(0, 7));
+
+  useEffect(() => {
+    if (firstIso) setMonthAnchor(firstIso.slice(0, 7));
+  }, [firstIso]);
+
   const grouped = useMemo(() => {
     const map = new Map();
     for (const c of rows) {
@@ -821,37 +927,76 @@ function ConcertCalendar({ rows, selectedId, onSelect }) {
       if (!map.has(key)) map.set(key, []);
       map.get(key).push(c);
     }
-    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
+    for (const shows of map.values()) shows.sort((a, b) => (b.capacity || 0) - (a.capacity || 0));
+    return map;
   }, [rows]);
+
+  const days = useMemo(() => monthGrid(monthAnchor), [monthAnchor]);
+  const monthShows = rows.filter((c) => c.date?.startsWith(monthAnchor)).length;
 
   return (
     <div className="cohear-panel overflow-hidden">
-      <div className="border-b border-white/10 px-5 py-4">
-        <h3 className="text-sm font-semibold text-white">Calendar</h3>
-        <p className="mt-1 text-xs text-zinc-500">Grouped by show date, biggest shows listed first within each day.</p>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-4">
+        <div>
+          <h3 className="text-sm font-semibold text-white">{monthLabel(monthAnchor)}</h3>
+          <p className="mt-1 text-xs text-zinc-500">Month view with the biggest shows inside each date.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-zinc-500">{monthShows} shows</span>
+          <button className="cohear-icon-button h-8 w-8" onClick={() => setMonthAnchor(addMonths(monthAnchor, -1))} title="Previous month">‹</button>
+          <button className="cohear-icon-button h-8 w-8" onClick={() => setMonthAnchor(addMonths(monthAnchor, 1))} title="Next month">›</button>
+        </div>
       </div>
-      <div className="max-h-[660px] divide-y divide-white/[0.06] overflow-y-auto">
-        {grouped.map(([date, shows]) => (
-          <section key={date} className="grid gap-3 p-4 md:grid-cols-[120px_1fr]">
-            <div className="text-sm font-semibold text-zinc-300">{fmtDate(date)}</div>
-            <div className="grid gap-2">
-              {shows.slice(0, 8).map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => onSelect(c.id)}
-                  className={`grid gap-2 rounded-lg border p-3 text-left transition md:grid-cols-[1fr_auto] ${
-                    c.id === selectedId ? 'border-cyan-300/40 bg-cyan-300/[0.08]' : 'border-white/10 bg-white/[0.025] hover:border-white/20'
-                  }`}
-                >
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-semibold text-white">{c.artist}</span>
-                    <span className="mt-1 block truncate text-xs text-zinc-500">{c.venue} · {c.city}</span>
-                  </span>
-                  <span className="text-sm font-semibold text-amber-200">{fmtCapacity(c.capacity)}</span>
-                </button>
-              ))}
-            </div>
-          </section>
+      <div className="grid grid-cols-7 border-b border-white/10 bg-black/20 text-center text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-600">
+        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => <div key={d} className="px-2 py-2">{d}</div>)}
+      </div>
+      <div className="grid grid-cols-7">
+        {days.map((day) => {
+          const inMonth = day.iso.startsWith(monthAnchor);
+          const shows = grouped.get(day.iso) || [];
+          return (
+            <section key={day.iso} className={`min-h-32 border-b border-r border-white/[0.06] p-2 ${inMonth ? 'bg-white/[0.015]' : 'bg-black/25 opacity-45'}`}>
+              <div className="flex items-center justify-between gap-2">
+                <span className={`text-xs font-semibold tabular-nums ${day.iso === new Date().toISOString().slice(0, 10) ? 'rounded bg-cyan-300 px-1.5 py-0.5 text-zinc-950' : 'text-zinc-500'}`}>
+                  {Number(day.iso.slice(8, 10))}
+                </span>
+                {shows.length > 3 && <span className="text-[10px] text-zinc-600">+{shows.length - 3}</span>}
+              </div>
+              <div className="mt-2 grid gap-1">
+                {shows.slice(0, 3).map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => onSelect(c.id)}
+                    className={`rounded border px-2 py-1 text-left transition ${
+                      c.id === selectedId ? 'border-cyan-300/50 bg-cyan-300/[0.1]' : 'border-white/10 bg-black/20 hover:border-white/25'
+                    }`}
+                    title={`${c.artist} at ${c.venue}`}
+                  >
+                    <span className="block truncate text-[11px] font-semibold text-white">{c.artist}</span>
+                    <span className="block truncate text-[10px] text-zinc-500">{fmtCapacity(c.capacity)}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          );
+        })}
+      </div>
+      <div className="max-h-48 overflow-y-auto border-t border-white/10 p-3">
+        {rows.filter((c) => c.date?.startsWith(monthAnchor)).slice(0, 12).map((c) => (
+          <button
+            key={`${c.id}-month-list`}
+            onClick={() => onSelect(c.id)}
+            className={`mb-2 grid w-full gap-2 rounded-lg border p-3 text-left transition md:grid-cols-[110px_1fr_auto] ${
+              c.id === selectedId ? 'border-cyan-300/40 bg-cyan-300/[0.08]' : 'border-white/10 bg-white/[0.025] hover:border-white/20'
+            }`}
+          >
+            <span className="text-xs font-semibold text-zinc-500">{fmtDate(c.date)}</span>
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-semibold text-white">{c.artist}</span>
+              <span className="mt-1 block truncate text-xs text-zinc-500">{c.venue} · {c.city}</span>
+            </span>
+            <span className="text-sm font-semibold text-amber-200">{fmtCapacity(c.capacity)}</span>
+          </button>
         ))}
       </div>
     </div>
@@ -922,7 +1067,7 @@ function TimeStack({ concert, userZone, now }) {
     <span className="min-w-0 text-xs leading-5">
       <span className="block truncate font-semibold text-zinc-200">{formatVenueShowTime(concert)}</span>
       <span className="block truncate text-zinc-500">{formatUserShowTime(concert, userZone)}</span>
-      <span className={`block truncate font-semibold ${cd.tone === 'rose' ? 'text-rose-200' : cd.tone === 'amber' ? 'text-amber-200' : 'text-zinc-500'}`}>
+      <span className={`block truncate font-semibold ${countdownClass(cd.tone)}`}>
         {cd.text}
       </span>
     </span>
@@ -930,6 +1075,7 @@ function TimeStack({ concert, userZone, now }) {
 }
 
 function metricTone(tone) {
+  if (tone?.startsWith?.('green') || tone?.startsWith?.('red')) return countdownClass(tone);
   if (tone === 'amber') return 'text-amber-200';
   if (tone === 'rose') return 'text-rose-200';
   if (tone === 'cyan') return 'text-cyan-200';
@@ -977,9 +1123,50 @@ function countdownLabel(concert, now) {
   const ms = showStartMs(concert);
   if (!ms) return { text: 'Time TBA', tone: 'zinc' };
   const diff = ms - now;
-  if (diff > 0) return { text: `Starts in ${durationShort(diff)}`, tone: diff < 6 * 3600_000 ? 'rose' : 'amber' };
-  if (diff > -4 * 3600_000) return { text: `Started ${durationShort(Math.abs(diff))} ago`, tone: 'rose' };
+  if (diff > 0) {
+    if (diff < 2 * 3600_000) return { text: `Starts in ${durationShort(diff)}`, tone: 'green-hot' };
+    if (diff < 24 * 3600_000) return { text: `Starts in ${durationShort(diff)}`, tone: 'green' };
+    return { text: `Starts in ${durationShort(diff)}`, tone: 'green-soft' };
+  }
+  const elapsed = Math.abs(diff);
+  const end = showEndMs(concert);
+  if (end && now <= end) return { text: `Started ${durationShort(elapsed)} ago`, tone: elapsed < 2 * 3600_000 ? 'red-hot' : 'red' };
+  if (elapsed < 12 * 3600_000) return { text: `Ended ${durationShort(now - (end || ms))} ago`, tone: 'red-soft' };
   return { text: concert.when === 'past' ? 'Past show' : 'Started earlier', tone: 'zinc' };
+}
+
+function countdownClass(tone) {
+  if (tone === 'green-hot') return 'text-emerald-200';
+  if (tone === 'green') return 'text-green-300';
+  if (tone === 'green-soft') return 'text-lime-200';
+  if (tone === 'red-hot') return 'text-rose-200';
+  if (tone === 'red') return 'text-red-300';
+  if (tone === 'red-soft') return 'text-red-500';
+  if (tone === 'amber') return 'text-amber-200';
+  return 'text-zinc-500';
+}
+
+function showState(concert, now) {
+  const start = showStartMs(concert);
+  if (!start) return { current: false, ended: false, recentlyEnded: false };
+  const end = showEndMs(concert);
+  const nearStart = Math.abs(start - now) <= 2 * 3600_000;
+  const current = Boolean(end && now >= start && now <= end) || nearStart;
+  const ended = Boolean(end && now > end);
+  const recentlyEnded = Boolean(end && now > end && now - end <= 4 * 3600_000);
+  return { current, ended, recentlyEnded, start, end };
+}
+
+function showEndMs(concert) {
+  const start = showStartMs(concert);
+  if (!start) return null;
+  return start + estimatedShowMs(concert);
+}
+
+function estimatedShowMs(concert) {
+  const songs = concert?.songCount || concert?.setlist?.length || 0;
+  if (songs > 0) return Math.max(75, songs * 4.5 + (songs - 1) * 0.6) * 60_000;
+  return 3 * 3600_000;
 }
 
 function durationShort(ms) {
@@ -1106,6 +1293,35 @@ function projectMapPoint(lat, lng) {
     x: Math.max(4, Math.min(96, x)),
     y: Math.max(5, Math.min(95, y)),
   };
+}
+
+function shortLabel(value) {
+  const words = String(value || '').split(/\s+/).filter(Boolean);
+  if (words.length > 1) return words.slice(0, 2).join(' ');
+  return String(value || '').slice(0, 14);
+}
+
+function monthGrid(anchor) {
+  const [y, m] = anchor.split('-').map(Number);
+  const first = new Date(Date.UTC(y, m - 1, 1));
+  const start = new Date(first);
+  start.setUTCDate(first.getUTCDate() - first.getUTCDay());
+  return Array.from({ length: 42 }, (_, i) => {
+    const d = new Date(start);
+    d.setUTCDate(start.getUTCDate() + i);
+    return { iso: d.toISOString().slice(0, 10) };
+  });
+}
+
+function addMonths(anchor, delta) {
+  const [y, m] = anchor.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + delta, 1));
+  return d.toISOString().slice(0, 7);
+}
+
+function monthLabel(anchor) {
+  const [y, m] = anchor.split('-').map(Number);
+  return new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(Date.UTC(y, m - 1, 1)));
 }
 
 function SourceBadges({ sources }) {

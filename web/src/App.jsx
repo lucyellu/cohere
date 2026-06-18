@@ -42,6 +42,7 @@ export default function App() {
     const ev = await resolveEvent({
       artist: concert.artist,
       date: concert.date,
+      startDate: concert.startDate,
       venue: concert.venue,
       city: concert.city,
       country: concert.country,

@@ -399,7 +399,7 @@ export async function getFeatured() {
 // ---- Resolve an arbitrary artist into a live/replay event ---------------
 // `when`: 'live' uses tonight @ a generic time; 'replay' anchors to the real
 // past show's date. Venue/coords come from the caller (globe) when available.
-export async function resolveEvent({ artist, date, venue, city, country, lat, lng, tz, mode = 'live' }) {
+export async function resolveEvent({ artist, date, startDate, venue, city, country, lat, lng, tz, mode = 'live' }) {
   if (!artist) throw new Error('artist required');
   const zone = tz || 'America/New_York';
   const sf = await fetchSetlist(artist, { date, cityPref: city }).catch(() => null);
@@ -408,7 +408,10 @@ export async function resolveEvent({ artist, date, venue, city, country, lat, ln
   if (!songs.length) return null;
 
   let startUTC;
-  if (mode === 'replay' && (sf?.date || date)) {
+  const exactStart = startDateToUtc(startDate, zone);
+  if (exactStart) {
+    startUTC = exactStart;
+  } else if (mode === 'replay' && (sf?.date || date)) {
     const dmy = sf?.date || isoToDmy(String(date).slice(0, 10));
     const [dd, mm, yy] = dmy.split('-').map(Number);
     startUTC = zonedToUtc(zone, yy, mm, dd, 21, 0); // historical shows: assume 9pm local
@@ -436,6 +439,18 @@ export async function resolveEvent({ artist, date, venue, city, country, lat, ln
   });
   enrichDurations(ev); // real per-song lengths
   return snapshot(ev);
+}
+
+function startDateToUtc(raw, zone) {
+  if (!raw || !String(raw).includes('T')) return null;
+  const value = String(raw);
+  if (/[zZ]|[+-]\d{2}:?\d{2}$/.test(value)) {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d.getTime();
+  }
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(value);
+  if (!m) return null;
+  return zonedToUtc(zone, Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4]), Number(m[5]));
 }
 
 function slug(s) {
