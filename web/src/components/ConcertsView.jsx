@@ -24,7 +24,7 @@ const WHEN = [
 
 const SORT_KEYS = ['capacity', 'popularity', 'date', 'artist', 'venue', 'city'];
 const USER_ZONE_KEY = 'cohear_user_timezone';
-const DISCOVER_STATE_KEY = 'cohear_discover_state_v1';
+const DISCOVER_STATE_KEY = 'cohear_discover_state_v3';
 const DETECTED_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Vancouver';
 const USER_TIME_ZONES = withDetectedZone([
   { zone: 'America/Vancouver', city: 'Vancouver', label: 'Vancouver / Pacific' },
@@ -51,13 +51,13 @@ function readDiscoverState() {
     sortKey: 'capacity',
     dir: 'desc',
     when: 'all',
-    hideEnded: false,
+    hideEnded: true,
     selectedId: null,
   };
   try {
     const parsed = JSON.parse(sessionStorage.getItem(DISCOVER_STATE_KEY) || 'null');
     if (!parsed || !Array.isArray(parsed.concerts)) return fallback;
-    return { ...fallback, ...parsed };
+    return { ...fallback, ...parsed, hideEnded: parsed.hideEnded ?? true };
   } catch {
     return fallback;
   }
@@ -239,8 +239,9 @@ export default function ConcertsView({ onEnterShow, onSyncLive }) {
   const biggest = visible[0] || null;
   const stats = useMemo(() => {
     const totalCap = visible.reduce((n, c) => n + (c.capacity || 0), 0);
+    const ticketValue = visible.reduce((n, c) => n + estimatedTicketUsd(c), 0);
     const upcoming = concerts.filter((c) => c.when === 'upcoming').length;
-    return { count: visible.length, totalCap, upcoming, past: concerts.length - upcoming };
+    return { count: visible.length, totalCap, ticketValue, upcoming, past: concerts.length - upcoming };
   }, [concerts, visible]);
 
   return (
@@ -383,6 +384,12 @@ function DiscoverHeader({ artist, browse, biggest, loading, stats, spotify, user
               label="Known capacity"
               value={fmtCapacity(stats.totalCap)}
               title="Sum of venue capacity for the currently visible shows. It is not confirmed attendance or tickets sold."
+            />
+            <MetricBlock
+              label="Ticket value"
+              value={fmtUsd(stats.ticketValue)}
+              tone="green"
+              title="Estimated face-value ticket spend avoided if you sampled each visible concert digitally. Cohear does not have live ticket-price data yet."
             />
           </div>
         </div>
@@ -625,6 +632,7 @@ function ConcertInspector({ concert, saved, sources, userZone, now, onSave, onEn
 
         <div className="grid grid-cols-2 gap-3">
           <MetricBlock label="Capacity" value={fmtCapacity(concert.capacity)} tone="amber" />
+          <MetricBlock label="Est. ticket" value={fmtUsd(estimatedTicketUsd(concert))} tone="green" title="Estimated average ticket value, not live market pricing." />
           <MetricBlock label="Countdown" value={countdownLabel(concert, now).text} tone={countdownLabel(concert, now).tone} />
           <MetricBlock label="Concert city" value={formatVenueShowTime(concert)} />
           <MetricBlock label="Your city" value={formatUserShowTime(concert, userZone)} />
@@ -1130,6 +1138,7 @@ function userLocalSortValue(concert, userZone) {
 
 function metricTone(tone) {
   if (tone?.startsWith?.('green') || tone?.startsWith?.('red')) return countdownClass(tone);
+  if (tone === 'green') return 'text-emerald-200';
   if (tone === 'amber') return 'text-amber-200';
   if (tone === 'rose') return 'text-rose-200';
   if (tone === 'cyan') return 'text-cyan-200';
@@ -1221,6 +1230,18 @@ function estimatedShowMs(concert) {
   const songs = concert?.songCount || concert?.setlist?.length || 0;
   if (songs > 0) return Math.max(75, songs * 4.5 + (songs - 1) * 0.6) * 60_000;
   return 3 * 3600_000;
+}
+
+function estimatedTicketUsd(concert) {
+  if (concert?.avgTicketUsd) return Math.round(concert.avgTicketUsd);
+  const popularity = Number(concert?.popularity || 55);
+  const capacity = Number(concert?.capacity || 12000);
+  const arenaPremium = capacity >= 60000 ? 80 : capacity >= 25000 ? 45 : capacity >= 15000 ? 25 : 0;
+  return Math.max(35, Math.round(45 + popularity * 1.15 + arenaPremium));
+}
+
+function fmtUsd(value) {
+  return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value || 0);
 }
 
 function durationShort(ms) {
@@ -1381,6 +1402,7 @@ function monthLabel(anchor) {
 function SourceBadges({ sources }) {
   const sourceLabel = (value) => {
     if (value === 'live') return ['Live', 'text-emerald-200 border-emerald-300/20 bg-emerald-300/10'];
+    if (value === 'demo') return ['Demo', 'text-cyan-200 border-cyan-300/20 bg-cyan-300/10'];
     if (value === 'mock') return ['Demo', 'text-amber-200 border-amber-300/20 bg-amber-300/10'];
     if (value === 'error') return ['Error', 'text-rose-200 border-rose-300/20 bg-rose-300/10'];
     if (value === 'nokey') return ['No key', 'text-zinc-400 border-white/10 bg-white/5'];

@@ -52,7 +52,7 @@ export async function resolveEvent(body) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   }).then((x) => x.json()).catch(() => null);
-  return r?.ok ? r.event : null;
+  return r?.ok ? r.event : fallbackEvent(body);
 }
 
 // --- Crowd beacon (tap-to-sync) -----------------------------------------
@@ -142,4 +142,83 @@ export async function youtubeTop(query) {
   const out = { videoId: item.id.videoId, title: item.snippet?.title || query, channel: item.snippet?.channelTitle || '' };
   localStorage.setItem(key, JSON.stringify(out));
   return out;
+}
+
+function fallbackEvent(body = {}) {
+  if (!body.artist) return null;
+  const songs = fallbackSongs(body.artist);
+  const startUTC = startMs(body.startDate, body.date, body.tz || 'America/Vancouver');
+  const timeline = songs.map((song, i) => ({
+    i,
+    song,
+    startMs: startUTC + i * 270_000,
+    durSec: 225,
+  }));
+  return {
+    id: `fallback-${slug(body.artist)}-${String(body.date || '').slice(0, 10) || 'show'}`,
+    artist: body.artist,
+    venue: body.venue || 'Venue TBA',
+    city: body.city || '',
+    country: body.country || '',
+    lat: body.lat,
+    lng: body.lng,
+    tz: body.tz || 'America/Vancouver',
+    startUTC,
+    mode: body.mode || 'live',
+    songsSource: 'fallback',
+    setlistDate: body.date,
+    exact: false,
+    timeline,
+    showLengthMs: timeline.length ? (timeline[timeline.length - 1].startMs + timeline[timeline.length - 1].durSec * 1000) - startUTC : 0,
+    correctionMs: 0,
+    clips: [],
+    serverNow: Date.now(),
+  };
+}
+
+function fallbackSongs(artist) {
+  const key = String(artist || '').toLowerCase();
+  if (key.includes('bruno')) return ['24K Magic', 'Treasure', 'That’s What I Like', 'Leave the Door Open', 'Locked Out of Heaven', 'Just the Way You Are', 'Uptown Funk'];
+  if (key.includes('harry')) return ['Music for a Sushi Restaurant', 'Golden', 'Adore You', 'Watermelon Sugar', 'Sign of the Times', 'As It Was', 'Kiwi'];
+  if (key.includes('olivia')) return ['bad idea right?', 'vampire', 'drivers license', 'deja vu', 'traitor', 'good 4 u', 'all-american bitch'];
+  if (key.includes('beyonce')) return ['Crazy in Love', 'Formation', 'Cuff It', 'Break My Soul', 'Love on Top', 'Texas Hold ’Em', 'Halo'];
+  return ['Opening song', 'Fan favorite', 'The big single', 'Acoustic moment', 'Deep cut', 'Crowd singalong', 'Encore'];
+}
+
+function startMs(startDate, date, zone) {
+  const raw = String(startDate || '');
+  if (raw.includes('T')) {
+    const d = new Date(raw);
+    if (!Number.isNaN(d.getTime()) && /[zZ]|[+-]\d{2}:?\d{2}$/.test(raw)) return d.getTime();
+    const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(raw);
+    if (m) return zonedToUtc(zone, Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4]), Number(m[5]));
+  }
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(date || ''));
+  if (m) return zonedToUtc(zone, Number(m[1]), Number(m[2]), Number(m[3]), 20, 0);
+  return Date.now() + 10 * 60_000;
+}
+
+function zonedToUtc(tz, y, mo, d, h, mi) {
+  const guess = Date.UTC(y, mo - 1, d, h, mi);
+  return guess - tzOffsetMs(tz, guess);
+}
+
+function tzOffsetMs(tz, utcMs) {
+  const parts = {};
+  const dtf = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    hour12: false,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+  for (const p of dtf.formatToParts(new Date(utcMs))) parts[p.type] = p.value;
+  return Date.UTC(+parts.year, +parts.month - 1, +parts.day, +(parts.hour % 24), +parts.minute, +parts.second) - utcMs;
+}
+
+function slug(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
 }

@@ -95,7 +95,7 @@ export default function LiveRoom({ event: initial, onBack }) {
       {/* Accuracy / source bar — honest about prediction vs real setlist */}
       <AccuracyBar event={event} presenceCount={presenceCount} synced={synced} />
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(280px,.9fr)_minmax(280px,.85fr)]">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(280px,.85fr)_minmax(280px,.85fr)]">
         <RoomPanel
           id="video"
           title="Video"
@@ -111,8 +111,20 @@ export default function LiveRoom({ event: initial, onBack }) {
 
           {/* Demo time-warp */}
           <DemoWarp event={event} onWarp={warpToSong} />
+        </RoomPanel>
 
-          {isLive && np.song && <Lyrics artist={event.artist} song={np.song} />}
+        <RoomPanel
+          id="lyrics"
+          title="Lyrics"
+          subtitle={np.song ? np.song : 'Current-song lyrics'}
+          order={panelIndex.lyrics}
+          onMove={movePanel}
+        >
+          {np.song ? (
+            <Lyrics artist={event.artist} song={np.song} />
+          ) : (
+            <EmptyPanelText>Lyrics appear when a song is selected or the show reaches a track.</EmptyPanelText>
+          )}
         </RoomPanel>
 
         <RoomPanel
@@ -137,19 +149,26 @@ export default function LiveRoom({ event: initial, onBack }) {
           </div>
           <Weather event={event} />
         </RoomPanel>
-      </div>
 
-      {/* Crowd-sourced live feed (full width) */}
-      <FanWall event={event} np={np} clips={event.clips || []} onClipsChanged={async () => {
-        const fresh = await getEvent(event.id);
-        if (fresh) setEvent((prev) => ({ ...prev, ...fresh }));
-      }} />
+        <RoomPanel
+          id="social"
+          title="Social feed"
+          subtitle="YouTube, TikTok, Instagram, X, and crowd links"
+          order={panelIndex.social}
+          onMove={movePanel}
+        >
+          <FanWall event={event} np={np} clips={event.clips || []} onClipsChanged={async () => {
+            const fresh = await getEvent(event.id);
+            if (fresh) setEvent((prev) => ({ ...prev, ...fresh }));
+          }} compact />
+        </RoomPanel>
+      </div>
     </div>
   );
 }
 
 function readPanelOrder() {
-  const fallback = ['video', 'setlist', 'map'];
+  const fallback = ['video', 'lyrics', 'setlist', 'map', 'social'];
   try {
     const parsed = JSON.parse(localStorage.getItem('cohear_live_panel_order') || 'null');
     if (Array.isArray(parsed) && fallback.every((id) => parsed.includes(id))) {
@@ -162,6 +181,10 @@ function readPanelOrder() {
     /* ignore bad saved layout */
   }
   return fallback;
+}
+
+function EmptyPanelText({ children }) {
+  return <p className="rounded-xl border border-white/10 bg-black/20 p-4 text-sm leading-6 text-zinc-500">{children}</p>;
 }
 
 function RoomPanel({ id, title, subtitle, order, onMove, children }) {

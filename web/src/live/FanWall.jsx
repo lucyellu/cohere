@@ -24,11 +24,11 @@ const SORTS = [
   { id: 'az', label: 'A–Z' },
 ];
 
-export default function FanWall({ event, np, clips, onClipsChanged }) {
+export default function FanWall({ event, np, clips, onClipsChanged, compact = false }) {
   const [platform, setPlatform] = useState('all');
   const [sort, setSort] = useState('recent');
   const [scope, setScope] = useState('all'); // 'all' | songIndex
-  const [columns, setColumns] = useState(3);
+  const [columns, setColumns] = useState(compact ? 2 : 3);
   const [refreshKey, setRefreshKey] = useState(0);
   const [yt, setYt] = useState({ items: [], error: null, loading: true });
   const [social, setSocial] = useState({ items: [], loading: true });
@@ -126,10 +126,10 @@ export default function FanWall({ event, np, clips, onClipsChanged }) {
   }, [yt.items, social.items, clips, platform, sort, scope, scopeSong]);
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+    <div className={compact ? '' : 'rounded-2xl border border-white/10 bg-white/[0.03] p-4'}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold text-zinc-100">Crowd-sourced live feed</h3>
+          <h3 className="text-sm font-semibold text-zinc-100">{compact ? 'Crowd media' : 'Crowd-sourced live feed'}</h3>
           <p className="text-[11px] text-zinc-500">
             {scopeSong ? <>Footage of <span className="text-fuchsia-300">“{scopeSong}”</span></> : 'Every platform, one feed'}
           </p>
