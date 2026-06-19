@@ -15,10 +15,11 @@ const url = import.meta.env.VITE_SUPABASE_URL;
 const anon = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export const supabaseEnabled = Boolean(url && anon);
+export const supabase = supabaseEnabled
+  ? createClient(url, anon, { realtime: { params: { eventsPerSecond: 5 } } })
+  : null;
 
-if (supabaseEnabled) {
-  const supabase = createClient(url, anon, { realtime: { params: { eventsPerSecond: 5 } } });
-
+if (supabase) {
   // Anonymous auth so each viewer is a distinct (if nameless) presence. Falls
   // back gracefully if anonymous sign-ins are disabled on the project.
   supabase.auth.signInAnonymously().catch(() => {});

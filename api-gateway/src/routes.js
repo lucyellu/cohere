@@ -360,6 +360,360 @@ router.get('/concerts', async (req, res) => {
   res.json({ ok: true, artist, browse, window: browse ? windowKey : null, concerts, sources });
 });
 
+// --- Ticketmaster Discovery: single-ticket price range + buy link --------
+// Open API only: event metadata, priceRanges, and the Ticketmaster event URL.
+// The Partner API is restricted, so checkout/inventory is intentionally out of
+// scope here. A user can send x-cohear-ticketmaster-key from local settings.
+const TM_BASE = 'https://app.ticketmaster.com/discovery/v2';
+
+router.get('/ticketmaster/match', async (req, res) => {
+  const artist = String(req.query.artist || '').trim();
+  const venue = String(req.query.venue || '').trim();
+  const city = String(req.query.city || '').trim();
+  const country = String(req.query.country || '').trim();
+  const date = String(req.query.date || '').slice(0, 10);
+  const userKey = String(req.get('x-cohear-ticketmaster-key') || '').trim();
+  const key = userKey || process.env.TICKETMASTER_API_KEY || '';
+  const affiliate = String(req.get('x-cohear-ticketmaster-affiliate') || process.env.TICKETMASTER_AFFILIATE_ID || '').trim();
+
+  if (!artist && !venue && !city) return res.status(400).json({ ok: false, error: 'artist, venue, or city required' });
+  if (!key) {
+    record('ticketmaster', { status: 200, latencyMs: 0, bytes: 0, mode: 'mock', error: 'no key' });
+    return res.json({ ok: false, mode: 'nokey', error: 'ticketmaster key required' });
+  }
+
+  const params = new URLSearchParams({
+    apikey: key,
+    classificationName: 'music',
+    size: '20',
+    sort: 'date,asc',
+  });
+  const attractionId = artist ? await ticketmasterAttractionId(artist, key) : null;
+  if (attractionId) params.set('attractionId', attractionId);
+  else if (artist) params.set('keyword', artist);
+  if (city) params.set('city', city);
+  const countryCode = ticketmasterCountryCode(country);
+  if (countryCode) params.set('countryCode', countryCode);
+  if (date) {
+    params.set('startDateTime', `${date}T00:00:00Z`);
+    params.set('endDateTime', `${date}T23:59:59Z`);
+  }
+
+  const result = await callLive('ticketmaster', `${TM_BASE}/events.json?${params.toString()}`);
+  if (!result.ok) return res.status(502).json({ ok: false, mode: 'live', error: `ticketmaster failed (HTTP ${result.status || 'unknown'})` });
+
+  const events = (result.data?._embedded?.events || []).filter((event) => !isLikelyTributeEvent(event, artist));
+  const ranked = events
+    .map((event) => ({ event, score: scoreTicketmasterEvent(event, { artist, venue, city, date }) }))
+    .sort((a, b) => b.score - a.score);
+  const best = ranked[0];
+  if (!best || best.score < 25) return res.json({ ok: false, mode: 'live', error: 'no confident ticket match' });
+
+  res.json({ ok: true, mode: 'live', ticket: normalizeTicketmasterEvent(best.event, affiliate), score: best.score });
+});
+
+function normalizeTicketmasterEvent(event, affiliate = '') {
+  const venue = event?._embedded?.venues?.[0] || {};
+  const priceRanges = Array.isArray(event?.priceRanges) ? event.priceRanges : [];
+  const prices = priceRanges
+    .map((p) => ({ min: numOrNull(p.min), max: numOrNull(p.max), currency: p.currency || venue.currency || '' }))
+    .filter((p) => p.min != null || p.max != null);
+  const min = prices.length ? Math.min(...prices.map((p) => p.min ?? p.max).filter((v) => v != null)) : null;
+  const max = prices.length ? Math.max(...prices.map((p) => p.max ?? p.min).filter((v) => v != null)) : null;
+  const currency = prices.find((p) => p.currency)?.currency || venue.currency || 'USD';
+  const typical = min != null && max != null ? Math.round((min + max) / 2) : (min ?? max);
+  return {
+    id: event.id,
+    name: event.name || '',
+    url: appendAffiliate(event.url || '', affiliate),
+    source: 'ticketmaster',
+    date: event.dates?.start?.localDate || '',
+    time: event.dates?.start?.localTime || '',
+    venue: venue.name || '',
+    city: venue.city?.name || '',
+    country: venue.country?.name || venue.country?.countryCode || '',
+    currency,
+    priceLow: min,
+    priceHigh: max,
+    priceTypical: typical,
+    priceSource: prices.length ? 'ticketmaster_price_range' : 'ticketmaster_event',
+  };
+}
+
+function appendAffiliate(url, affiliate) {
+  if (!url || !affiliate) return url || '';
+  try {
+    const u = new URL(url);
+    u.searchParams.set('CAMEFROM', affiliate);
+    return u.toString();
+  } catch {
+    const sep = url.includes('?') ? '&' : '?';
+    return `${url}${sep}CAMEFROM=${encodeURIComponent(affiliate)}`;
+  }
+}
+
+async function ticketmasterAttractionId(artist, key) {
+  const params = new URLSearchParams({
+    apikey: key,
+    keyword: artist,
+    classificationName: 'music',
+    size: '10',
+  });
+  const result = await callLive('ticketmaster', `${TM_BASE}/attractions.json?${params.toString()}`);
+  if (!result.ok) return null;
+  const attractions = result.data?._embedded?.attractions || [];
+  const exact = attractions.find((a) => String(a.name || '').trim().toLowerCase() === artist.toLowerCase());
+  return exact?.id || null;
+}
+
+function isLikelyTributeEvent(event, artist) {
+  if (!artist) return false;
+  const text = [
+    event?.name,
+    ...(event?._embedded?.attractions || []).map((a) => a.name),
+  ].filter(Boolean).join(' ').toLowerCase();
+  if (!/\b(tribute|tributes|cover band|candlelight|experience)\b/.test(text)) return false;
+  return !String(event?.name || '').trim().toLowerCase().startsWith(String(artist).toLowerCase());
+}
+
+function scoreTicketmasterEvent(event, wanted) {
+  const evVenue = event?._embedded?.venues?.[0] || {};
+  const haystack = [
+    event?.name,
+    evVenue.name,
+    evVenue.city?.name,
+    evVenue.country?.name,
+    ...(event?._embedded?.attractions || []).map((a) => a.name),
+  ].filter(Boolean).join(' ').toLowerCase();
+  let score = 0;
+  if (wanted.date && event?.dates?.start?.localDate === wanted.date) score += 45;
+  if (wanted.city && String(evVenue.city?.name || '').toLowerCase() === wanted.city.toLowerCase()) score += 20;
+  if (wanted.venue && fuzzyContains(evVenue.name, wanted.venue)) score += 24;
+  if (wanted.artist && fuzzyContains(haystack, wanted.artist)) score += 28;
+  if (event?.url) score += 4;
+  if (Array.isArray(event?.priceRanges) && event.priceRanges.length) score += 10;
+  return score;
+}
+
+function fuzzyContains(haystack, needle) {
+  const h = String(haystack || '').toLowerCase();
+  const parts = String(needle || '').toLowerCase().split(/\s+/).filter((p) => p.length > 2);
+  if (!h || !parts.length) return false;
+  return parts.every((p) => h.includes(p));
+}
+
+function ticketmasterCountryCode(country) {
+  const c = String(country || '').trim().toLowerCase();
+  if (!c) return '';
+  if (c === 'us' || c.includes('united states') || c === 'usa') return 'US';
+  if (c === 'ca' || c.includes('canada')) return 'CA';
+  if (c === 'gb' || c === 'uk' || c.includes('united kingdom') || c.includes('england')) return 'GB';
+  if (c.includes('australia')) return 'AU';
+  if (c.includes('new zealand')) return 'NZ';
+  if (c.includes('mexico')) return 'MX';
+  if (c.includes('ireland')) return 'IE';
+  if (c.includes('france')) return 'FR';
+  if (c.includes('germany')) return 'DE';
+  if (c.includes('spain')) return 'ES';
+  if (c.includes('italy')) return 'IT';
+  if (c.includes('japan')) return 'JP';
+  if (/^[a-z]{2}$/.test(c)) return c.toUpperCase();
+  return '';
+}
+
+// --- Web ticket estimate: top search snippets -> conservative price range -
+router.get('/tickets/web-estimate', async (req, res) => {
+  const artist = String(req.query.artist || '').trim();
+  const venue = String(req.query.venue || '').trim();
+  const city = String(req.query.city || '').trim();
+  const country = String(req.query.country || '').trim();
+  const date = String(req.query.date || '').slice(0, 10);
+  const requestedCurrency = String(req.query.currency || '').trim().toUpperCase();
+  const key = String(req.get('x-cohear-google-cse-key') || process.env.GOOGLE_CSE_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
+  const cx = String(req.get('x-cohear-google-cse-id') || process.env.GOOGLE_CSE_ID || '').trim();
+
+  if (!artist && !venue && !city) return res.status(400).json({ ok: false, error: 'artist, venue, or city required' });
+  if (!key || !cx) {
+    record('websearch', { status: 200, latencyMs: 0, bytes: 0, mode: 'mock', error: 'no google cse config' });
+    return res.json({ ok: false, mode: 'nokey', error: 'google search key and engine id required' });
+  }
+
+  const query = ticketSearchQuery({ artist, venue, city, country, date });
+  const params = new URLSearchParams({
+    key,
+    cx,
+    q: query,
+    num: '10',
+    safe: 'active',
+  });
+  const gl = ticketmasterCountryCode(country).toLowerCase();
+  if (gl) params.set('gl', gl);
+
+  const result = await callLive('websearch', `https://customsearch.googleapis.com/customsearch/v1?${params.toString()}`);
+  if (!result.ok) return res.status(502).json({ ok: false, mode: 'live', error: `web search failed (HTTP ${result.status || 'unknown'})` });
+
+  const items = Array.isArray(result.data?.items) ? result.data.items : [];
+  const estimate = estimateTicketPriceFromSearch(items, requestedCurrency || defaultCurrencyForCountry(country));
+  if (!estimate) {
+    return res.json({
+      ok: false,
+      mode: 'live',
+      error: 'no ticket prices found in search snippets',
+      query,
+      results: items.slice(0, 5).map(searchResultSummary),
+    });
+  }
+
+  res.json({ ok: true, mode: 'live', query, estimate });
+});
+
+function ticketSearchQuery({ artist, venue, city, country, date }) {
+  return [
+    artist,
+    venue ? `"${venue}"` : '',
+    city,
+    country,
+    date,
+    'tickets price',
+    '-parking',
+  ].filter(Boolean).join(' ');
+}
+
+function estimateTicketPriceFromSearch(items, defaultCurrency = 'USD') {
+  const perResult = items.map((item) => {
+    const summary = searchResultSummary(item);
+    const text = [
+      item?.title,
+      item?.snippet,
+      item?.htmlSnippet,
+      ...(item?.pagemap?.offer || []).map((offer) => `${offer.pricecurrency || ''} ${offer.price || ''}`),
+      ...(item?.pagemap?.offers || []).map((offer) => `${offer.pricecurrency || ''} ${offer.price || ''}`),
+    ].filter(Boolean).join(' ');
+    return { ...summary, prices: extractTicketPrices(text, defaultCurrency) };
+  });
+  const allPrices = perResult.flatMap((item) => item.prices.map((price) => ({ ...price, link: item.link })));
+  if (!allPrices.length) return null;
+
+  const byCurrency = new Map();
+  for (const price of allPrices) {
+    const list = byCurrency.get(price.currency) || [];
+    list.push(price);
+    byCurrency.set(price.currency, list);
+  }
+  const preferred = byCurrency.get(defaultCurrency);
+  const prices = preferred?.length ? preferred : [...byCurrency.values()].sort((a, b) => b.length - a.length)[0];
+  if (!prices?.length) return null;
+
+  const values = prices.map((price) => price.value).filter((value) => Number.isFinite(value)).sort((a, b) => a - b);
+  const resultLinks = new Set(prices.map((price) => price.link).filter(Boolean));
+  const trimmed = trimOutliers(values);
+  return {
+    source: 'web_search',
+    priceSource: 'google_cse_snippets',
+    currency: prices[0].currency,
+    priceLow: Math.round(trimmed[0]),
+    priceHigh: Math.round(trimmed[trimmed.length - 1]),
+    priceTypical: Math.round(medianNumber(trimmed)),
+    priceAverage: Math.round(trimmed.reduce((sum, value) => sum + value, 0) / trimmed.length),
+    observedCount: values.length,
+    sourceCount: resultLinks.size,
+    confidence: searchPriceConfidence(values.length, resultLinks.size),
+    results: perResult.filter((item) => item.prices.some((price) => price.currency === prices[0].currency)).slice(0, 5),
+  };
+}
+
+function searchResultSummary(item) {
+  return {
+    title: item?.title || '',
+    link: item?.link || '',
+    snippet: cleanSnippet(item?.snippet || ''),
+  };
+}
+
+function extractTicketPrices(text, defaultCurrency = 'USD') {
+  const out = [];
+  const seen = new Set();
+  const push = (rawValue, currency, index = 0, raw = '') => {
+    const value = parsePriceValue(rawValue);
+    const normalizedCurrency = normalizeCurrency(currency, defaultCurrency);
+    const max = normalizedCurrency === 'JPY' ? 500000 : 5000;
+    const min = normalizedCurrency === 'JPY' ? 1000 : 10;
+    if (!Number.isFinite(value) || value < min || value > max) return;
+    const context = String(text).slice(Math.max(0, index - 24), index + String(raw).length + 24).toLowerCase();
+    if (/\b(parking|hotel|shipping|deposit|gift card)\b/.test(context)) return;
+    const key = `${normalizedCurrency}:${Math.round(value)}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ value, currency: normalizedCurrency });
+  };
+
+  const symbolPattern = /(US\$|CA\$|C\$|A\$|\$|£|€|¥)\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.\d{1,2})?|[0-9]{2,6}(?:\.\d{1,2})?)/gi;
+  for (const match of String(text).matchAll(symbolPattern)) {
+    push(match[2], currencyForSymbol(match[1], defaultCurrency), match.index, match[0]);
+  }
+
+  const codeBeforePattern = /\b(USD|CAD|EUR|GBP|AUD|JPY)\s*\$?\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.\d{1,2})?|[0-9]{2,6}(?:\.\d{1,2})?)\b/gi;
+  for (const match of String(text).matchAll(codeBeforePattern)) {
+    push(match[2], match[1], match.index, match[0]);
+  }
+
+  const codeAfterPattern = /\b([0-9]{1,3}(?:,[0-9]{3})*(?:\.\d{1,2})?|[0-9]{2,6}(?:\.\d{1,2})?)\s*(USD|CAD|EUR|GBP|AUD|JPY)\b/gi;
+  for (const match of String(text).matchAll(codeAfterPattern)) {
+    push(match[1], match[2], match.index, match[0]);
+  }
+  return out.slice(0, 8);
+}
+
+function parsePriceValue(value) {
+  return Number(String(value || '').replace(/,/g, ''));
+}
+
+function currencyForSymbol(symbol, fallback) {
+  const s = String(symbol || '').toUpperCase();
+  if (s === 'US$') return 'USD';
+  if (s === 'CA$' || s === 'C$') return 'CAD';
+  if (s === 'A$') return 'AUD';
+  if (s === '£') return 'GBP';
+  if (s === '€') return 'EUR';
+  if (s === '¥') return 'JPY';
+  return fallback || 'USD';
+}
+
+function normalizeCurrency(currency, fallback = 'USD') {
+  const c = String(currency || '').toUpperCase();
+  return ['USD', 'CAD', 'EUR', 'GBP', 'AUD', 'JPY'].includes(c) ? c : (fallback || 'USD');
+}
+
+function defaultCurrencyForCountry(country) {
+  const code = ticketmasterCountryCode(country);
+  if (code === 'CA') return 'CAD';
+  if (code === 'GB' || code === 'IE') return 'GBP';
+  if (['FR', 'DE', 'ES', 'IT'].includes(code)) return 'EUR';
+  if (code === 'AU' || code === 'NZ') return 'AUD';
+  if (code === 'JP') return 'JPY';
+  return 'USD';
+}
+
+function trimOutliers(values) {
+  if (values.length < 5) return values;
+  return values.slice(1, -1);
+}
+
+function medianNumber(values) {
+  const mid = Math.floor(values.length / 2);
+  return values.length % 2 ? values[mid] : (values[mid - 1] + values[mid]) / 2;
+}
+
+function searchPriceConfidence(count, sourceCount) {
+  if (count >= 5 && sourceCount >= 3) return 'medium';
+  if (count >= 2 && sourceCount >= 2) return 'low';
+  return 'very_low';
+}
+
+function cleanSnippet(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim();
+}
+
 // --- YouTube: crowd-sourced concert video search -------------------------
 router.get('/youtube/search', async (req, res) => {
   const q = req.query.q || 'coldplay live';

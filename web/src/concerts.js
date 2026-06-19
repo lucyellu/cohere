@@ -2,6 +2,8 @@
 // normalized, deduped list spanning PAST (setlist.fm) + UPCOMING (JamBase)
 // shows. The List / Map / Calendar views all render off this same array.
 
+import { readApiKey } from './settings.js';
+
 const CACHE_TTL_MS = 8 * 60 * 60 * 1000;
 const memoryCache = new Map();
 const pending = new Map();
@@ -78,6 +80,63 @@ export async function fetchConcerts(artist, source = 'live', window = 'week', { 
     .finally(() => pending.delete(key));
   pending.set(key, request);
   return request;
+}
+
+export async function ticketmasterMatch(concert) {
+  if (!concert) return null;
+  const p = new URLSearchParams();
+  for (const [key, value] of [
+    ['artist', concert.artist],
+    ['venue', concert.venue],
+    ['city', concert.city],
+    ['country', concert.country],
+    ['date', concert.date],
+  ]) {
+    if (value) p.set(key, value);
+  }
+  const settings = readLocalSettings();
+  const key = readApiKey('ticketmaster');
+  const affiliate = settings?.affiliateIds?.ticketmaster || '';
+  const headers = {
+    ...(key ? { 'x-cohear-ticketmaster-key': key } : {}),
+    ...(affiliate ? { 'x-cohear-ticketmaster-affiliate': affiliate } : {}),
+  };
+  return fetch(`/api/ticketmaster/match?${p.toString()}`, { headers })
+    .then((x) => x.json())
+    .catch(() => null);
+}
+
+export async function ticketWebEstimate(concert, currency = 'USD') {
+  if (!concert) return null;
+  const p = new URLSearchParams();
+  for (const [key, value] of [
+    ['artist', concert.artist],
+    ['venue', concert.venue],
+    ['city', concert.city],
+    ['country', concert.country],
+    ['date', concert.date],
+    ['currency', currency],
+  ]) {
+    if (value) p.set(key, value);
+  }
+  const settings = readLocalSettings();
+  const key = readApiKey('googleCse');
+  const searchEngineId = settings?.searchEngineIds?.googleCse || '';
+  const headers = {
+    ...(key ? { 'x-cohear-google-cse-key': key } : {}),
+    ...(searchEngineId ? { 'x-cohear-google-cse-id': searchEngineId } : {}),
+  };
+  return fetch(`/api/tickets/web-estimate?${p.toString()}`, { headers })
+    .then((x) => x.json())
+    .catch(() => null);
+}
+
+function readLocalSettings() {
+  try {
+    return JSON.parse(localStorage.getItem('cohear_settings_v1') || '{}') || {};
+  } catch {
+    return {};
+  }
 }
 
 // Each sort has a key getter and a sensible default direction (numbers high→low,

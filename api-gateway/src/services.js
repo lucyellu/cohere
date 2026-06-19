@@ -63,6 +63,21 @@ export const SERVICES = {
     live: true,
     description: 'Venue weather at showtime (live + historical for replays)',
   },
+  ticketmaster: {
+    label: 'Ticketmaster',
+    category: 'data',
+    envKey: 'TICKETMASTER_API_KEY',
+    live: true,
+    description: 'Future-show ticket price ranges and buy-ticket links',
+  },
+  websearch: {
+    label: 'Web ticket search',
+    category: 'data',
+    envKey: 'GOOGLE_CSE_API_KEY',
+    requiredEnvKeys: ['GOOGLE_CSE_API_KEY', 'GOOGLE_CSE_ID'],
+    live: true,
+    description: 'Search-result ticket price snippets when official pricing is missing',
+  },
   suno: {
     label: 'Suno (6 accounts)',
     category: 'library',
@@ -148,6 +163,7 @@ export function hasKey(id) {
   const svc = SERVICES[id];
   if (!svc) return false;
   if (svc.keyless) return true; // no credentials required (e.g. public OG data)
+  if (svc.requiredEnvKeys) return svc.requiredEnvKeys.every((key) => Boolean(process.env[key]?.trim()));
   return Boolean(process.env[svc.envKey] && process.env[svc.envKey].trim());
 }
 

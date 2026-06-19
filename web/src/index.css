@@ -147,6 +147,72 @@ button:disabled {
   opacity: 0.45;
 }
 
+.cohear-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
+  padding: 0.25rem;
+}
+
+.cohear-tabs button {
+  min-height: 2.2rem;
+  border-radius: 6px;
+  padding: 0 0.85rem;
+  color: rgb(161 161 170);
+  font-size: 0.8125rem;
+  font-weight: 750;
+  transition: color 160ms ease, background 160ms ease;
+}
+
+.cohear-tabs button:hover {
+  color: white;
+}
+
+.cohear-tabs button.active {
+  background: white;
+  color: #09090b;
+}
+
+.cohear-settings-section {
+  display: grid;
+  gap: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 10px;
+  padding: 1rem;
+}
+
+.cohear-input,
+.cohear-select {
+  min-height: 2.6rem;
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.28);
+  padding: 0 0.8rem;
+  color: white;
+  outline: none;
+}
+
+.cohear-input:focus,
+.cohear-select:focus {
+  border-color: rgba(34, 211, 238, 0.42);
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.08);
+}
+
+.cohear-input:disabled {
+  color: rgb(82 82 91);
+  cursor: not-allowed;
+}
+
+.cohear-select option {
+  background: #09090b;
+  color: white;
+}
+
 .cohear-field {
   display: flex;
   min-height: 2.75rem;
@@ -189,6 +255,59 @@ button:disabled {
   color: rgb(82 82 91);
 }
 
+.cohear-resizable-layout {
+  --cohear-inspector-width: 380px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 14px minmax(300px, var(--cohear-inspector-width));
+  align-items: start;
+}
+
+.cohear-resize-handle {
+  display: grid;
+  min-height: 28rem;
+  cursor: col-resize;
+  place-items: center;
+}
+
+.cohear-resize-handle span {
+  display: block;
+  width: 3px;
+  height: 4rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  transition: background 160ms ease, height 160ms ease;
+}
+
+.cohear-resize-handle:hover span,
+.cohear-resize-handle:focus-visible span {
+  height: 6rem;
+  background: rgba(34, 211, 238, 0.55);
+}
+
+.cohear-stamp-card {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background:
+    linear-gradient(135deg, rgba(244, 244, 245, 0.05), rgba(0, 0, 0, 0.18)),
+    rgba(255, 255, 255, 0.025);
+  border-radius: 10px;
+  padding: 1rem;
+}
+
+.cohear-stamp-ink {
+  display: grid;
+  min-height: 10rem;
+  place-items: center;
+  border: 3px double rgba(251, 191, 36, 0.78);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(251, 191, 36, 0.11), transparent 55%),
+    rgba(0, 0, 0, 0.22);
+  color: rgb(253 230 138);
+  text-align: center;
+  transform: rotate(-2deg);
+  box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.22);
+}
+
 .cohear-link {
   color: rgb(165 243 252);
   font-size: 0.875rem;
@@ -211,5 +330,16 @@ button:disabled {
 
   .cohear-nav button {
     flex: 1;
+  }
+}
+
+@media (max-width: 1279px) {
+  .cohear-resizable-layout {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+
+  .cohear-resize-handle {
+    display: none;
   }
 }

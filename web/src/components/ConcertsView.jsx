@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { fetchConcerts, getCachedConcerts, filterWhen, spotifyArtist, C_SORTS, defaultDir } from '../concerts.js';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { fetchConcerts, getCachedConcerts, filterWhen, spotifyArtist, ticketmasterMatch, ticketWebEstimate, C_SORTS, defaultDir } from '../concerts.js';
 import { fmtCapacity, fmtDate } from '../tour.js';
 import { loadGoogleMaps, hasMapsKey } from '../live/maps.js';
+import { claimStamp, markAttended, recordConcertAction } from '../account.js';
 
 const VIEW_MODES = [
   { id: 'list', label: 'List' },
@@ -25,6 +26,8 @@ const WHEN = [
 const SORT_KEYS = ['capacity', 'popularity', 'date', 'artist', 'venue', 'city'];
 const USER_ZONE_KEY = 'cohear_user_timezone';
 const DISCOVER_STATE_KEY = 'cohear_discover_state_v3';
+const DISCOVER_LAYOUT_KEY = 'cohear_discover_layout_v1';
+const DEFAULT_INSPECTOR_WIDTH = 380;
 const DETECTED_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Vancouver';
 const USER_TIME_ZONES = withDetectedZone([
   { zone: 'America/Vancouver', city: 'Vancouver', label: 'Vancouver / Pacific' },
@@ -71,7 +74,20 @@ function writeDiscoverState(state) {
   }
 }
 
-export default function ConcertsView({ onEnterShow, onSyncLive }) {
+function readInspectorWidth() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(DISCOVER_LAYOUT_KEY) || 'null');
+    return clampInspectorWidth(parsed?.inspectorWidth || DEFAULT_INSPECTOR_WIDTH);
+  } catch {
+    return DEFAULT_INSPECTOR_WIDTH;
+  }
+}
+
+function clampInspectorWidth(width) {
+  return Math.max(300, Math.min(560, Number(width) || DEFAULT_INSPECTOR_WIDTH));
+}
+
+export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSettingsChange }) {
   const initialState = useMemo(() => readDiscoverState(), []);
   const [query, setQuery] = useState(initialState.query);
   const [artist, setArtist] = useState(initialState.artist);
@@ -88,10 +104,14 @@ export default function ConcertsView({ onEnterShow, onSyncLive }) {
   const [selectedId, setSelectedId] = useState(initialState.selectedId);
   const [spotify, setSpotify] = useState(null);
   const [saved, setSaved] = useState(() => new Set(JSON.parse(localStorage.getItem('cohear_saved_shows') || '[]')));
-  const [userZone, setUserZoneState] = useState(() => localStorage.getItem(USER_ZONE_KEY) || DETECTED_TIME_ZONE);
+  const [fallbackUserZone, setFallbackUserZone] = useState(() => settings?.timezone || localStorage.getItem(USER_ZONE_KEY) || DETECTED_TIME_ZONE);
   const [now, setNow] = useState(() => Date.now());
+  const [inspectorWidth, setInspectorWidth] = useState(() => readInspectorWidth());
+  const resizeRef = useRef(null);
 
   const browse = !artist;
+  const userZone = settings?.timezone || fallbackUserZone;
+  const preferredCurrency = settings?.currency || 'USD';
 
   async function loadBrowse(win = windowKey, { force = false, reset = true } = {}) {
     const cached = !force ? getCachedConcerts('', 'live', win) : null;
@@ -213,8 +233,30 @@ export default function ConcertsView({ onEnterShow, onSyncLive }) {
   }
 
   function setUserZone(zone) {
-    setUserZoneState(zone);
+    setFallbackUserZone(zone);
     localStorage.setItem(USER_ZONE_KEY, zone);
+    onSettingsChange?.((prev) => ({ ...prev, timezone: zone }));
+  }
+
+  const resetDiscoverLayout = useCallback(() => {
+    setInspectorWidth(DEFAULT_INSPECTOR_WIDTH);
+    setMode('list');
+    setSortKey('capacity');
+    setDir('desc');
+    setWhen('all');
+    setHideEnded(true);
+    try {
+      localStorage.removeItem(DISCOVER_LAYOUT_KEY);
+    } catch {
+      /* ignore storage failures */
+    }
+  }, []);
+
+  function beginInspectorResize(e) {
+    resizeRef.current = { startX: e.clientX, startWidth: inspectorWidth };
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
   }
 
   const visible = useMemo(() => {
@@ -239,10 +281,51 @@ export default function ConcertsView({ onEnterShow, onSyncLive }) {
   const biggest = visible[0] || null;
   const stats = useMemo(() => {
     const totalCap = visible.reduce((n, c) => n + (c.capacity || 0), 0);
-    const ticketValue = visible.reduce((n, c) => n + estimatedTicketUsd(c), 0);
+    const typicalTickets = visible.map((c) => estimatedTicketUsd(c)).filter(Boolean);
     const upcoming = concerts.filter((c) => c.when === 'upcoming').length;
-    return { count: visible.length, totalCap, ticketValue, upcoming, past: concerts.length - upcoming };
+    return { count: visible.length, totalCap, typicalTicket: median(typicalTickets), ticketCount: typicalTickets.length, upcoming, past: concerts.length - upcoming };
   }, [concerts, visible]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(DISCOVER_LAYOUT_KEY, JSON.stringify({ inspectorWidth }));
+    } catch {
+      /* ignore storage failures */
+    }
+  }, [inspectorWidth]);
+
+  useEffect(() => {
+    function move(e) {
+      const active = resizeRef.current;
+      if (!active) return;
+      const delta = e.clientX - active.startX;
+      setInspectorWidth(clampInspectorWidth(active.startWidth - delta));
+    }
+    function stop() {
+      if (!resizeRef.current) return;
+      resizeRef.current = null;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', stop);
+    window.addEventListener('pointercancel', stop);
+    return () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', stop);
+      window.removeEventListener('pointercancel', stop);
+      stop();
+    };
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener('cohear:reset-layout', resetDiscoverLayout);
+    return () => window.removeEventListener('cohear:reset-layout', resetDiscoverLayout);
+  }, [resetDiscoverLayout]);
+
+  useEffect(() => {
+    if (selected) recordConcertAction(selected, 'viewed', { source: 'discover' });
+  }, [selected?.id]);
 
   return (
     <div className="space-y-5">
@@ -254,6 +337,7 @@ export default function ConcertsView({ onEnterShow, onSyncLive }) {
         stats={stats}
         spotify={spotify}
         userZone={userZone}
+        currency={preferredCurrency}
         now={now}
         onBrowse={() => loadBrowse(windowKey)}
       />
@@ -281,6 +365,7 @@ export default function ConcertsView({ onEnterShow, onSyncLive }) {
         loading={loading}
         onArtistSearch={() => loadArtist(query)}
         onRefresh={refreshConcerts}
+        onResetLayout={resetDiscoverLayout}
       />
 
       {loading ? (
@@ -292,7 +377,7 @@ export default function ConcertsView({ onEnterShow, onSyncLive }) {
           action={browse ? <button className="cohear-link" onClick={() => loadBrowse('upcoming')}>Show upcoming</button> : <button className="cohear-link" onClick={() => loadBrowse(windowKey)}>Back to Discover</button>}
         />
       ) : (
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <div className="cohear-resizable-layout" style={{ '--cohear-inspector-width': `${inspectorWidth}px` }}>
           <main className="min-w-0">
             {mode === 'list' && (
               <ConcertTable
@@ -312,11 +397,22 @@ export default function ConcertsView({ onEnterShow, onSyncLive }) {
             {mode === 'calendar' && <ConcertCalendar rows={visible} selectedId={selected?.id} onSelect={setSelectedId} />}
           </main>
 
+          <button
+            type="button"
+            className="cohear-resize-handle"
+            onPointerDown={beginInspectorResize}
+            aria-label="Resize concert detail panel"
+            title="Drag to resize details"
+          >
+            <span />
+          </button>
+
           <ConcertInspector
             concert={selected}
             saved={selected ? saved.has(selected.id) : false}
             sources={sources}
             userZone={userZone}
+            currency={preferredCurrency}
             now={now}
             onSave={() => selected && toggleSave(selected.id)}
             onEnterShow={onEnterShow}
@@ -328,7 +424,7 @@ export default function ConcertsView({ onEnterShow, onSyncLive }) {
   );
 }
 
-function DiscoverHeader({ artist, browse, biggest, loading, stats, spotify, userZone, now, onBrowse }) {
+function DiscoverHeader({ artist, browse, biggest, loading, stats, spotify, userZone, currency, now, onBrowse }) {
   return (
     <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
       <div className="cohear-panel p-5">
@@ -386,10 +482,10 @@ function DiscoverHeader({ artist, browse, biggest, loading, stats, spotify, user
               title="Sum of venue capacity for the currently visible shows. It is not confirmed attendance or tickets sold."
             />
             <MetricBlock
-              label="Ticket value"
-              value={fmtUsd(stats.ticketValue)}
+              label="Typical ticket"
+              value={stats.ticketCount ? `${fmtUsd(stats.typicalTicket)} est.` : 'N/A'}
               tone="green"
-              title="Estimated face-value ticket spend avoided if you sampled each visible concert digitally. Cohear does not have live ticket-price data yet."
+              title="Single-ticket estimate for a typical seat. Real Ticketmaster ranges appear on selected future concerts when configured."
             />
           </div>
         </div>
@@ -414,7 +510,7 @@ function DiscoverHeader({ artist, browse, biggest, loading, stats, spotify, user
 function ControlSurface(props) {
   const {
     browse, query, setQuery, location, setLocation, userZone, setUserZone, windowKey, setWindowKey,
-    mode, setMode, sortKey, pickSort, dir, setDir, when, setWhen, hideEnded, setHideEnded, loading, onArtistSearch, onRefresh,
+    mode, setMode, sortKey, pickSort, dir, setDir, when, setWhen, hideEnded, setHideEnded, loading, onArtistSearch, onRefresh, onResetLayout,
   } = props;
 
   return (
@@ -490,6 +586,9 @@ function ControlSurface(props) {
           title="Bypass the 8-hour concert cache and reload this view"
         >
           <RefreshIcon spinning={loading} />
+        </button>
+        <button className="cohear-secondary min-h-9 px-3 text-xs" onClick={onResetLayout} title="Reset Discover to the default list view and panel sizing">
+          Reset layout
         </button>
       </div>
     </section>
@@ -587,8 +686,49 @@ function SortHeader({ id, label, sortKey, dir, onSort, align = 'left' }) {
   );
 }
 
-function ConcertInspector({ concert, saved, sources, userZone, now, onSave, onEnterShow, onSyncLive }) {
+function ConcertInspector({ concert, saved, sources, userZone, currency, now, onSave, onEnterShow, onSyncLive }) {
   const [syncing, setSyncing] = useState(false);
+  const [ticket, setTicket] = useState(null);
+  const [webTicket, setWebTicket] = useState(null);
+  const [ticketLoading, setTicketLoading] = useState(false);
+  const [webTicketLoading, setWebTicketLoading] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    setTicket(null);
+    setWebTicket(null);
+    if (!concert || concert.when === 'past') {
+      setTicketLoading(false);
+      setWebTicketLoading(false);
+      return () => {
+        alive = false;
+      };
+    }
+    setTicketLoading(true);
+    ticketmasterMatch(concert)
+      .then((res) => {
+        if (alive) setTicket(res);
+        const ticketInfo = res?.ok ? res.ticket : null;
+        if (alive && !hasTicketPrice(ticketInfo)) {
+          setWebTicketLoading(true);
+          return ticketWebEstimate(concert, currency)
+            .then((webRes) => {
+              if (alive) setWebTicket(webRes);
+            })
+            .finally(() => {
+              if (alive) setWebTicketLoading(false);
+            });
+        }
+        return null;
+      })
+      .finally(() => {
+        if (alive) setTicketLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [concert, currency]);
+
   if (!concert) {
     return <aside className="cohear-panel p-5 text-sm text-zinc-500">Select a concert to inspect it.</aside>;
   }
@@ -599,6 +739,10 @@ function ConcertInspector({ concert, saved, sources, userZone, now, onSave, onEn
     await onSyncLive(concert);
     setSyncing(false);
   }
+
+  const ticketInfo = ticket?.ok ? ticket.ticket : null;
+  const webEstimate = webTicket?.ok ? webTicket.estimate : null;
+  const priceLoading = ticketLoading || webTicketLoading;
 
   return (
     <aside className="cohear-panel sticky top-5 self-start overflow-hidden">
@@ -632,7 +776,12 @@ function ConcertInspector({ concert, saved, sources, userZone, now, onSave, onEn
 
         <div className="grid grid-cols-2 gap-3">
           <MetricBlock label="Capacity" value={fmtCapacity(concert.capacity)} tone="amber" />
-          <MetricBlock label="Est. ticket" value={fmtUsd(estimatedTicketUsd(concert))} tone="green" title="Estimated average ticket value, not live market pricing." />
+          <MetricBlock
+            label={ticketPriceLabel(ticketInfo, webEstimate)}
+            value={priceLoading ? 'Checking' : ticketPriceDisplay(ticketInfo, webEstimate, concert, currency)}
+            tone="green"
+            title={ticketPriceTitle(ticketInfo, webEstimate)}
+          />
           <MetricBlock label="Countdown" value={countdownLabel(concert, now).text} tone={countdownLabel(concert, now).tone} />
           <MetricBlock label="Concert city" value={formatVenueShowTime(concert)} />
           <MetricBlock label="Your city" value={formatUserShowTime(concert, userZone)} />
@@ -653,7 +802,17 @@ function ConcertInspector({ concert, saved, sources, userZone, now, onSave, onEn
 
         <MiniMap concert={concert} />
 
+        <TicketCard ticket={ticketInfo} webEstimate={webEstimate} loading={priceLoading} concert={concert} currency={currency} />
+
         <div className="grid gap-2">
+          <div className="grid grid-cols-2 gap-2">
+            <button className="cohear-secondary w-full justify-center" onClick={() => markAttended(concert)}>
+              I was here
+            </button>
+            <button className="cohear-secondary w-full justify-center" onClick={() => claimStamp(concert)}>
+              Claim stamp
+            </button>
+          </div>
           {onEnterShow && (
             <button className="cohear-secondary w-full justify-center" onClick={() => onEnterShow(concert)}>
               Open archive replay
@@ -692,7 +851,7 @@ function ConcertInspector({ concert, saved, sources, userZone, now, onSave, onEn
 
 function ConcertMap({ rows, selectedId, onSelect }) {
   const mapRef = useRef(null);
-  const stateRef = useRef({ map: null, maps: null, markers: new Map(), trail: null, fittedKey: '' });
+  const stateRef = useRef({ map: null, maps: null, markers: new Map(), trails: [], fittedKey: '' });
   const [err, setErr] = useState(hasMapsKey() ? null : 'missing-key');
   const [mapReady, setMapReady] = useState(false);
   const [showLabels, setShowLabels] = useState(false);
@@ -703,6 +862,7 @@ function ConcertMap({ rows, selectedId, onSelect }) {
     if (!trailArtist) return [];
     return mappable.filter((c) => c.artist === trailArtist).sort((a, b) => String(a.date).localeCompare(String(b.date)));
   }, [mappable, trailArtist]);
+  const routeSegments = useMemo(() => routeTrailSegments(trailRows), [trailRows]);
 
   useEffect(() => {
     if (!hasMapsKey()) return;
@@ -776,26 +936,35 @@ function ConcertMap({ rows, selectedId, onSelect }) {
       marker.setLabel(showLabels ? { text: shortLabel(c.artist || c.venue), color: '#f4f4f5', fontSize: '11px', fontWeight: '700' } : null);
       marker.setZIndex(c.id === selectedId ? 1000 : 1);
     }
-    if (stateRef.current.trail) {
-      stateRef.current.trail.setMap(null);
-      stateRef.current.trail = null;
-    }
-    if (trailRows.length > 1) {
-      stateRef.current.trail = new maps.Polyline({
-        path: trailRows.map((c) => ({ lat: Number(c.lat), lng: Number(c.lng) })),
-        geodesic: true,
+    for (const trail of stateRef.current.trails) trail.setMap(null);
+    stateRef.current.trails = [];
+    for (const segment of routeSegments) {
+      const dashedIcon = {
+        path: 'M 0,-1 0,1',
+        strokeOpacity: 1,
         strokeColor: '#67e8f9',
-        strokeOpacity: 0.8,
-        strokeWeight: 3,
+        scale: 2.4,
+      };
+      const trail = new maps.Polyline({
+        path: [
+          { lat: Number(segment.from.lat), lng: Number(segment.from.lng) },
+          { lat: Number(segment.to.lat), lng: Number(segment.to.lng) },
+        ],
+        geodesic: true,
+        strokeColor: segment.done ? '#34d399' : '#67e8f9',
+        strokeOpacity: segment.done ? 0.86 : 0,
+        strokeWeight: segment.done ? 3 : 2,
+        icons: segment.done ? [] : [{ icon: dashedIcon, offset: '0', repeat: '14px' }],
         map,
       });
+      stateRef.current.trails.push(trail);
     }
     const fittedKey = mappable.map((c) => c.id).join('|');
     if (mappable.length && stateRef.current.fittedKey !== fittedKey) {
       map.fitBounds(bounds, 72);
       stateRef.current.fittedKey = fittedKey;
     }
-  }, [mappable, onSelect, selectedId, showLabels, trailRows]);
+  }, [mappable, onSelect, routeSegments, selectedId, showLabels]);
 
   useEffect(() => {
     const { map } = stateRef.current;
@@ -816,7 +985,7 @@ function ConcertMap({ rows, selectedId, onSelect }) {
         artists={artists}
         fallbackReason={err}
       >
-        <FallbackMap rows={mappable} selectedId={selectedId} onSelect={onSelect} showLabels={showLabels} trailRows={trailRows} />
+        <FallbackMap rows={mappable} selectedId={selectedId} onSelect={onSelect} showLabels={showLabels} trailRows={trailRows} routeSegments={routeSegments} />
       </MapShell>
     );
   }
@@ -847,7 +1016,7 @@ function MapShell({ children, count, showLabels, setShowLabels, trailArtist, set
     ? fallbackReason === 'missing-key'
       ? 'Google Maps key is missing, so Cohear is showing its built-in coordinate map.'
       : `Google Maps did not finish loading (${fallbackReason}), so Cohear is showing its built-in coordinate map.`
-    : 'Google Maps markers sized by known attendance capacity.';
+    : 'Google Maps markers sized by known attendance capacity. Tour trails use solid completed legs and dashed future legs.';
   return (
     <div className="cohear-panel overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-4">
@@ -874,7 +1043,7 @@ function MapShell({ children, count, showLabels, setShowLabels, trailArtist, set
   );
 }
 
-function FallbackMap({ rows, selectedId, onSelect, showLabels, trailRows }) {
+function FallbackMap({ rows, selectedId, onSelect, showLabels, trailRows, routeSegments }) {
   const plotted = rows.slice(0, 80).map((c) => ({
     ...c,
     point: projectMapPoint(Number(c.lat), Number(c.lng)),
@@ -891,14 +1060,24 @@ function FallbackMap({ rows, selectedId, onSelect, showLabels, trailRows }) {
       <div className="absolute inset-y-8 left-1/2 border-l border-white/10" />
       {trailPoints.length > 1 && (
         <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-          <polyline
-            points={trailPoints.map((p) => `${p.x},${p.y}`).join(' ')}
-            vectorEffect="non-scaling-stroke"
-            fill="none"
-            stroke="#67e8f9"
-            strokeOpacity="0.85"
-            strokeWidth="0.7"
-          />
+          {routeSegments.map((segment) => {
+            const a = projectMapPoint(Number(segment.from.lat), Number(segment.from.lng));
+            const b = projectMapPoint(Number(segment.to.lat), Number(segment.to.lng));
+            return (
+              <line
+                key={`${segment.from.id}-${segment.to.id}`}
+                x1={a.x}
+                y1={a.y}
+                x2={b.x}
+                y2={b.y}
+                vectorEffect="non-scaling-stroke"
+                stroke={segment.done ? '#34d399' : '#67e8f9'}
+                strokeOpacity="0.86"
+                strokeWidth="0.7"
+                strokeDasharray={segment.done ? undefined : '2 1.6'}
+              />
+            );
+          })}
         </svg>
       )}
       {plotted.map((c) => (
@@ -1030,6 +1209,62 @@ function MiniMap({ concert }) {
         {[concert.city, concert.country].filter(Boolean).join(', ') || 'Venue location'}
       </div>
       <div className="absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-cyan-300 shadow-[0_0_28px_rgba(34,211,238,.55)]" />
+    </div>
+  );
+}
+
+function TicketCard({ ticket, webEstimate, loading, concert, currency }) {
+  if (concert.when === 'past') return null;
+  if (loading) {
+    return (
+      <div className="rounded-lg border border-white/10 bg-black/20 p-3 text-sm text-zinc-400">
+        Checking Ticketmaster and web sources for ticket prices...
+      </div>
+    );
+  }
+  if (!ticket && !webEstimate) {
+    return (
+      <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-600">Tickets</div>
+        <div className="mt-1 text-sm font-semibold text-white">{estimatedTicketLabel(concert)}</div>
+        <p className="mt-1 text-xs leading-5 text-zinc-500">
+          Estimated single-ticket value. Add Ticketmaster and Google Search keys in Settings for live ranges, buy links, and web estimates.
+        </p>
+      </div>
+    );
+  }
+  const shown = hasTicketPrice(ticket) ? ticket : webEstimate;
+  return (
+    <div className="rounded-lg border border-emerald-300/20 bg-emerald-300/[0.06] p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-200/70">Tickets</div>
+          <div className="mt-1 text-sm font-semibold text-white">{ticketRangeLabel(shown, currency)}</div>
+          <div className="mt-1 truncate text-xs text-emerald-100/65">
+            {ticket?.venue || concert.venue} {ticket?.date ? `- ${fmtDate(ticket.date)}` : ''}
+          </div>
+          {webEstimate && !hasTicketPrice(ticket) && (
+            <div className="mt-2 text-xs leading-5 text-emerald-100/70">
+              Web estimate from {webEstimate.sourceCount || 0} source{webEstimate.sourceCount === 1 ? '' : 's'}.
+              {webEstimate.confidence ? ` Confidence: ${webEstimate.confidence.replace('_', ' ')}.` : ''}
+            </div>
+          )}
+        </div>
+        {ticket?.url && (
+          <a className="cohear-primary min-h-9 shrink-0 px-3 text-xs" href={ticket.url} target="_blank" rel="noreferrer">
+            Buy
+          </a>
+        )}
+      </div>
+      {webEstimate?.results?.length ? (
+        <div className="mt-3 grid gap-1 border-t border-emerald-300/10 pt-3">
+          {webEstimate.results.slice(0, 3).map((result) => (
+            <a key={result.link || result.title} className="truncate text-xs text-emerald-100/70 hover:text-white" href={result.link} target="_blank" rel="noreferrer">
+              {result.title || result.link}
+            </a>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1234,14 +1469,62 @@ function estimatedShowMs(concert) {
 
 function estimatedTicketUsd(concert) {
   if (concert?.avgTicketUsd) return Math.round(concert.avgTicketUsd);
-  const popularity = Number(concert?.popularity || 55);
+  const rawPopularity = Number(concert?.spotifyPopularity ?? concert?.artistPopularity ?? concert?.popularity ?? 55);
+  const popularity = rawPopularity > 100 ? Math.min(100, 48 + Math.log10(Math.max(10, rawPopularity)) * 10) : rawPopularity;
   const capacity = Number(concert?.capacity || 12000);
   const arenaPremium = capacity >= 60000 ? 80 : capacity >= 25000 ? 45 : capacity >= 15000 ? 25 : 0;
   return Math.max(35, Math.round(45 + popularity * 1.15 + arenaPremium));
 }
 
+function estimatedTicketLabel(concert) {
+  return `${fmtUsd(estimatedTicketUsd(concert))} typical est.`;
+}
+
+function hasTicketPrice(ticket) {
+  return ticket?.priceLow != null || ticket?.priceHigh != null || ticket?.priceTypical != null;
+}
+
+function ticketPriceLabel(ticket, webEstimate) {
+  if (hasTicketPrice(ticket)) return 'Ticket range';
+  if (webEstimate) return 'Web estimate';
+  return 'Est. ticket';
+}
+
+function ticketPriceDisplay(ticket, webEstimate, concert, currency) {
+  if (hasTicketPrice(ticket)) return ticketRangeLabel(ticket, currency);
+  if (webEstimate) return ticketRangeLabel(webEstimate, currency);
+  return estimatedTicketLabel(concert);
+}
+
+function ticketPriceTitle(ticket, webEstimate) {
+  if (hasTicketPrice(ticket)) return 'Ticketmaster single-ticket price range when supplied by the event.';
+  if (webEstimate) return 'Estimated from top web search result snippets. Use as directional market pricing, not official inventory.';
+  return 'Estimated single-ticket value, not live market pricing.';
+}
+
+function ticketRangeLabel(ticket, fallbackCurrency = 'USD') {
+  const currency = ticket?.currency || fallbackCurrency || 'USD';
+  const low = ticket?.priceLow;
+  const high = ticket?.priceHigh;
+  if (low != null && high != null && low !== high) return `${fmtMoney(low, currency)}-${fmtMoney(high, currency)}`;
+  if (low != null || high != null) return fmtMoney(low ?? high, currency);
+  if (ticket?.priceTypical != null) return `${fmtMoney(ticket.priceTypical, currency)} typical`;
+  return 'Price unavailable';
+}
+
+function median(values) {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+}
+
 function fmtUsd(value) {
-  return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value || 0);
+  return fmtMoney(value, 'USD');
+}
+
+function fmtMoney(value, currency) {
+  return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'USD', maximumFractionDigits: 0 }).format(value || 0);
 }
 
 function durationShort(ms) {
@@ -1368,6 +1651,20 @@ function projectMapPoint(lat, lng) {
     x: Math.max(4, Math.min(96, x)),
     y: Math.max(5, Math.min(95, y)),
   };
+}
+
+function routeTrailSegments(rows) {
+  const out = [];
+  for (let i = 0; i < rows.length - 1; i++) {
+    const from = rows[i];
+    const to = rows[i + 1];
+    out.push({
+      from,
+      to,
+      done: from.when === 'past' && to.when === 'past',
+    });
+  }
+  return out;
 }
 
 function shortLabel(value) {

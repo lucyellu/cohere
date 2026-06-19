@@ -5,17 +5,32 @@ import { PlayerProvider } from './live/player.jsx';
 import BottomPlayer from './live/BottomPlayer.jsx';
 import { resolveEvent } from './live/liveApi.js';
 import ConcertsView from './components/ConcertsView.jsx';
+import SettingsDrawer from './components/SettingsDrawer.jsx';
+import PassportView from './components/PassportView.jsx';
+import { readSettings, writeSettings } from './settings.js';
+import { recordConcertAction } from './account.js';
 
 const NAV = [
   { id: 'discover', label: 'Discover' },
   { id: 'live', label: 'Live Rooms' },
+  { id: 'passport', label: 'Passport' },
 ];
 
 export default function App() {
   const [view, setView] = useState('discover');
   const [liveEvent, setLiveEvent] = useState(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settings, setSettings] = useState(() => readSettings());
+
+  function updateSettings(nextSettings) {
+    setSettings((prev) => {
+      const next = typeof nextSettings === 'function' ? nextSettings(prev) : nextSettings;
+      return writeSettings(next);
+    });
+  }
 
   async function syncLive(concert) {
+    recordConcertAction(concert, concert.when === 'past' ? 'opened_replay' : 'joined_live', { source: 'discover' });
     const ev = await resolveEvent({
       artist: concert.artist,
       date: concert.date,
@@ -29,9 +44,15 @@ export default function App() {
       mode: concert.when === 'upcoming' ? 'live' : 'replay',
     });
     if (ev) {
+      recordConcertAction(ev, ev.mode === 'replay' ? 'opened_replay' : 'joined_live', { source: 'live_room' });
       setLiveEvent(ev);
       setView('live');
     }
+  }
+
+  function joinLandingEvent(event) {
+    recordConcertAction(event, event.mode === 'replay' ? 'opened_replay' : 'joined_live', { source: 'live_landing' });
+    setLiveEvent(event);
   }
 
   return (
@@ -62,23 +83,39 @@ export default function App() {
                 Browse concerts
               </button>
             </div>
+
+            <button className="cohear-icon-button" onClick={() => setSettingsOpen(true)} aria-label="Open settings" title="Settings">
+              <GearIcon />
+            </button>
           </header>
 
           <main className="mt-5 flex-1">
-            {view === 'discover' && <ConcertsView onSyncLive={syncLive} />}
+            {view === 'discover' && <ConcertsView onSyncLive={syncLive} settings={settings} onSettingsChange={updateSettings} />}
+
+            {view === 'passport' && <PassportView />}
 
             {view === 'live' &&
               (liveEvent ? (
                 <LiveRoom event={liveEvent} onBack={() => setLiveEvent(null)} />
               ) : (
                 <section className="cohear-panel p-5">
-                  <LiveLanding onJoin={setLiveEvent} />
+                  <LiveLanding onJoin={joinLandingEvent} />
                 </section>
               ))}
           </main>
         </div>
         <BottomPlayer />
+        <SettingsDrawer open={settingsOpen} settings={settings} onChange={updateSettings} onClose={() => setSettingsOpen(false)} />
       </div>
     </PlayerProvider>
+  );
+}
+
+function GearIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />
+      <path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.04.04a2.1 2.1 0 0 1-2.98 2.98l-.04-.04a1.8 1.8 0 0 0-1.98-.36 1.8 1.8 0 0 0-1.08 1.65V21a2.1 2.1 0 0 1-4.2 0v-.06a1.8 1.8 0 0 0-1.18-1.65 1.8 1.8 0 0 0-1.98.36l-.04.04a2.1 2.1 0 0 1-2.98-2.98l.04-.04A1.8 1.8 0 0 0 4 14.8a1.8 1.8 0 0 0-1.65-1.08H2.3a2.1 2.1 0 0 1 0-4.2h.06A1.8 1.8 0 0 0 4 8.34a1.8 1.8 0 0 0-.36-1.98l-.04-.04a2.1 2.1 0 0 1 2.98-2.98l.04.04A1.8 1.8 0 0 0 8.6 4a1.8 1.8 0 0 0 1.08-1.65V2.3a2.1 2.1 0 0 1 4.2 0v.06A1.8 1.8 0 0 0 15.06 4a1.8 1.8 0 0 0 1.98-.36l.04-.04a2.1 2.1 0 0 1 2.98 2.98l-.04.04A1.8 1.8 0 0 0 19.4 8.6a1.8 1.8 0 0 0 1.65 1.08h.06a2.1 2.1 0 0 1 0 4.2h-.06A1.8 1.8 0 0 0 19.4 15Z" />
+    </svg>
   );
 }
