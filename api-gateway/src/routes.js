@@ -11,6 +11,7 @@ import * as pool from './genpool.js';
 import { synthesize } from './pipeline.js';
 import * as live from './live.js';
 import * as rapid from './rapid.js';
+import * as passport from './passport.js';
 
 const router = express.Router();
 
@@ -23,6 +24,29 @@ function isAdminRequest(req) {
   const bearer = header.startsWith('Bearer ') ? header.slice(7) : '';
   return bearer === ADMIN_TOKEN || req.get('x-admin-token') === ADMIN_TOKEN;
 }
+
+// --- Passport tokens: Ed25519 signed credentials + Supabase registry ----
+// Mint stays local-first/instant in the browser; the client calls /issue
+// lazily to obtain a signature + global mint number, then flips to "verified".
+router.get('/passport/pubkey', (_req, res) => {
+  res.json({ ok: true, alg: 'ed25519', publicKey: passport.PUBLIC_KEY_B64, registry: passport.registryEnabled });
+});
+
+router.post('/passport/issue', express.json({ limit: '32kb' }), async (req, res) => {
+  try {
+    res.json(await passport.issue(req.body || {}));
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+router.get('/passport/verify', async (req, res) => {
+  try {
+    res.json(await passport.verify(String(req.query.serial || '')));
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
 
 // --- Health: config + live usage snapshot for the monitor panel ---------
 router.get('/health', (_req, res) => {

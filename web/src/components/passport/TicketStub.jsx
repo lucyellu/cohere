@@ -2,11 +2,11 @@ import { ticketPalette } from './palette.js';
 
 // Vintage admit-one ticket, ported from the css-grid-train-ticket pen: a grid
 // body + a perforated tear-off stub. Paper color is deterministic per artist.
-export default function TicketStub({ stub, art }) {
+export default function TicketStub({ stub, art, onGenerate, generating }) {
   const seat = stub.seat || {};
   const pal = ticketPalette(stub.artist || stub.id);
   const style = { '--paper': pal.paper, '--ink': pal.ink, '--accent': pal.accent };
-  const mint = String(stub.edition ?? 1).padStart(4, '0');
+  const mint = String(stub.mintNo ?? stub.edition ?? 1).padStart(4, '0');
   const place = [stub.city, stub.country].filter(Boolean).join(', ');
 
   return (
@@ -14,7 +14,21 @@ export default function TicketStub({ stub, art }) {
       <div className="cohear-stub__main">
         <header className="cohear-stub__head">
           <span className="cohear-stub__artist">{stub.artist || 'Live Concert'}</span>
-          <span className="cohear-stub__admit">Admit One</span>
+          <span className="flex items-center gap-1.5">
+            {onGenerate && (
+              <button
+                type="button"
+                className="rounded bg-white/15 px-1.5 py-0.5 text-[9px] font-bold hover:bg-white/30 disabled:opacity-60"
+                style={{ color: 'var(--paper)' }}
+                onClick={onGenerate}
+                disabled={generating}
+                title="Generate AI poster art for this ticket"
+              >
+                {generating ? '…' : art ? '✨ Redo' : '✨ Art'}
+              </button>
+            )}
+            <span className="cohear-stub__admit">Admit One</span>
+          </span>
         </header>
 
         {art && (

@@ -169,6 +169,7 @@ export function issueVisa(input) {
   };
   writeArray(VISAS_KEY, [visa, ...visas]);
   emitHistoryChanged();
+  signToken('visa', visa);
   return visa;
 }
 
@@ -203,6 +204,7 @@ export function addEntryStamp(input) {
   };
   writeArray(ENTRIES_KEY, [stamp, ...entries]);
   emitHistoryChanged();
+  signToken('entry', stamp);
   return stamp;
 }
 
@@ -255,6 +257,7 @@ export function claimTicketStub(input) {
   };
   writeArray(STUBS_KEY, [stub, ...stubs]);
   emitHistoryChanged();
+  signToken('ticket', stub);
   return stub;
 }
 
@@ -343,6 +346,72 @@ function addDays(iso, days) {
 }
 function isoDate(d) {
   return d.toISOString().slice(0, 10);
+}
+
+// --- Token layer (Ed25519 signing + Supabase registry, via the gateway) ------
+// Mint is instant + local; signing happens lazily so it never blocks the UI and
+// survives being offline (records stay "pending" and re-sync later).
+const TYPE_KEY = { visa: VISAS_KEY, entry: ENTRIES_KEY, ticket: STUBS_KEY };
+
+function guestKey() {
+  let k = localStorage.getItem('cohear_guest_id');
+  if (!k) {
+    k = (window.crypto?.randomUUID?.() || `g-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    localStorage.setItem('cohear_guest_id', k);
+  }
+  return k;
+}
+
+function patchRecord(type, id, patch) {
+  const key = TYPE_KEY[type];
+  const list = readArray(key);
+  const i = list.findIndex((x) => x.id === id);
+  if (i < 0) return;
+  list[i] = { ...list[i], ...patch };
+  writeArray(key, list);
+  emitHistoryChanged();
+}
+
+async function signToken(type, record) {
+  if (!record || record.verified) return;
+  try {
+    const res = await fetch('/api/passport/issue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type,
+        scopeKey: record.id,
+        userKey: guestKey(),
+        serial: record.serial,
+        concertId: record.concertId || record.id,
+        artist: record.artist || '',
+        venue: record.venue || '',
+        city: record.city || '',
+        country: record.country || '',
+        date: record.date || '',
+      }),
+    });
+    const out = await res.json();
+    if (!out?.ok) return;
+    patchRecord(type, record.id, {
+      mintNo: out.mintNo ?? null,
+      signature: out.signature || null,
+      publicKey: out.publicKey || null,
+      issuedAt: out.issuedAt || record.issuedAt,
+      verified: Boolean(out.registered),
+    });
+  } catch {
+    /* offline — stays pending; resyncTokens() retries later */
+  }
+}
+
+// Retry signing for anything still pending (called on the Passport view mount).
+export function resyncTokens() {
+  for (const [type, key] of Object.entries(TYPE_KEY)) {
+    for (const record of readArray(key)) {
+      if (!record.verified) signToken(type, record);
+    }
+  }
 }
 
 function emitHistoryChanged() {

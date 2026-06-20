@@ -1,7 +1,7 @@
 // Per-country visa, postage-stamp styled (perforated edge) with a real-world-ish
 // validity window from the bundled VISA_RULES. CSS vignette by default; an
 // on-demand FLUX illustration drops into `art`.
-export default function VisaCard({ visa, entryCount = 1, art }) {
+export default function VisaCard({ visa, entryCount = 1, art, onGenerate, generating }) {
   const rule = visa.rule || {};
   const accent = rule.accent || '#3b82f6';
   const status = visaStatus(visa.expiresAt);
@@ -16,6 +16,17 @@ export default function VisaCard({ visa, entryCount = 1, art }) {
 
         <div className="cohear-visa__vignette">
           {art ? <img src={art} alt="" /> : <span className="cohear-visa__seal">{countryEmoji(visa.country)}</span>}
+          {onGenerate && (
+            <button
+              type="button"
+              className="absolute right-1 top-1 rounded bg-black/45 px-1.5 py-0.5 text-[9px] font-bold text-white hover:bg-black/65 disabled:opacity-60"
+              onClick={onGenerate}
+              disabled={generating}
+              title="Generate AI art for this visa"
+            >
+              {generating ? '…' : art ? '✨ Redo' : '✨ Art'}
+            </button>
+          )}
         </div>
 
         <div>
@@ -43,7 +54,7 @@ export default function VisaCard({ visa, entryCount = 1, art }) {
 
         <div className="flex items-center justify-between border-t border-black/10 pt-1 text-[8px] font-mono tracking-[0.08em] opacity-70">
           <span>{visa.serial}</span>
-          <span>{visa.verified ? '✓ verified' : '• pending'}</span>
+          <span>{visa.verified ? `✓ #${visa.mintNo ?? '—'}` : '• pending'}</span>
         </div>
       </div>
     </article>

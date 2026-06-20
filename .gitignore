@@ -6,4 +6,5 @@ dist/
 npm-debug.log*
 .cyanite-cache.json
 .lalalai-cache.json
+.passport-key
 tmp/

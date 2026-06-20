@@ -9,8 +9,10 @@ import {
   readStubs,
   readProfile,
   writeProfile,
+  resyncTokens,
 } from '../account.js';
 import { supabase, supabaseEnabled } from '../live/supabase.js';
+import { readArtMap, generateArtFor } from './passport/passportArt.js';
 import PassportBook from './passport/PassportBook.jsx';
 import VisaCard from './passport/VisaCard.jsx';
 import EntryStamp from './passport/EntryStamp.jsx';
@@ -22,6 +24,8 @@ export default function PassportView() {
   const [entries, setEntries] = useState(() => readEntries());
   const [stubs, setStubs] = useState(() => readStubs());
   const [profile, setProfile] = useState(() => readProfile());
+  const [art, setArt] = useState(() => readArtMap());
+  const [genId, setGenId] = useState(null);
   const [session, setSession] = useState(null);
   const [email, setEmail] = useState('');
   const [authMessage, setAuthMessage] = useState('');
@@ -36,8 +40,21 @@ export default function PassportView() {
       setProfile(readProfile());
     }
     window.addEventListener(HISTORY_EVENT, refresh);
+    resyncTokens(); // re-attempt signing for anything still "pending"
     return () => window.removeEventListener(HISTORY_EVENT, refresh);
   }, []);
+
+  async function generate(item) {
+    setGenId(item.id);
+    try {
+      const url = await generateArtFor(item);
+      setArt((m) => ({ ...m, [item.id]: url }));
+    } catch {
+      /* generation unavailable — CSS card stays */
+    } finally {
+      setGenId(null);
+    }
+  }
 
   useEffect(() => {
     if (!supabase) return undefined;
@@ -178,7 +195,16 @@ export default function PassportView() {
           <Empty>No visas yet — open a live room to clear customs.</Empty>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {visas.map((visa) => <VisaCard key={visa.id} visa={visa} entryCount={entriesByCountry[visa.country] || 1} />)}
+            {visas.map((visa) => (
+              <VisaCard
+                key={visa.id}
+                visa={visa}
+                entryCount={entriesByCountry[visa.country] || 1}
+                art={art[visa.id]}
+                onGenerate={() => generate(visa)}
+                generating={genId === visa.id}
+              />
+            ))}
           </div>
         )}
       </PageSection>
@@ -202,7 +228,15 @@ export default function PassportView() {
             <Empty dark>No ticket stubs yet — play a song in a live room.</Empty>
           ) : (
             <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
-              {stubs.map((stub) => <TicketStub key={stub.serial} stub={stub} />)}
+              {stubs.map((stub) => (
+                <TicketStub
+                  key={stub.serial}
+                  stub={stub}
+                  art={art[stub.id]}
+                  onGenerate={() => generate(stub)}
+                  generating={genId === stub.id}
+                />
+              ))}
             </div>
           )}
         </div>
