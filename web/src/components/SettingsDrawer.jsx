@@ -8,6 +8,15 @@ const TABS = [
   { id: 'dev', label: 'Dev status' },
 ];
 
+const ACCENT_PRESETS = [
+  { label: 'Amber', hex: '#f5c04a' },
+  { label: 'Cyan', hex: '#22d3ee' },
+  { label: 'Violet', hex: '#a78bfa' },
+  { label: 'Rose', hex: '#fb7185' },
+  { label: 'Emerald', hex: '#34d399' },
+  { label: 'Coral', hex: '#fb923c' },
+];
+
 const API_KEYS = [
   {
     id: 'ticketmaster',
@@ -127,6 +136,37 @@ export default function SettingsDrawer({ open, settings, onChange, onClose }) {
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
           {tab === 'preferences' && (
             <div className="grid gap-5">
+              <section className="cohear-settings-section">
+                <div>
+                  <h3 className="text-sm font-semibold text-white">Accent colour</h3>
+                  <p className="mt-1 text-sm leading-6 text-zinc-500">Sets the highlight colour used throughout buttons, indicators, and live elements.</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  {ACCENT_PRESETS.map((p) => {
+                    const active = (settings.themeAccent || '#f5c04a') === p.hex;
+                    return (
+                      <button
+                        key={p.hex}
+                        onClick={() => update({ themeAccent: p.hex })}
+                        title={p.label}
+                        aria-label={p.label}
+                        className={`h-8 w-8 rounded-full border-2 transition-transform ${active ? 'scale-110 border-white' : 'border-transparent hover:border-white/50'}`}
+                        style={{ background: p.hex }}
+                      />
+                    );
+                  })}
+                  <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-400" title="Pick a custom colour">
+                    <input
+                      type="color"
+                      value={settings.themeAccent || '#f5c04a'}
+                      onChange={(e) => update({ themeAccent: e.target.value })}
+                      className="cohear-color-picker"
+                    />
+                    Custom
+                  </label>
+                </div>
+              </section>
+
               <section className="cohear-settings-section">
                 <div>
                   <h3 className="text-sm font-semibold text-white">Locale</h3>

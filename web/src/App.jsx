@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import LiveLanding from './live/LiveLanding.jsx';
 import LiveRoom from './live/LiveRoom.jsx';
 import { PlayerProvider } from './live/player.jsx';
@@ -24,6 +24,10 @@ export default function App() {
   const [cityTarget, setCityTarget] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settings, setSettings] = useState(() => readSettings());
+
+  useEffect(() => {
+    applyAccent(settings.themeAccent || '#f5c04a');
+  }, [settings.themeAccent]);
 
   function openCity(city, country) {
     if (!city) return;
@@ -69,6 +73,12 @@ export default function App() {
   return (
     <PlayerProvider>
       <div className="min-h-full bg-cohear text-zinc-100">
+        {/* Ambient mesh blobs — colour follows themeAccent via CSS vars */}
+        <div aria-hidden="true" className="pointer-events-none select-none">
+          <div className="cohear-mesh-blob" style={{ width: 640, height: 640, top: -160, left: -100, opacity: 0.07, animationDuration: '14s' }} />
+          <div className="cohear-mesh-blob" style={{ width: 520, height: 520, top: '38%', right: -80, opacity: 0.05, animationDuration: '18s', animationDelay: '-5s' }} />
+          <div className="cohear-mesh-blob" style={{ width: 460, height: 460, bottom: -60, left: '42%', opacity: 0.04, animationDuration: '22s', animationDelay: '-10s' }} />
+        </div>
         <div className="mx-auto flex min-h-screen w-full max-w-[1480px] flex-col px-4 py-5 pb-28 sm:px-6 lg:px-8">
           <header className="cohear-topbar">
             <button className="flex min-w-0 items-center gap-3 text-left" onClick={() => setView('discover')} aria-label="Open Discover">
@@ -129,6 +139,23 @@ export default function App() {
       </div>
     </PlayerProvider>
   );
+}
+
+function applyAccent(hex) {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return;
+  const r = parseInt(m[1].slice(0, 2), 16);
+  const g = parseInt(m[1].slice(2, 4), 16);
+  const b = parseInt(m[1].slice(4, 6), 16);
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  const dim = (v) => Math.round(v * 0.72).toString(16).padStart(2, '0');
+  const root = document.documentElement;
+  root.style.setProperty('--accent', hex);
+  root.style.setProperty('--accent-dim', `#${dim(r)}${dim(g)}${dim(b)}`);
+  root.style.setProperty('--accent-text', lum > 0.52 ? '#17110a' : '#fff');
+  root.style.setProperty('--accent-r', String(r));
+  root.style.setProperty('--accent-g', String(g));
+  root.style.setProperty('--accent-b', String(b));
 }
 
 function GearIcon() {

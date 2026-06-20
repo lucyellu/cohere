@@ -628,7 +628,7 @@ function ConcertTable({ rows, selectedId, onSelect, saved, userZone, now, sortKe
 
   return (
     <div className="cohear-panel overflow-hidden">
-      <div className="grid grid-cols-[56px_minmax(170px,1.05fr)_minmax(170px,1fr)_120px_190px_90px_92px] border-b border-white/10 px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-zinc-500 max-lg:hidden">
+      <div className="grid grid-cols-[56px_minmax(155px,1.05fr)_minmax(140px,0.9fr)_minmax(120px,0.7fr)_minmax(155px,0.9fr)_88px_88px] border-b border-white/10 px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-zinc-500 max-lg:hidden">
         <span>Rank</span>
         <SortHeader id="artist" label="Artist" sortKey={sortKey} dir={dir} onSort={onSort} />
         <SortHeader id="venue" label="Venue" sortKey={sortKey} dir={dir} onSort={onSort} />
@@ -643,7 +643,7 @@ function ConcertTable({ rows, selectedId, onSelect, saved, userZone, now, sortKe
           return (
             <li
               key={c.id}
-              className={`grid gap-3 border-b border-white/[0.06] px-4 py-4 last:border-b-0 lg:grid-cols-[56px_minmax(170px,1.05fr)_minmax(170px,1fr)_120px_190px_90px_92px] lg:items-center ${
+              className={`grid gap-3 border-b border-white/[0.06] px-4 py-4 last:border-b-0 lg:grid-cols-[56px_minmax(155px,1.05fr)_minmax(140px,0.9fr)_minmax(120px,0.7fr)_minmax(155px,0.9fr)_88px_88px] lg:items-center ${
                 c.id === selectedId
                   ? 'bg-cyan-300/[0.08]'
                   : state.current
@@ -669,7 +669,7 @@ function ConcertTable({ rows, selectedId, onSelect, saved, userZone, now, sortKe
                   </span>
                 </span>
                 <span className="hidden min-w-0 truncate text-sm text-zinc-300 lg:block">{c.venue}</span>
-                <span className="hidden truncate text-sm text-zinc-400 lg:block">{[c.city, c.country].filter(Boolean).join(', ')}</span>
+                <span className="hidden min-w-0 truncate text-sm text-zinc-400 lg:block">{[c.city, c.country].filter(Boolean).join(', ')}</span>
                 <TimeStack concert={c} userZone={userZone} now={now} />
                 <span className="text-left text-sm font-semibold tabular-nums text-amber-200 lg:text-right">{fmtCapacity(c.capacity)}</span>
               </button>
