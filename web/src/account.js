@@ -279,7 +279,8 @@ export function autoStampOnView(input) {
   recordConcertAction(input, concert.when === 'past' ? 'opened_replay' : 'joined_live', { source: 'view' });
   const visa = issueVisa(concert);
   const entry = addEntryStamp(concert);
-  return { visa, entry };
+  const stub = issueTicketStub(concert); // attending a show = you hold its ticket
+  return { visa, entry, stub };
 }
 
 // Manual "add to passport" — an explicit opt-in that overrides a prior
@@ -290,29 +291,32 @@ export function claimStamp(input) {
   recordConcertAction(input, 'stamp_claimed', { source: 'passport' });
   const visa = issueVisa(input);
   const entry = addEntryStamp(input);
-  return { visa, entry };
+  const stub = issueTicketStub(input);
+  return { visa, entry, stub };
 }
 
-// --- Ticket stubs (per concert, on listen) ------------------------------------
-export function claimTicketStub(input) {
+// --- Ticket stubs (one per concert you attend) --------------------------------
+// Minting a stub is the souvenir of attending a specific show. Deduped per
+// concert id and idempotent, so attending, listening, or backfilling all land on
+// the same single stub.
+export function issueTicketStub(input) {
   const concert = normalizeConcert(input);
   if (!concert.id || isOptedOut(concert.id)) return null;
-  const record = recordConcertAction(input, 'listened', { source: 'live_room' });
-  if (!record) return null;
-  // Listening implies presence — make sure the country/city are stamped too.
-  issueVisa(concert);
-  addEntryStamp(concert);
   const stubs = readStubs();
-  const prev = stubs.find((stub) => stub.id === record.id);
+  const prev = stubs.find((stub) => stub.id === concert.id);
   if (prev) return prev;
+  // Prefer the richer history record (carries status/capacity) if we have it.
+  const record = readHistory().find((h) => h.id === concert.id) || concert;
   const edition = stubs.length + 1;
   const stub = {
     ...record,
+    id: concert.id,
     type: 'ticket',
     issuedAt: new Date().toISOString(),
     edition,
     serial: stubSerial(record, edition),
     seat: stubSeat(record),
+    estTicketUsd: estTicketUsd({ ...concert, ...record }),
     prompt: ticketPrompt(record),
     token: null,
     verified: false,
@@ -321,6 +325,47 @@ export function claimTicketStub(input) {
   emitHistoryChanged();
   signToken('ticket', stub);
   return stub;
+}
+
+// Listening in the room: record it, ensure the visa/entry, then mint the stub.
+export function claimTicketStub(input) {
+  const concert = normalizeConcert(input);
+  if (!concert.id || isOptedOut(concert.id)) return null;
+  recordConcertAction(input, 'listened', { source: 'live_room' });
+  issueVisa(concert);
+  addEntryStamp(concert);
+  return issueTicketStub(input);
+}
+
+// One-time repair: make sure every show you've attended has its ticket stub
+// (older data only minted a stub when a song happened to be playing).
+export function backfillStubs() {
+  const have = new Set(readStubs().map((s) => s.id));
+  let made = 0;
+  for (const item of readHistory()) {
+    if (item.status === 'attended' && !have.has(item.id) && !isOptedOut(item.id)) {
+      if (issueTicketStub(item)) {
+        have.add(item.id);
+        made += 1;
+      }
+    }
+  }
+  return made;
+}
+
+// Aggregate "your live passport" stats for the Discover header.
+export function personalStats() {
+  const stubs = readStubs();
+  const trip = travelItinerary(readEntries(), resolveHome(readProfile()));
+  const attendedHistory = readHistory().filter((h) => h.status === 'attended').length;
+  const savedUsd = stubs.reduce((sum, s) => sum + (s.estTicketUsd || estTicketUsd(s) || 0), 0);
+  return {
+    attended: Math.max(stubs.length, attendedHistory),
+    miles: trip.miles,
+    km: trip.km,
+    stops: trip.stops,
+    savedUsd,
+  };
 }
 
 export function normalizeConcert(input = {}) {
@@ -342,10 +387,24 @@ export function normalizeConcert(input = {}) {
     timeZone: input.timeZone || input.tz || '',
     lat: input.lat ?? null,
     lng: input.lng ?? null,
+    capacity: input.capacity ?? null,
+    popularity: input.popularity ?? input.spotifyPopularity ?? input.artistPopularity ?? null,
+    avgTicketUsd: input.avgTicketUsd ?? null,
     when: input.when || (input.mode === 'replay' ? 'past' : 'upcoming'),
     tour: input.tour || input.name || '',
     source: input.source || input.mode || '',
   };
+}
+
+// Rough single-ticket estimate (mirrors Discover's estimatedTicketUsd) so the
+// passport can total up "ticket money saved" by being there virtually.
+export function estTicketUsd(c = {}) {
+  if (c.avgTicketUsd) return Math.round(c.avgTicketUsd);
+  const rawPop = Number(c.popularity ?? c.spotifyPopularity ?? c.artistPopularity ?? 55);
+  const pop = rawPop > 100 ? Math.min(100, 48 + Math.log10(Math.max(10, rawPop)) * 10) : rawPop;
+  const cap = Number(c.capacity || 12000);
+  const premium = cap >= 60000 ? 80 : cap >= 25000 ? 45 : cap >= 15000 ? 25 : 0;
+  return Math.max(35, Math.round(45 + pop * 1.15 + premium));
 }
 
 // --- FLUX prompt builders (CSS renders by default; art is generated on demand) -
@@ -375,7 +434,7 @@ export const stampPrompt = entryPrompt;
 
 // --- Helpers ------------------------------------------------------------------
 function attendedAction(action) {
-  return ['attended', 'joined_live', 'opened_replay', 'listened'].includes(action);
+  return ['attended', 'joined_live', 'opened_replay', 'listened', 'stamp_claimed'].includes(action);
 }
 
 function visaSerial(id, edition) {

@@ -298,10 +298,10 @@ export default function PassportView({ onOpenCity }) {
 
       {/* Ticket stubs */}
       <section className="cohear-panel overflow-hidden">
-        <SectionHeader title="Ticket stubs" caption="Minted automatically when you hear a song in a live room" />
+        <SectionHeader title="Ticket stubs" caption="One mints automatically for every show you attend" />
         <div className="p-4">
           {!stubs.length ? (
-            <Empty dark>No ticket stubs yet — join a live room while a song's playing and one mints itself.</Empty>
+            <Empty dark>No ticket stubs yet — open any concert's live room and a stub mints itself.</Empty>
           ) : (
             <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
               {stubs.map((stub) => (

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fetchConcerts, getCachedConcerts, filterWhen, spotifyArtist, ticketmasterMatch, ticketWebEstimate, C_SORTS, defaultDir } from '../concerts.js';
 import { fmtCapacity, fmtDate } from '../tour.js';
 import { loadGoogleMaps, hasMapsKey } from '../live/maps.js';
-import { claimStamp, optOutConcert, recordConcertAction } from '../account.js';
+import { claimStamp, optOutConcert, recordConcertAction, personalStats, backfillStubs, HISTORY_EVENT } from '../account.js';
 
 const VIEW_MODES = [
   { id: 'list', label: 'List' },
@@ -107,7 +107,18 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
   const [fallbackUserZone, setFallbackUserZone] = useState(() => settings?.timezone || localStorage.getItem(USER_ZONE_KEY) || DETECTED_TIME_ZONE);
   const [now, setNow] = useState(() => Date.now());
   const [inspectorWidth, setInspectorWidth] = useState(() => readInspectorWidth());
+  const [me, setMe] = useState(() => personalStats());
   const resizeRef = useRef(null);
+
+  // Personal passport stats for the header — backfill any missing stubs once,
+  // then keep the numbers live as you stamp shows.
+  useEffect(() => {
+    backfillStubs();
+    const refresh = () => setMe(personalStats());
+    refresh();
+    window.addEventListener(HISTORY_EVENT, refresh);
+    return () => window.removeEventListener(HISTORY_EVENT, refresh);
+  }, []);
 
   const browse = !artist;
   const userZone = settings?.timezone || fallbackUserZone;
@@ -283,10 +294,8 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
   const selected = useMemo(() => visible.find((c) => c.id === selectedId) || visible[0] || null, [selectedId, visible]);
   const biggest = visible[0] || null;
   const stats = useMemo(() => {
-    const totalCap = visible.reduce((n, c) => n + (c.capacity || 0), 0);
-    const typicalTickets = visible.map((c) => estimatedTicketUsd(c)).filter(Boolean);
     const upcoming = concerts.filter((c) => c.when === 'upcoming').length;
-    return { count: visible.length, totalCap, typicalTicket: median(typicalTickets), ticketCount: typicalTickets.length, upcoming, past: concerts.length - upcoming };
+    return { count: visible.length, upcoming, past: concerts.length - upcoming };
   }, [concerts, visible]);
 
   useEffect(() => {
@@ -476,19 +485,24 @@ function DiscoverHeader({ artist, browse, biggest, loading, stats, spotify, user
 
       <div className="cohear-panel grid content-between gap-4 p-5">
         <div>
-          <p className="cohear-label">Coverage</p>
+          <p className="cohear-label">Your live passport</p>
           <div className="mt-3 grid grid-cols-2 gap-3">
-            <MetricBlock label="Visible shows" value={loading ? '...' : stats.count.toLocaleString()} />
             <MetricBlock
-              label="Known capacity"
-              value={fmtCapacity(stats.totalCap)}
-              title="Sum of venue capacity for the currently visible shows. It is not confirmed attendance or tickets sold."
+              label="Concerts attended"
+              value={me.attended.toLocaleString()}
+              title="Shows you've been in the room for — stamped automatically when you open a live room."
             />
             <MetricBlock
-              label="Typical ticket"
-              value={stats.ticketCount ? `${fmtUsd(stats.typicalTicket)} est.` : 'N/A'}
+              label="Miles travelled"
+              value={`${Math.round(me.miles).toLocaleString()} mi`}
+              tone="amber"
+              title="Great-circle distance of your concert-hopping itinerary, as if you'd flown to each city. Set a home city on your passport to count the round-trip."
+            />
+            <MetricBlock
+              label="Ticket $ saved"
+              value={`${fmtUsd(me.savedUsd)} est.`}
               tone="green"
-              title="Single-ticket estimate for a typical seat. Real Ticketmaster ranges appear on selected future concerts when configured."
+              title="Estimated total face value of tickets for every show you attended virtually instead of buying in."
             />
           </div>
         </div>
@@ -1513,13 +1527,6 @@ function ticketRangeLabel(ticket, fallbackCurrency = 'USD') {
   if (low != null || high != null) return fmtMoney(low ?? high, currency);
   if (ticket?.priceTypical != null) return `${fmtMoney(ticket.priceTypical, currency)} typical`;
   return 'Price unavailable';
-}
-
-function median(values) {
-  if (!values.length) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
 }
 
 function fmtUsd(value) {
