@@ -3,11 +3,11 @@ Add-Type -AssemblyName System.Drawing
 $Dir       = $PSScriptRoot
 $IconPath  = Join-Path $Dir 'cohere.ico'
 $BatPath   = Join-Path $Dir 'launch-musicathon.bat'
-$LinkName  = 'Cohear.lnk'
+$LinkName  = 'Cohere.lnk'
 $LinkPath  = Join-Path ([Environment]::GetFolderPath('Desktop')) $LinkName
 
 # Remove old shortcuts from earlier names.
-foreach ($OldName in @('Reverb.lnk', 'Cohere.lnk', 'Musicathon.lnk')) {
+foreach ($OldName in @('Reverb.lnk', 'Cohear.lnk', 'Musicathon.lnk')) {
     $OldLink = Join-Path ([Environment]::GetFolderPath('Desktop')) $OldName
     if (Test-Path $OldLink) { Remove-Item $OldLink -Force -EA SilentlyContinue }
 }

@@ -352,6 +352,7 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
         userZone={userZone}
         currency={preferredCurrency}
         now={now}
+        me={me}
         onBrowse={() => loadBrowse(windowKey)}
       />
 
@@ -437,7 +438,7 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
   );
 }
 
-function DiscoverHeader({ artist, browse, biggest, loading, stats, spotify, userZone, currency, now, onBrowse }) {
+function DiscoverHeader({ artist, browse, biggest, loading, stats, spotify, userZone, currency, now, me, onBrowse }) {
   return (
     <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
       <div className="cohear-panel p-5">
