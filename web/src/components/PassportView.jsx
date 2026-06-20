@@ -339,7 +339,7 @@ export default function PassportView({ onOpenCity }) {
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <span className="text-xs text-zinc-600">{item.date || 'Date TBA'}</span>
                     <button className="cohear-primary min-h-8 px-2.5 text-xs" onClick={() => claim(item)}>Stamp passport</button>
-                    <button className="cohear-secondary min-h-8 px-2.5 text-xs" onClick={() => neverHere(item)} title="Remove this show from your passport">I was never here</button>
+                    <button className="cohear-secondary min-h-8 px-2.5 text-xs" onClick={() => neverHere(item)} title="Delete this show — removes its stamp, ticket and city from your passport, map and mileage">✕ Delete</button>
                   </div>
                 </article>
               ))}
