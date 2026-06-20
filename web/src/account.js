@@ -139,7 +139,7 @@ export function readProfile() {
   }
 }
 export function writeProfile(patch) {
-  const next = { ...readProfile(), ...patch };
+  const next = { ...readProfile(), ...patch, profileUpdatedAt: new Date().toISOString() };
   localStorage.setItem(PROFILE_KEY, JSON.stringify(next));
   emitHistoryChanged();
   return next;
@@ -532,6 +532,88 @@ export function resyncTokens() {
 
 function emitHistoryChanged() {
   window.dispatchEvent(new Event(HISTORY_EVENT));
+  schedulePush();
+}
+
+// --- Cross-device cloud sync (Supabase, registered by the Passport view) ------
+// account.js stays network-agnostic: the view hands us a push function + user id
+// once signed in, and we (a) write through every mutation (debounced) and
+// (b) expose pure merge helpers so a new device reconciles cloud + local without
+// losing a single stamp.
+let cloudPush = null; // (state) => Promise
+let cloudUserId = null;
+let pushTimer = null;
+
+export function setCloudSync(userId, pushFn) {
+  cloudUserId = userId || null;
+  cloudPush = pushFn || null;
+}
+
+function schedulePush() {
+  if (!cloudPush || !cloudUserId) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(() => {
+    Promise.resolve(cloudPush(snapshotLocal())).catch(() => {});
+  }, 1200);
+}
+
+// The full local passport as one plain object (what we store in the cloud row).
+export function snapshotLocal() {
+  return {
+    profile: readProfile(),
+    visas: readVisas(),
+    entries: readEntries(),
+    stubs: readStubs(),
+    history: readHistory(),
+    optout: readOptOut(),
+  };
+}
+
+// Overwrite local storage with a reconciled state and notify the UI. Does not
+// re-trigger a push (the caller owns the cloud write for this state).
+export function writeLocalState(state = {}) {
+  if (state.profile) localStorage.setItem(PROFILE_KEY, JSON.stringify(state.profile));
+  if (state.visas) writeArray(VISAS_KEY, state.visas);
+  if (state.entries) writeArray(ENTRIES_KEY, state.entries);
+  if (state.stubs) writeArray(STUBS_KEY, state.stubs);
+  if (state.history) writeArray(HISTORY_KEY, state.history);
+  if (state.optout) writeArray(OPTOUT_KEY, state.optout);
+  window.dispatchEvent(new Event(HISTORY_EVENT)); // refresh UI, no cloud push
+}
+
+function latestTs(obj, keys) {
+  for (const k of keys) if (obj && obj[k]) return obj[k];
+  return '';
+}
+
+// Union two id-keyed lists, keeping the newer copy of any shared id. Never drops
+// a record that exists on only one side — so logging in merges, never deletes.
+function mergeById(local = [], remote = [], tsKeys = ['issuedAt']) {
+  const map = new Map();
+  for (const item of [...(remote || []), ...(local || [])]) {
+    if (!item || !item.id) continue;
+    const prev = map.get(item.id);
+    if (!prev || latestTs(item, tsKeys) >= latestTs(prev, tsKeys)) map.set(item.id, item);
+  }
+  return [...map.values()].sort((a, b) => String(latestTs(b, tsKeys)).localeCompare(String(latestTs(a, tsKeys))));
+}
+
+// Reconcile a local snapshot with a cloud snapshot. Arrays union (no loss);
+// profile is last-write-wins on profileUpdatedAt.
+export function mergeState(local = {}, remote = {}) {
+  const lp = local.profile || {};
+  const rp = remote.profile || {};
+  const profile = (lp.profileUpdatedAt || '') >= (rp.profileUpdatedAt || '')
+    ? { ...rp, ...lp }
+    : { ...lp, ...rp };
+  return {
+    profile,
+    visas: mergeById(local.visas, remote.visas, ['issuedAt']),
+    entries: mergeById(local.entries, remote.entries, ['issuedAt']),
+    stubs: mergeById(local.stubs, remote.stubs, ['issuedAt']),
+    history: mergeById(local.history, remote.history, ['lastViewedAt', 'firstViewedAt']),
+    optout: [...new Set([...(local.optout || []), ...(remote.optout || [])])],
+  };
 }
 
 function readArray(key) {

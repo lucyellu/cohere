@@ -13,6 +13,10 @@ import {
   resolveHome,
   travelItinerary,
   cityCoords,
+  snapshotLocal,
+  mergeState,
+  writeLocalState,
+  setCloudSync,
 } from '../account.js';
 import { supabase, supabaseEnabled } from '../live/supabase.js';
 import { readArtMap, generateArtFor } from './passport/passportArt.js';
@@ -115,35 +119,54 @@ export default function PassportView({ onOpenCity }) {
     setSession(null);
   }
 
+  // On sign-in: pull the cloud passport, merge it with whatever is on this
+  // device (union — no stamp is ever lost), write the result back to both, and
+  // then keep the cloud row updated on every later change (via setCloudSync).
+  useEffect(() => {
+    if (!supabase) return undefined;
+    const user = session?.user;
+    if (!user || user.is_anonymous) {
+      setCloudSync(null, null);
+      return undefined;
+    }
+    let alive = true;
+    const userId = user.id;
+    const upsert = (state) => supabase
+      .from('passport_state')
+      .upsert({ id: userId, state, updated_at: new Date().toISOString() });
+
+    (async () => {
+      setSyncMessage('Syncing your passport…');
+      const { data, error } = await supabase
+        .from('passport_state')
+        .select('state')
+        .eq('id', userId)
+        .maybeSingle();
+      if (!alive) return;
+      if (error) {
+        setSyncMessage(error.message);
+        return;
+      }
+      const merged = mergeState(snapshotLocal(), data?.state || {});
+      writeLocalState(merged); // refreshes the UI + local cache
+      const { error: upErr } = await upsert(merged);
+      if (!alive) return;
+      setSyncMessage(upErr ? upErr.message : 'Synced across your devices.');
+      setCloudSync(userId, upsert); // write through every later mutation
+    })();
+
+    return () => {
+      alive = false;
+      setCloudSync(null, null);
+    };
+  }, [session]);
+
   async function syncCloud() {
     if (!supabase || !session?.user || session.user.is_anonymous) return;
-    setSyncMessage('Syncing...');
-    const userId = session.user.id;
-    const profileRow = { id: userId, display_name: profile.name || session.user.email || null, updated_at: new Date().toISOString() };
-    const historyRows = history.map((item) => ({
-      user_id: userId,
-      concert_key: item.id,
-      artist: item.artist || null,
-      venue: item.venue || null,
-      city: item.city || null,
-      region: item.region || null,
-      country: item.country || null,
-      concert_date: item.date || null,
-      start_at: parseDateTime(item.startDate),
-      timezone: item.timeZone || null,
-      status: item.status || 'visited',
-      source: item.source || null,
-      first_viewed_at: item.firstViewedAt || new Date().toISOString(),
-      last_viewed_at: item.lastViewedAt || new Date().toISOString(),
-      attended_at: item.attendedAt || null,
-      actions: item.actions || {},
-      updated_at: new Date().toISOString(),
-    }));
-    const profileRes = await supabase.from('profiles').upsert(profileRow);
-    const historyRes = historyRows.length
-      ? await supabase.from('concert_history').upsert(historyRows, { onConflict: 'user_id,concert_key' })
-      : { error: null };
-    const error = profileRes.error || historyRes.error;
+    setSyncMessage('Syncing…');
+    const { error } = await supabase
+      .from('passport_state')
+      .upsert({ id: session.user.id, state: snapshotLocal(), updated_at: new Date().toISOString() });
     setSyncMessage(error ? error.message : 'Synced.');
   }
 
@@ -179,16 +202,18 @@ export default function PassportView({ onOpenCity }) {
                 <div className="space-y-3">
                   <div className="truncate text-sm font-semibold text-white">{session.user.email}</div>
                   <div className="flex flex-wrap gap-2">
-                    <button className="cohear-primary" onClick={syncCloud}>Sync passport</button>
+                    <button className="cohear-primary" onClick={syncCloud}>Sync now</button>
                     <button className="cohear-secondary" onClick={signOut}>Sign out</button>
                   </div>
-                  {syncMessage && <p className="text-xs leading-5 text-zinc-500">{syncMessage}</p>}
+                  <p className="text-xs leading-5 text-zinc-500">
+                    {syncMessage || 'Your passport syncs automatically across every device you sign in on.'}
+                  </p>
                 </div>
               ) : (
                 <form onSubmit={sendMagicLink} className="space-y-3">
                   <input className="cohear-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email address" />
                   <button className="cohear-primary w-full justify-center" disabled={!email.trim()}>Email sign-in link</button>
-                  {authMessage && <p className="text-xs leading-5 text-zinc-500">{authMessage}</p>}
+                  <p className="text-xs leading-5 text-zinc-500">{authMessage || 'Sign in to save your passport and see your stamps on any device.'}</p>
                 </form>
               )
             ) : (
@@ -287,12 +312,6 @@ export default function PassportView({ onOpenCity }) {
       </section>
     </div>
   );
-}
-
-function parseDateTime(value) {
-  if (!value) return null;
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
 function PageSection({ title, caption, children }) {
