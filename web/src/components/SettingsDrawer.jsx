@@ -107,7 +107,7 @@ export default function SettingsDrawer({ open, settings, onChange, onClose }) {
         <header className="flex items-center justify-between gap-4 border-b border-white/10 px-5 py-4">
           <div>
             <p className="cohear-label">Settings</p>
-            <h2 className="mt-1 text-xl font-semibold text-white">Cohear controls</h2>
+            <h2 className="mt-1 text-xl font-semibold text-white">Cohere controls</h2>
           </div>
           <button className="cohear-icon-button" onClick={onClose} aria-label="Close settings" title="Close settings">
             <CloseIcon />

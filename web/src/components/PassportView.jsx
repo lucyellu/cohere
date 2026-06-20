@@ -25,6 +25,7 @@ import VisaCard from './passport/VisaCard.jsx';
 import EntryStamp from './passport/EntryStamp.jsx';
 import TicketStub from './passport/TicketStub.jsx';
 import ExportSheet from './passport/ExportSheet.jsx';
+import PassportMap from './passport/PassportMap.jsx';
 import { exportPng, exportPdf } from './passport/passportExport.js';
 
 export default function PassportView({ onOpenCity }) {
@@ -265,6 +266,9 @@ export default function PassportView({ onOpenCity }) {
         </div>
       </section>
 
+      {/* Chronological journey map */}
+      {entries.length > 0 && <PassportMap entries={entries} home={home} />}
+
       {/* Visas */}
       <PageSection title="Visas" caption={`${visas.length} ${visas.length === 1 ? 'country' : 'countries'}`}>
         {!visas.length ? (
@@ -298,10 +302,10 @@ export default function PassportView({ onOpenCity }) {
 
       {/* Ticket stubs */}
       <section className="cohear-panel overflow-hidden">
-        <SectionHeader title="Ticket stubs" caption="Minted automatically when you hear a song in a live room" />
+        <SectionHeader title="Ticket stubs" caption="One mints automatically for every show you attend" />
         <div className="p-4">
           {!stubs.length ? (
-            <Empty dark>No ticket stubs yet — join a live room while a song's playing and one mints itself.</Empty>
+            <Empty dark>No ticket stubs yet — open any concert's live room and a stub mints itself.</Empty>
           ) : (
             <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
               {stubs.map((stub) => (
@@ -339,7 +343,7 @@ export default function PassportView({ onOpenCity }) {
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <span className="text-xs text-zinc-600">{item.date || 'Date TBA'}</span>
                     <button className="cohear-primary min-h-8 px-2.5 text-xs" onClick={() => claim(item)}>Stamp passport</button>
-                    <button className="cohear-secondary min-h-8 px-2.5 text-xs" onClick={() => neverHere(item)} title="Remove this show from your passport">I was never here</button>
+                    <button className="cohear-secondary min-h-8 px-2.5 text-xs" onClick={() => neverHere(item)} title="Delete this show — removes its stamp, ticket and city from your passport, map and mileage">✕ Delete</button>
                   </div>
                 </article>
               ))}

@@ -24,7 +24,7 @@ export default function EntryStamp({ entry, onOpen }) {
       <span className="cohear-entry__sub">✈ Admitted</span>
       <span className="cohear-entry__city">{(entry.city || 'Unknown').toUpperCase()}</span>
       <span className="cohear-entry__date">{d}</span>
-      <span className="cohear-entry__sub">Cohear Border</span>
+      <span className="cohear-entry__sub">Cohere Border</span>
     </div>
   );
 }

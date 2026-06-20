@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fetchConcerts, getCachedConcerts, filterWhen, spotifyArtist, ticketmasterMatch, ticketWebEstimate, C_SORTS, defaultDir } from '../concerts.js';
 import { fmtCapacity, fmtDate } from '../tour.js';
 import { loadGoogleMaps, hasMapsKey } from '../live/maps.js';
-import { claimStamp, optOutConcert, recordConcertAction } from '../account.js';
+import { GOOGLE_PAPER_MAP } from '../live/mapStyle.js';
+import { claimStamp, optOutConcert, recordConcertAction, personalStats, backfillStubs, HISTORY_EVENT } from '../account.js';
 
 const VIEW_MODES = [
   { id: 'list', label: 'List' },
@@ -107,7 +108,18 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
   const [fallbackUserZone, setFallbackUserZone] = useState(() => settings?.timezone || localStorage.getItem(USER_ZONE_KEY) || DETECTED_TIME_ZONE);
   const [now, setNow] = useState(() => Date.now());
   const [inspectorWidth, setInspectorWidth] = useState(() => readInspectorWidth());
+  const [me, setMe] = useState(() => personalStats());
   const resizeRef = useRef(null);
+
+  // Personal passport stats for the header — backfill any missing stubs once,
+  // then keep the numbers live as you stamp shows.
+  useEffect(() => {
+    backfillStubs();
+    const refresh = () => setMe(personalStats());
+    refresh();
+    window.addEventListener(HISTORY_EVENT, refresh);
+    return () => window.removeEventListener(HISTORY_EVENT, refresh);
+  }, []);
 
   const browse = !artist;
   const userZone = settings?.timezone || fallbackUserZone;
@@ -283,10 +295,8 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
   const selected = useMemo(() => visible.find((c) => c.id === selectedId) || visible[0] || null, [selectedId, visible]);
   const biggest = visible[0] || null;
   const stats = useMemo(() => {
-    const totalCap = visible.reduce((n, c) => n + (c.capacity || 0), 0);
-    const typicalTickets = visible.map((c) => estimatedTicketUsd(c)).filter(Boolean);
     const upcoming = concerts.filter((c) => c.when === 'upcoming').length;
-    return { count: visible.length, totalCap, typicalTicket: median(typicalTickets), ticketCount: typicalTickets.length, upcoming, past: concerts.length - upcoming };
+    return { count: visible.length, upcoming, past: concerts.length - upcoming };
   }, [concerts, visible]);
 
   useEffect(() => {
@@ -342,6 +352,7 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
         userZone={userZone}
         currency={preferredCurrency}
         now={now}
+        me={me}
         onBrowse={() => loadBrowse(windowKey)}
       />
 
@@ -427,7 +438,7 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
   );
 }
 
-function DiscoverHeader({ artist, browse, biggest, loading, stats, spotify, userZone, currency, now, onBrowse }) {
+function DiscoverHeader({ artist, browse, biggest, loading, stats, spotify, userZone, currency, now, me, onBrowse }) {
   return (
     <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
       <div className="cohear-panel p-5">
@@ -476,19 +487,24 @@ function DiscoverHeader({ artist, browse, biggest, loading, stats, spotify, user
 
       <div className="cohear-panel grid content-between gap-4 p-5">
         <div>
-          <p className="cohear-label">Coverage</p>
+          <p className="cohear-label">Your live passport</p>
           <div className="mt-3 grid grid-cols-2 gap-3">
-            <MetricBlock label="Visible shows" value={loading ? '...' : stats.count.toLocaleString()} />
             <MetricBlock
-              label="Known capacity"
-              value={fmtCapacity(stats.totalCap)}
-              title="Sum of venue capacity for the currently visible shows. It is not confirmed attendance or tickets sold."
+              label="Concerts attended"
+              value={me.attended.toLocaleString()}
+              title="Shows you've been in the room for — stamped automatically when you open a live room."
             />
             <MetricBlock
-              label="Typical ticket"
-              value={stats.ticketCount ? `${fmtUsd(stats.typicalTicket)} est.` : 'N/A'}
+              label="Miles travelled"
+              value={`${Math.round(me.miles).toLocaleString()} mi`}
+              tone="amber"
+              title="Great-circle distance of your concert-hopping itinerary, as if you'd flown to each city. Set a home city on your passport to count the round-trip."
+            />
+            <MetricBlock
+              label="Ticket $ saved"
+              value={`${fmtUsd(me.savedUsd)} est.`}
               tone="green"
-              title="Single-ticket estimate for a typical seat. Real Ticketmaster ranges appear on selected future concerts when configured."
+              title="Estimated total face value of tickets for every show you attended virtually instead of buying in."
             />
           </div>
         </div>
@@ -859,6 +875,7 @@ function ConcertMap({ rows, selectedId, onSelect }) {
   const [mapReady, setMapReady] = useState(false);
   const [showLabels, setShowLabels] = useState(false);
   const [trailArtist, setTrailArtist] = useState('');
+  const [mapType, setMapType] = useState('paper');
   const mappable = rows.filter((c) => c.lat != null && c.lng != null);
   const artists = useMemo(() => [...new Set(mappable.map((c) => c.artist).filter(Boolean))].sort((a, b) => a.localeCompare(b)), [mappable]);
   const trailRows = useMemo(() => {
@@ -881,8 +898,8 @@ function ConcertMap({ rows, selectedId, onSelect }) {
           disableDefaultUI: true,
           zoomControl: true,
           gestureHandling: 'greedy',
-          backgroundColor: '#09090b',
-          styles: GOOGLE_DARK_MAP,
+          backgroundColor: '#a9c4cc',
+          styles: GOOGLE_PAPER_MAP,
         });
         stateRef.current.map = map;
         setMapReady(true);
@@ -905,6 +922,15 @@ function ConcertMap({ rows, selectedId, onSelect }) {
     };
   }, []);
 
+  // Switch between the paper-styled roadmap, satellite, and terrain views.
+  useEffect(() => {
+    const { map } = stateRef.current;
+    if (!map) return;
+    if (mapType === 'satellite') { map.setMapTypeId('hybrid'); map.setOptions({ styles: [] }); }
+    else if (mapType === 'terrain') { map.setMapTypeId('terrain'); map.setOptions({ styles: [] }); }
+    else { map.setMapTypeId('roadmap'); map.setOptions({ styles: GOOGLE_PAPER_MAP }); }
+  }, [mapType, mapReady]);
+
   useEffect(() => {
     const { map, maps, markers } = stateRef.current;
     if (!map || !maps) return;
@@ -923,10 +949,10 @@ function ConcertMap({ rows, selectedId, onSelect }) {
       const icon = {
         path: maps.SymbolPath.CIRCLE,
         scale: c.id === selectedId ? scale + 4 : scale,
-        fillColor: c.id === selectedId ? '#67e8f9' : '#fbbf24',
-        fillOpacity: c.id === selectedId ? 0.95 : 0.74,
-        strokeColor: '#ffffff',
-        strokeWeight: c.id === selectedId ? 2 : 0.8,
+        fillColor: c.id === selectedId ? '#0ea5b7' : '#e0922b',
+        fillOpacity: c.id === selectedId ? 0.95 : 0.85,
+        strokeColor: mapType === 'paper' ? '#5b4a2a' : '#ffffff',
+        strokeWeight: c.id === selectedId ? 2 : 1,
       };
       let marker = markers.get(c.id);
       if (!marker) {
@@ -936,7 +962,7 @@ function ConcertMap({ rows, selectedId, onSelect }) {
       }
       marker.setPosition(position);
       marker.setIcon(icon);
-      marker.setLabel(showLabels ? { text: shortLabel(c.artist || c.venue), color: '#f4f4f5', fontSize: '11px', fontWeight: '700' } : null);
+      marker.setLabel(showLabels ? { text: shortLabel(c.artist || c.venue), color: mapType === 'paper' ? '#3a2e16' : '#f4f4f5', fontSize: '11px', fontWeight: '700' } : null);
       marker.setZIndex(c.id === selectedId ? 1000 : 1);
     }
     for (const trail of stateRef.current.trails) trail.setMap(null);
@@ -967,7 +993,7 @@ function ConcertMap({ rows, selectedId, onSelect }) {
       map.fitBounds(bounds, 72);
       stateRef.current.fittedKey = fittedKey;
     }
-  }, [mappable, onSelect, routeSegments, selectedId, showLabels]);
+  }, [mappable, onSelect, routeSegments, selectedId, showLabels, mapType]);
 
   useEffect(() => {
     const { map } = stateRef.current;
@@ -986,6 +1012,8 @@ function ConcertMap({ rows, selectedId, onSelect }) {
         trailArtist={trailArtist}
         setTrailArtist={setTrailArtist}
         artists={artists}
+        mapType={mapType}
+        setMapType={setMapType}
         fallbackReason={err}
       >
         <FallbackMap rows={mappable} selectedId={selectedId} onSelect={onSelect} showLabels={showLabels} trailRows={trailRows} routeSegments={routeSegments} />
@@ -1001,12 +1029,14 @@ function ConcertMap({ rows, selectedId, onSelect }) {
       trailArtist={trailArtist}
       setTrailArtist={setTrailArtist}
       artists={artists}
+      mapType={mapType}
+      setMapType={setMapType}
     >
       <div className="relative">
-        <div ref={mapRef} aria-label="Concert location map" className="h-[620px] w-full bg-zinc-950" />
+        <div ref={mapRef} aria-label="Concert location map" className="h-[620px] w-full bg-[#e9ddc0]" />
         {!mapReady && (
-          <div className="pointer-events-none absolute inset-0 grid place-items-center bg-zinc-950/80 text-sm text-zinc-400">
-            Loading Google Maps...
+          <div className="pointer-events-none absolute inset-0 grid place-items-center bg-[#f1e7d0]/80 text-sm text-black/60">
+            Unrolling the map…
           </div>
         )}
       </div>
@@ -1014,11 +1044,13 @@ function ConcertMap({ rows, selectedId, onSelect }) {
   );
 }
 
-function MapShell({ children, count, showLabels, setShowLabels, trailArtist, setTrailArtist, artists, fallbackReason }) {
+const MAP_TYPES = [{ id: 'paper', label: 'Paper' }, { id: 'satellite', label: 'Satellite' }, { id: 'terrain', label: 'Terrain' }];
+
+function MapShell({ children, count, showLabels, setShowLabels, trailArtist, setTrailArtist, artists, mapType, setMapType, fallbackReason }) {
   const reasonText = fallbackReason
     ? fallbackReason === 'missing-key'
-      ? 'Google Maps key is missing, so Cohear is showing its built-in coordinate map.'
-      : `Google Maps did not finish loading (${fallbackReason}), so Cohear is showing its built-in coordinate map.`
+      ? 'Google Maps key is missing, so Cohere is showing its built-in coordinate map.'
+      : `Google Maps did not finish loading (${fallbackReason}), so Cohere is showing its built-in coordinate map.`
     : 'Google Maps markers sized by known attendance capacity. Tour trails use solid completed legs and dashed future legs.';
   return (
     <div className="cohear-panel overflow-hidden">
@@ -1028,6 +1060,19 @@ function MapShell({ children, count, showLabels, setShowLabels, trailArtist, set
           <p className="mt-1 text-xs text-zinc-500">{reasonText}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {setMapType && !fallbackReason && (
+            <div className="flex overflow-hidden rounded-lg border border-white/10">
+              {MAP_TYPES.map((t) => (
+                <button
+                  key={t.id}
+                  className={`px-3 py-2 text-xs font-semibold ${mapType === t.id ? 'bg-amber-300/[0.16] text-amber-100' : 'bg-black/20 text-zinc-400 hover:text-zinc-100'}`}
+                  onClick={() => setMapType(t.id)}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          )}
           <button
             className={`rounded-lg border px-3 py-2 text-xs font-semibold ${showLabels ? 'border-cyan-300/40 bg-cyan-300/[0.12] text-cyan-100' : 'border-white/10 bg-black/20 text-zinc-400 hover:text-zinc-100'}`}
             onClick={() => setShowLabels((v) => !v)}
@@ -1515,13 +1560,6 @@ function ticketRangeLabel(ticket, fallbackCurrency = 'USD') {
   return 'Price unavailable';
 }
 
-function median(values) {
-  if (!values.length) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
-}
-
 function fmtUsd(value) {
   return fmtMoney(value, 'USD');
 }
@@ -1768,13 +1806,3 @@ function RefreshIcon({ spinning }) {
   );
 }
 
-const GOOGLE_DARK_MAP = [
-  { elementType: 'geometry', stylers: [{ color: '#17191f' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#a1a1aa' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#09090b' }] },
-  { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#3f3f46' }] },
-  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#27272a' }] },
-  { featureType: 'road', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
-];

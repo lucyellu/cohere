@@ -61,7 +61,7 @@ export default function PassportBook({
       <div className="cohear-book__page cohear-passport-page" aria-hidden={!open}>
         <div className="flex items-center justify-between gap-2 border-b border-black/15 pb-2">
           <span className="text-[11px] font-black uppercase tracking-[0.3em]">Passport</span>
-          <span className="text-[10px] font-bold uppercase tracking-[0.16em] opacity-70">Cohear · Citizen of Live Music</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.16em] opacity-70">Cohere · Citizen of Live Music</span>
           <button
             type="button"
             className="rounded border border-black/25 bg-black/[0.04] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide hover:bg-black/[0.1]"
@@ -153,7 +153,7 @@ export default function PassportBook({
               </div>
             </Field>
             <Field label="Type"><span className="font-mono text-base font-bold">P</span></Field>
-            <Field label="Authority"><span className="font-mono text-base font-bold">COHEAR</span></Field>
+            <Field label="Authority"><span className="font-mono text-base font-bold">COHERE</span></Field>
           </div>
         </div>
 
@@ -198,7 +198,7 @@ export default function PassportBook({
       >
         <span className="cohear-book__cover-face">
           <span className="cohear-book__emblem" aria-hidden="true">✦</span>
-          <span className="cohear-book__cover-title">Cohear</span>
+          <span className="cohear-book__cover-title">Cohere</span>
           <span className="cohear-book__cover-sub">Passport</span>
           <span className="cohear-book__crest" aria-hidden="true">🛂</span>
           <span className="cohear-book__cover-foot">Citizen of Live Music</span>
@@ -206,7 +206,7 @@ export default function PassportBook({
         </span>
         {/* the inner back of the cover (visible while open) */}
         <span className="cohear-book__cover-back" aria-hidden="true">
-          <span className="cohear-book__cover-back-note">This passport remains the property of Cohear.<br />Found stamps should be returned to their city.</span>
+          <span className="cohear-book__cover-back-note">This passport remains the property of Cohere.<br />Found stamps should be returned to their city.</span>
         </span>
       </button>
     </div>
