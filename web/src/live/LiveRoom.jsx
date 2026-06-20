@@ -36,8 +36,10 @@ export default function LiveRoom({ event: initial, onBack }) {
     autoStampOnView(event);
   }, [event.id]);
 
-  // Listen to at least one song while here → mint a ticket stub. The persistent
-  // player can still hold a track from another room, so match the artist first.
+  // Mint a ticket stub the moment you've heard a song here — either by playing
+  // one yourself (the persistent player may hold a track from another room, so
+  // match the artist), or just by being present while the synced setlist is
+  // mid-song. claimTicketStub is idempotent per show, so both can fire freely.
   useEffect(() => {
     const t = player?.track;
     if (t?.videoId && sameArtist(t.artist, event.artist)) claimTicketStub(event);
@@ -67,6 +69,12 @@ export default function LiveRoom({ event: initial, onBack }) {
   const now = syncedNow();
   const np = nowPlaying(event, now);
   const isLive = np.status === 'live';
+
+  // Passive listening: a song is playing on the synced clock while you're in the
+  // room → that counts as being there for it. Auto-mints the stub, no clicks.
+  useEffect(() => {
+    if (synced && isLive) claimTicketStub(event);
+  }, [synced, isLive, event.id]);
 
   function warpToSong(i) {
     const slot = event.timeline[i];

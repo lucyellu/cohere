@@ -667,6 +667,162 @@ button:disabled {
   background: linear-gradient(90deg, #c79a3e, #e8c977, #c79a3e);
 }
 
+/* ---- Export sheet (html2canvas-safe; off-screen source for PNG/PDF) ---- */
+.cohear-export {
+  width: 820px;
+  box-sizing: border-box;
+  padding: 28px 30px 24px;
+  background: #ece3cf;
+  color: #2c2418;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+.cohear-export__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 18px;
+  border-radius: 8px;
+  background: linear-gradient(160deg, #1b2a4a, #0d1830);
+  border: 2px solid #c79a3e;
+}
+.cohear-export__brand {
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: #e8c977;
+}
+.cohear-export__brand--right { letter-spacing: 0.44em; }
+.cohear-export__id {
+  display: flex;
+  gap: 18px;
+  align-items: stretch;
+  margin-top: 18px;
+}
+.cohear-export__photo {
+  width: 96px;
+  height: 116px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  font-weight: 900;
+  color: #fff;
+  background: #34507e;
+  border: 3px solid #fbf7ec;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+.cohear-export__photo img { width: 100%; height: 100%; object-fit: cover; }
+.cohear-export__id-fields { flex: 1 1 auto; min-width: 0; }
+.cohear-export__name { font-size: 26px; font-weight: 900; line-height: 1.1; }
+.cohear-export__meta {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 18px;
+  font-size: 12px;
+}
+.cohear-export__meta b { font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.6; margin-right: 4px; }
+.cohear-export__miles {
+  flex: none;
+  width: 168px;
+  text-align: right;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(120, 96, 50, 0.4);
+  background: #f3ead2;
+}
+.cohear-export__miles-num { font-size: 30px; font-weight: 900; line-height: 1; }
+.cohear-export__miles-unit { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.65; }
+.cohear-export__miles-sub { margin-top: 4px; font-size: 11px; opacity: 0.7; }
+.cohear-export__stats {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin-top: 16px;
+}
+.cohear-export__stat {
+  text-align: center;
+  padding: 8px 4px;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: rgba(255, 255, 255, 0.4);
+}
+.cohear-export__stat-num { font-size: 22px; font-weight: 900; }
+.cohear-export__stat-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.6; }
+.cohear-export__section { margin-top: 22px; }
+.cohear-export__section-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  padding-bottom: 6px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.18);
+}
+.cohear-export__grid { display: grid; gap: 12px; }
+.cohear-export__grid--visa { grid-template-columns: repeat(3, 1fr); }
+.cohear-export__grid--stamp { grid-template-columns: repeat(5, 1fr); }
+.cohear-export__grid--stub { grid-template-columns: repeat(2, 1fr); }
+.cohear-export__visa {
+  padding: 10px;
+  border: 2px solid #3b82f6;
+  border-radius: 4px;
+  background: #f7f1e3;
+}
+.cohear-export__visa-top { font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.12em; }
+.cohear-export__visa-country { font-size: 16px; font-weight: 900; text-transform: uppercase; margin: 4px 0; }
+.cohear-export__visa-row { font-size: 11px; opacity: 0.8; }
+.cohear-export__stamp {
+  text-align: center;
+  padding: 10px 6px;
+  border: 2.5px solid #b4452f;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.25);
+}
+.cohear-export__stamp-sub { font-size: 8px; text-transform: uppercase; letter-spacing: 0.16em; opacity: 0.85; }
+.cohear-export__stamp-city { font-size: 13px; font-weight: 900; letter-spacing: 0.03em; margin: 2px 0; }
+.cohear-export__stamp-date { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; }
+.cohear-export__stub {
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+.cohear-export__stub-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  font-size: 14px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.cohear-export__stub-head span:last-child { font-size: 9px; letter-spacing: 0.14em; }
+.cohear-export__stub-body { padding: 8px 12px 10px; }
+.cohear-export__stub-venue { font-size: 13px; font-weight: 800; }
+.cohear-export__stub-line { font-size: 11px; opacity: 0.8; margin-top: 2px; }
+.cohear-export__serial {
+  margin-top: 6px;
+  font: 700 9px/1.3 ui-monospace, "Courier New", monospace;
+  letter-spacing: 0.06em;
+  opacity: 0.7;
+}
+.cohear-export__foot { margin-top: 24px; border-top: 1px solid rgba(0, 0, 0, 0.18); padding-top: 10px; }
+.cohear-export__foot pre {
+  font: 700 12px/1.4 ui-monospace, "Courier New", monospace;
+  letter-spacing: 0.04em;
+  white-space: pre-wrap;
+  word-break: break-all;
+  opacity: 0.8;
+  margin: 0;
+}
+.cohear-export__issued { margin-top: 8px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; opacity: 0.55; }
+
 .cohear-link {
   color: rgb(165 243 252);
   font-size: 0.875rem;

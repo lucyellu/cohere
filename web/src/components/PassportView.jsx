@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   HISTORY_EVENT,
   claimStamp,
@@ -24,6 +24,8 @@ import PassportBook from './passport/PassportBook.jsx';
 import VisaCard from './passport/VisaCard.jsx';
 import EntryStamp from './passport/EntryStamp.jsx';
 import TicketStub from './passport/TicketStub.jsx';
+import ExportSheet from './passport/ExportSheet.jsx';
+import { exportPng, exportPdf } from './passport/passportExport.js';
 
 export default function PassportView({ onOpenCity }) {
   const [history, setHistory] = useState(() => readHistory());
@@ -37,6 +39,9 @@ export default function PassportView({ onOpenCity }) {
   const [email, setEmail] = useState('');
   const [authMessage, setAuthMessage] = useState('');
   const [syncMessage, setSyncMessage] = useState('');
+  const [exporting, setExporting] = useState('');
+  const [exportMsg, setExportMsg] = useState('');
+  const exportRef = useRef(null);
 
   useEffect(() => {
     function refresh() {
@@ -101,6 +106,21 @@ export default function PassportView({ onOpenCity }) {
   function setHome(value) {
     const coords = cityCoords(value);
     setProfile(writeProfile({ homeCity: value, homeLat: coords?.lat ?? null, homeLng: coords?.lng ?? null }));
+  }
+
+  async function doExport(kind) {
+    if (!exportRef.current || exporting) return;
+    setExporting(kind);
+    setExportMsg('');
+    try {
+      const slug = (profile.name || 'guest').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'guest';
+      if (kind === 'pdf') await exportPdf(exportRef.current, `cohear-passport-${slug}.pdf`);
+      else await exportPng(exportRef.current, `cohear-passport-${slug}.png`);
+    } catch {
+      setExportMsg('Export failed — try removing an AI-generated photo, then retry.');
+    } finally {
+      setExporting('');
+    }
   }
 
   async function sendMagicLink(e) {
@@ -180,6 +200,23 @@ export default function PassportView({ onOpenCity }) {
 
   return (
     <div className="space-y-5">
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold text-white">Your passport</h2>
+          <p className="text-xs text-zinc-500">Visas, stamps and tickets — collected automatically as you go.</p>
+        </div>
+        <div className="flex gap-2">
+          <button className="cohear-secondary" onClick={() => doExport('png')} disabled={Boolean(exporting)} title="Download your passport as a PNG image">
+            {exporting === 'png' ? 'Exporting…' : '⬇ PNG'}
+          </button>
+          <button className="cohear-secondary" onClick={() => doExport('pdf')} disabled={Boolean(exporting)} title="Download your passport as a PDF">
+            {exporting === 'pdf' ? 'Exporting…' : '⬇ PDF'}
+          </button>
+        </div>
+        {exportMsg && <p className="w-full text-right text-xs text-amber-300/80">{exportMsg}</p>}
+      </div>
+
       {/* Identity + account */}
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
         <PassportBook
@@ -261,10 +298,10 @@ export default function PassportView({ onOpenCity }) {
 
       {/* Ticket stubs */}
       <section className="cohear-panel overflow-hidden">
-        <SectionHeader title="Ticket stubs" caption="Kept when you listen to a song in the room" />
+        <SectionHeader title="Ticket stubs" caption="Minted automatically when you hear a song in a live room" />
         <div className="p-4">
           {!stubs.length ? (
-            <Empty dark>No ticket stubs yet — play a song in a live room.</Empty>
+            <Empty dark>No ticket stubs yet — join a live room while a song's playing and one mints itself.</Empty>
           ) : (
             <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
               {stubs.map((stub) => (
@@ -310,6 +347,22 @@ export default function PassportView({ onOpenCity }) {
           )}
         </div>
       </section>
+
+      {/* Off-screen export sheet — the source for PNG / PDF downloads. */}
+      <div aria-hidden="true" style={{ position: 'fixed', top: 0, left: -99999, width: 860, pointerEvents: 'none', zIndex: -1 }}>
+        <ExportSheet
+          ref={exportRef}
+          profile={profile}
+          stats={stats}
+          travel={travel}
+          home={home}
+          memberSince={memberSince}
+          visas={visas}
+          entries={entries}
+          stubs={stubs}
+          identitySeed={session?.user?.email || profile.name || ''}
+        />
+      </div>
     </div>
   );
 }
