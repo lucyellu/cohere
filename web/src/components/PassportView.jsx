@@ -7,6 +7,12 @@ import {
   readVisas,
   readEntries,
   readStubs,
+  readTrash,
+  restoreFromTrash,
+  deleteFromTrash,
+  emptyTrash,
+  findDuplicateStubs,
+  deduplicateStubs,
   readProfile,
   writeProfile,
   resyncTokens,
@@ -17,6 +23,8 @@ import {
   mergeState,
   writeLocalState,
   setCloudSync,
+  exportJson,
+  importJson,
 } from '../account.js';
 import { supabase, supabaseEnabled } from '../live/supabase.js';
 import { readArtMap, generateArtFor } from './passport/passportArt.js';
@@ -34,9 +42,14 @@ export default function PassportView({ onOpenCity }) {
   const [entries, setEntries] = useState(() => readEntries());
   const [stubs, setStubs] = useState(() => readStubs());
   const [profile, setProfile] = useState(() => readProfile());
+  const [trash, setTrash] = useState(() => readTrash());
+  const [dupCount, setDupCount] = useState(() => findDuplicateStubs().reduce((n, g) => n + g.length - 1, 0));
   const [art, setArt] = useState(() => readArtMap());
   const [genId, setGenId] = useState(null);
+  const [importMsg, setImportMsg] = useState('');
+  const importRef = useRef(null);
   const [session, setSession] = useState(null);
+  const [sessionLoading, setSessionLoading] = useState(true);
   const [email, setEmail] = useState('');
   const [authMessage, setAuthMessage] = useState('');
   const [syncMessage, setSyncMessage] = useState('');
@@ -51,6 +64,8 @@ export default function PassportView({ onOpenCity }) {
       setEntries(readEntries());
       setStubs(readStubs());
       setProfile(readProfile());
+      setTrash(readTrash());
+      setDupCount(findDuplicateStubs().reduce((n, g) => n + g.length - 1, 0));
     }
     window.addEventListener(HISTORY_EVENT, refresh);
     resyncTokens(); // re-attempt signing for anything still "pending"
@@ -70,12 +85,15 @@ export default function PassportView({ onOpenCity }) {
   }
 
   useEffect(() => {
-    if (!supabase) return undefined;
+    if (!supabase) { setSessionLoading(false); return undefined; }
     let alive = true;
     supabase.auth.getSession().then(({ data }) => {
-      if (alive) setSession(data.session || null);
+      if (alive) { setSession(data.session || null); setSessionLoading(false); }
     });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => setSession(nextSession));
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      setSessionLoading(false);
+    });
     return () => {
       alive = false;
       sub?.subscription?.unsubscribe?.();
@@ -122,6 +140,38 @@ export default function PassportView({ onOpenCity }) {
     } finally {
       setExporting('');
     }
+  }
+
+  function doExportJson() {
+    const blob = new Blob([exportJson()], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const slug = (profile.name || 'guest').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'guest';
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `cohear-passport-${slug}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleImportFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        importJson(ev.target.result);
+        setImportMsg('Passport restored successfully.');
+      } catch (err) {
+        setImportMsg(err.message);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  }
+
+  function handleDeduplicate() {
+    const n = deduplicateStubs();
+    setImportMsg(n > 0 ? `Removed ${n} duplicate ${n === 1 ? 'stub' : 'stubs'} — check Recently deleted to restore any you want back.` : 'No duplicates found.');
   }
 
   async function sendMagicLink(e) {
@@ -199,6 +249,62 @@ export default function PassportView({ onOpenCity }) {
     claimStamp(item);
   }
 
+  const isLoggedIn = !supabaseEnabled || (session?.user && !session.user.is_anonymous);
+
+  if (supabaseEnabled && sessionLoading) {
+    return <div className="grid min-h-64 place-items-center text-sm text-zinc-600">Loading…</div>;
+  }
+
+  if (!isLoggedIn) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-8 py-16">
+        <div className="text-center">
+          <div className="mb-3 text-5xl">🛂</div>
+          <h2 className="text-2xl font-bold text-white">Your concert passport</h2>
+          <p className="mt-2 max-w-sm text-sm leading-6 text-zinc-400">
+            Sign in to collect visas, entry stamps, and ticket stubs as you explore live rooms and discover shows.
+          </p>
+        </div>
+
+        <div className="cohear-panel w-full max-w-sm p-6">
+          <form onSubmit={sendMagicLink} className="space-y-3">
+            <input
+              className="cohear-input"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Email address"
+              autoFocus
+            />
+            <button className="cohear-primary w-full justify-center" disabled={!email.trim()}>
+              Email sign-in link
+            </button>
+            {authMessage && (
+              <p className="text-center text-xs leading-5 text-zinc-400">{authMessage}</p>
+            )}
+          </form>
+          <p className="mt-4 text-center text-xs text-zinc-600">
+            We'll send a magic link — no password needed.
+          </p>
+        </div>
+
+        <div className="grid max-w-md grid-cols-3 gap-4 text-center">
+          {[
+            { icon: '🌍', label: 'Country visas', desc: 'One per country you visit' },
+            { icon: '📬', label: 'Entry stamps', desc: 'City + date, every show' },
+            { icon: '🎟', label: 'Ticket stubs', desc: 'Minted when you listen' },
+          ].map(({ icon, label, desc }) => (
+            <div key={label} className="rounded-xl border border-white/10 bg-white/5 p-4">
+              <div className="text-2xl">{icon}</div>
+              <div className="mt-2 text-xs font-semibold text-white">{label}</div>
+              <div className="mt-1 text-xs text-zinc-500">{desc}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
       {/* Toolbar */}
@@ -207,7 +313,17 @@ export default function PassportView({ onOpenCity }) {
           <h2 className="text-lg font-semibold text-white">Your passport</h2>
           <p className="text-xs text-zinc-500">Visas, stamps and tickets — collected automatically as you go.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          {dupCount > 0 && (
+            <button className="cohear-secondary text-amber-300" onClick={handleDeduplicate} title="Remove duplicate stubs (same artist + date)">
+              Remove {dupCount} duplicate{dupCount !== 1 ? 's' : ''}
+            </button>
+          )}
+          <button className="cohear-secondary" onClick={doExportJson} title="Download a JSON backup you can restore from">⬇ JSON backup</button>
+          <label className="cohear-secondary cursor-pointer" title="Restore from a previously downloaded JSON backup">
+            ↑ Restore backup
+            <input ref={importRef} type="file" accept=".json,application/json" className="sr-only" onChange={handleImportFile} />
+          </label>
           <button className="cohear-secondary" onClick={() => doExport('png')} disabled={Boolean(exporting)} title="Download your passport as a PNG image">
             {exporting === 'png' ? 'Exporting…' : '⬇ PNG'}
           </button>
@@ -215,7 +331,9 @@ export default function PassportView({ onOpenCity }) {
             {exporting === 'pdf' ? 'Exporting…' : '⬇ PDF'}
           </button>
         </div>
-        {exportMsg && <p className="w-full text-right text-xs text-amber-300/80">{exportMsg}</p>}
+        {(exportMsg || importMsg) && (
+          <p className="w-full text-right text-xs text-amber-300/80">{importMsg || exportMsg}</p>
+        )}
       </div>
 
       {/* Identity + account */}
@@ -351,6 +469,42 @@ export default function PassportView({ onOpenCity }) {
           )}
         </div>
       </section>
+
+      {/* Recently deleted */}
+      {trash.length > 0 && (
+        <section className="cohear-panel overflow-hidden">
+          <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+            <div>
+              <h3 className="text-sm font-semibold text-white">Recently deleted</h3>
+              <p className="text-xs text-zinc-500">Items are permanently removed after 30 days.</p>
+            </div>
+            <button className="cohear-secondary text-xs text-red-400" onClick={() => { emptyTrash(); setTrash([]); }}>
+              Empty trash
+            </button>
+          </div>
+          <div className="divide-y divide-white/5">
+            {trash.map((item) => {
+              const record = item.history || item.stub || item.entries?.[0];
+              const daysLeft = Math.max(0, Math.ceil((new Date(item.deletedAt).getTime() + 30 * 24 * 60 * 60 * 1000 - Date.now()) / (24 * 60 * 60 * 1000)));
+              return (
+                <div key={item.concertId} className="flex items-center justify-between gap-3 px-5 py-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold text-zinc-300">{record?.artist || record?.venue || item.concertId}</div>
+                    <div className="mt-0.5 text-xs text-zinc-600">
+                      {[record?.venue, record?.city, record?.date].filter(Boolean).join(' · ')}
+                      {' '}· deleted {new Date(item.deletedAt).toLocaleDateString()} · {daysLeft}d left
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <button className="cohear-primary min-h-8 px-2.5 text-xs" onClick={() => restoreFromTrash(item.concertId)}>Restore</button>
+                    <button className="cohear-secondary min-h-8 px-2.5 text-xs text-red-400" onClick={() => deleteFromTrash(item.concertId)} title="Delete permanently">✕</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* Off-screen export sheet — the source for PNG / PDF downloads. */}
       <div aria-hidden="true" style={{ position: 'fixed', top: 0, left: -99999, width: 860, pointerEvents: 'none', zIndex: -1 }}>

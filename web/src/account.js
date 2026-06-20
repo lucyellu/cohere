@@ -6,6 +6,8 @@ const ENTRIES_KEY = 'cohear_passport_entries_v1';
 const STUBS_KEY = 'cohear_ticket_stubs_v1';
 const OPTOUT_KEY = 'cohear_passport_optout_v1';
 const PROFILE_KEY = 'cohear_passport_profile_v1';
+const TRASH_KEY = 'cohear_passport_trash_v1';
+const TRASH_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 // --- Real-world-ish visa rules ------------------------------------------------
 // Bundled static reference data (no API): typical tourist-visa terms per country
@@ -129,6 +131,110 @@ export function readStubs() { return readArray(STUBS_KEY); }
 export function readOptOut() { return readArray(OPTOUT_KEY); }
 export function isOptedOut(id) { return id ? readOptOut().includes(id) : false; }
 
+// --- Trash (soft-delete, 30-day window) ---------------------------------------
+export function readTrash() {
+  const cutoff = Date.now() - TRASH_TTL_MS;
+  return readArray(TRASH_KEY).filter((t) => new Date(t.deletedAt).getTime() > cutoff);
+}
+
+function writeTrash(items) {
+  writeArray(TRASH_KEY, items.slice(0, 200));
+}
+
+// Move a concert and all its associated records into the trash instead of
+// hard-deleting them. The caller (optOutConcert) still removes them from the
+// active arrays and reconciles visas — this just keeps a recoverable snapshot.
+function pushToTrash(concert) {
+  const concertId = concert.id;
+  const histItem = readHistory().find((h) => h.id === concertId) || null;
+  const stubItem = readStubs().find((s) => s.id === concertId) || null;
+  const entryItems = readEntries().filter((e) => e.concertId === concertId);
+  const trashEntry = {
+    concertId,
+    deletedAt: new Date().toISOString(),
+    history: histItem,
+    stub: stubItem,
+    entries: entryItems,
+    country: histItem?.country || entryItems[0]?.country || concert.country || '',
+  };
+  writeTrash([trashEntry, ...readTrash().filter((t) => t.concertId !== concertId)]);
+}
+
+export function restoreFromTrash(concertId) {
+  const trash = readTrash();
+  const item = trash.find((t) => t.concertId === concertId);
+  if (!item) return;
+
+  // Restore history record
+  if (item.history) {
+    const hist = readHistory();
+    if (!hist.find((h) => h.id === concertId)) {
+      writeArray(HISTORY_KEY, [item.history, ...hist]);
+    }
+  }
+  // Restore ticket stub
+  if (item.stub) {
+    const stubs = readStubs();
+    if (!stubs.find((s) => s.id === concertId)) {
+      writeArray(STUBS_KEY, [item.stub, ...stubs]);
+    }
+  }
+  // Restore entry stamps
+  if (item.entries?.length) {
+    const entries = readEntries();
+    const existing = new Set(entries.map((e) => e.id));
+    const toAdd = item.entries.filter((e) => !existing.has(e.id));
+    if (toAdd.length) writeArray(ENTRIES_KEY, [...toAdd, ...entries]);
+  }
+  // Re-issue visa (idempotent — skips if country already has a visa)
+  if (item.history || item.entries?.[0]) {
+    issueVisa(item.history || item.entries[0]);
+  }
+  // Clear from optout and trash
+  const list = readOptOut();
+  if (list.includes(concertId)) writeArray(OPTOUT_KEY, list.filter((x) => x !== concertId));
+  writeTrash(trash.filter((t) => t.concertId !== concertId));
+  emitHistoryChanged();
+}
+
+export function deleteFromTrash(concertId) {
+  writeTrash(readTrash().filter((t) => t.concertId !== concertId));
+  emitHistoryChanged();
+}
+
+export function emptyTrash() {
+  writeTrash([]);
+  emitHistoryChanged();
+}
+
+// Find stubs that appear to be duplicates: same artist + date, different id.
+// Returns an array of groups where each group is [keepStub, ...dupStubs].
+export function findDuplicateStubs() {
+  const stubs = readStubs();
+  const groups = new Map();
+  for (const stub of stubs) {
+    const key = `${slug(stub.artist || '')}|${stub.date || ''}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(stub);
+  }
+  return [...groups.values()]
+    .filter((g) => g.length > 1)
+    .map((g) => g.sort((a, b) => String(b.issuedAt || '').localeCompare(String(a.issuedAt || ''))));
+}
+
+// Remove duplicate stubs (keeping newest per artist+date), moving the extras to trash.
+export function deduplicateStubs() {
+  const groups = findDuplicateStubs();
+  let removed = 0;
+  for (const [, ...dups] of groups) {
+    for (const dup of dups) {
+      optOutConcert(dup); // soft-deletes (pushes to trash internally)
+      removed += 1;
+    }
+  }
+  return removed;
+}
+
 // Editable passport identity (display name + chosen home city/avatar tint).
 export function readProfile() {
   try {
@@ -151,12 +257,12 @@ function clearOptOut(id) {
   writeArray(OPTOUT_KEY, list.filter((x) => x !== id));
 }
 
-// "I was never here" — opt out and scrub every trace of the show: history,
-// ticket stub, the city's entry stamp for that date, and the country visa if no
-// other entries remain under it.
+// Soft-delete: move all traces of the show to the trash (recoverable for 30 days),
+// then scrub from the active arrays and update optout so it won't auto-re-stamp.
 export function optOutConcert(input) {
   const concert = normalizeConcert(input);
   if (!concert.id) return;
+  pushToTrash(concert); // snapshot before removing
   const list = readOptOut();
   if (!list.includes(concert.id)) writeArray(OPTOUT_KEY, [concert.id, ...list]);
   writeArray(HISTORY_KEY, readHistory().filter((item) => item.id !== concert.id));
@@ -178,10 +284,14 @@ export function recordConcertAction(input, action = 'viewed', meta = {}) {
   if (isOptedOut(concert.id)) return null; // respects "I was never here"
   const now = new Date().toISOString();
   const history = readHistory();
-  const prev = history.find((item) => item.id === concert.id);
+  const prev = history.find((item) => item.id === concert.id)
+    || (concert.artist && concert.date
+      ? history.find((item) => slug(item.artist || '') === slug(concert.artist) && item.date === concert.date)
+      : null);
   const entry = {
     ...(prev || {}),
     ...concert,
+    id: prev?.id || concert.id, // keep the original id if merging into an existing record
     firstViewedAt: prev?.firstViewedAt || now,
     lastViewedAt: now,
     status: attendedAction(action) ? 'attended' : (prev?.status || 'visited'),
@@ -189,7 +299,7 @@ export function recordConcertAction(input, action = 'viewed', meta = {}) {
     source: meta.source || prev?.source || concert.source || 'cohear',
   };
   if (attendedAction(action)) entry.attendedAt = prev?.attendedAt || now;
-  writeArray(HISTORY_KEY, [entry, ...history.filter((item) => item.id !== concert.id)]);
+  writeArray(HISTORY_KEY, [entry, ...history.filter((item) => item.id !== entry.id)]);
   emitHistoryChanged();
   return entry;
 }
@@ -303,7 +413,10 @@ export function issueTicketStub(input) {
   const concert = normalizeConcert(input);
   if (!concert.id || isOptedOut(concert.id)) return null;
   const stubs = readStubs();
-  const prev = stubs.find((stub) => stub.id === concert.id);
+  const prev = stubs.find((stub) => stub.id === concert.id)
+    || (concert.artist && concert.date
+      ? stubs.find((stub) => slug(stub.artist || '') === slug(concert.artist) && stub.date === concert.date)
+      : null);
   if (prev) return prev;
   // Prefer the richer history record (carries status/capacity) if we have it.
   const record = readHistory().find((h) => h.id === concert.id) || concert;
@@ -673,6 +786,25 @@ export function mergeState(local = {}, remote = {}) {
     history: mergeById(local.history, remote.history, ['lastViewedAt', 'firstViewedAt']),
     optout: [...new Set([...(local.optout || []), ...(remote.optout || [])])],
   };
+}
+
+// --- JSON backup / restore ----------------------------------------------------
+export function exportJson() {
+  return JSON.stringify({ ...snapshotLocal(), exportedAt: new Date().toISOString(), version: 1 }, null, 2);
+}
+
+export function importJson(json) {
+  let parsed;
+  try { parsed = JSON.parse(json); } catch { throw new Error('Invalid JSON file'); }
+  if (!parsed || typeof parsed !== 'object') throw new Error('Unrecognised backup format');
+  // Accept any object that has at least one recognisable passport key.
+  const known = ['history', 'visas', 'entries', 'stubs', 'profile', 'optout'];
+  if (!known.some((k) => Array.isArray(parsed[k]) || (k === 'profile' && parsed[k]))) {
+    throw new Error('File does not appear to be a Cohear passport backup');
+  }
+  // Merge rather than replace so importing never loses local stamps.
+  const merged = mergeState(snapshotLocal(), parsed);
+  writeLocalState(merged);
 }
 
 function readArray(key) {
