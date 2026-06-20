@@ -25,6 +25,7 @@ import VisaCard from './passport/VisaCard.jsx';
 import EntryStamp from './passport/EntryStamp.jsx';
 import TicketStub from './passport/TicketStub.jsx';
 import ExportSheet from './passport/ExportSheet.jsx';
+import PassportMap from './passport/PassportMap.jsx';
 import { exportPng, exportPdf } from './passport/passportExport.js';
 
 export default function PassportView({ onOpenCity }) {
@@ -264,6 +265,9 @@ export default function PassportView({ onOpenCity }) {
           </p>
         </div>
       </section>
+
+      {/* Chronological journey map */}
+      {entries.length > 0 && <PassportMap entries={entries} home={home} />}
 
       {/* Visas */}
       <PageSection title="Visas" caption={`${visas.length} ${visas.length === 1 ? 'country' : 'countries'}`}>

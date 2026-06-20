@@ -8,6 +8,7 @@ import ConcertsView from './components/ConcertsView.jsx';
 import SettingsDrawer from './components/SettingsDrawer.jsx';
 import PassportView from './components/PassportView.jsx';
 import CityView from './components/CityView.jsx';
+import AccountButton from './components/AccountButton.jsx';
 import { readSettings, writeSettings } from './settings.js';
 import { recordConcertAction, autoStampOnView } from './account.js';
 
@@ -91,6 +92,8 @@ export default function App() {
                 Browse concerts
               </button>
             </div>
+
+            <AccountButton />
 
             <button className="cohear-icon-button" onClick={() => setSettingsOpen(true)} aria-label="Open settings" title="Settings">
               <GearIcon />

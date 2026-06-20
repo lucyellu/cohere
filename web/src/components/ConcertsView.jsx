@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fetchConcerts, getCachedConcerts, filterWhen, spotifyArtist, ticketmasterMatch, ticketWebEstimate, C_SORTS, defaultDir } from '../concerts.js';
 import { fmtCapacity, fmtDate } from '../tour.js';
 import { loadGoogleMaps, hasMapsKey } from '../live/maps.js';
+import { GOOGLE_PAPER_MAP } from '../live/mapStyle.js';
 import { claimStamp, optOutConcert, recordConcertAction, personalStats, backfillStubs, HISTORY_EVENT } from '../account.js';
 
 const VIEW_MODES = [
@@ -873,6 +874,7 @@ function ConcertMap({ rows, selectedId, onSelect }) {
   const [mapReady, setMapReady] = useState(false);
   const [showLabels, setShowLabels] = useState(false);
   const [trailArtist, setTrailArtist] = useState('');
+  const [mapType, setMapType] = useState('paper');
   const mappable = rows.filter((c) => c.lat != null && c.lng != null);
   const artists = useMemo(() => [...new Set(mappable.map((c) => c.artist).filter(Boolean))].sort((a, b) => a.localeCompare(b)), [mappable]);
   const trailRows = useMemo(() => {
@@ -895,8 +897,8 @@ function ConcertMap({ rows, selectedId, onSelect }) {
           disableDefaultUI: true,
           zoomControl: true,
           gestureHandling: 'greedy',
-          backgroundColor: '#09090b',
-          styles: GOOGLE_DARK_MAP,
+          backgroundColor: '#a9c4cc',
+          styles: GOOGLE_PAPER_MAP,
         });
         stateRef.current.map = map;
         setMapReady(true);
@@ -919,6 +921,15 @@ function ConcertMap({ rows, selectedId, onSelect }) {
     };
   }, []);
 
+  // Switch between the paper-styled roadmap, satellite, and terrain views.
+  useEffect(() => {
+    const { map } = stateRef.current;
+    if (!map) return;
+    if (mapType === 'satellite') { map.setMapTypeId('hybrid'); map.setOptions({ styles: [] }); }
+    else if (mapType === 'terrain') { map.setMapTypeId('terrain'); map.setOptions({ styles: [] }); }
+    else { map.setMapTypeId('roadmap'); map.setOptions({ styles: GOOGLE_PAPER_MAP }); }
+  }, [mapType, mapReady]);
+
   useEffect(() => {
     const { map, maps, markers } = stateRef.current;
     if (!map || !maps) return;
@@ -937,10 +948,10 @@ function ConcertMap({ rows, selectedId, onSelect }) {
       const icon = {
         path: maps.SymbolPath.CIRCLE,
         scale: c.id === selectedId ? scale + 4 : scale,
-        fillColor: c.id === selectedId ? '#67e8f9' : '#fbbf24',
-        fillOpacity: c.id === selectedId ? 0.95 : 0.74,
-        strokeColor: '#ffffff',
-        strokeWeight: c.id === selectedId ? 2 : 0.8,
+        fillColor: c.id === selectedId ? '#0ea5b7' : '#e0922b',
+        fillOpacity: c.id === selectedId ? 0.95 : 0.85,
+        strokeColor: mapType === 'paper' ? '#5b4a2a' : '#ffffff',
+        strokeWeight: c.id === selectedId ? 2 : 1,
       };
       let marker = markers.get(c.id);
       if (!marker) {
@@ -950,7 +961,7 @@ function ConcertMap({ rows, selectedId, onSelect }) {
       }
       marker.setPosition(position);
       marker.setIcon(icon);
-      marker.setLabel(showLabels ? { text: shortLabel(c.artist || c.venue), color: '#f4f4f5', fontSize: '11px', fontWeight: '700' } : null);
+      marker.setLabel(showLabels ? { text: shortLabel(c.artist || c.venue), color: mapType === 'paper' ? '#3a2e16' : '#f4f4f5', fontSize: '11px', fontWeight: '700' } : null);
       marker.setZIndex(c.id === selectedId ? 1000 : 1);
     }
     for (const trail of stateRef.current.trails) trail.setMap(null);
@@ -981,7 +992,7 @@ function ConcertMap({ rows, selectedId, onSelect }) {
       map.fitBounds(bounds, 72);
       stateRef.current.fittedKey = fittedKey;
     }
-  }, [mappable, onSelect, routeSegments, selectedId, showLabels]);
+  }, [mappable, onSelect, routeSegments, selectedId, showLabels, mapType]);
 
   useEffect(() => {
     const { map } = stateRef.current;
@@ -1000,6 +1011,8 @@ function ConcertMap({ rows, selectedId, onSelect }) {
         trailArtist={trailArtist}
         setTrailArtist={setTrailArtist}
         artists={artists}
+        mapType={mapType}
+        setMapType={setMapType}
         fallbackReason={err}
       >
         <FallbackMap rows={mappable} selectedId={selectedId} onSelect={onSelect} showLabels={showLabels} trailRows={trailRows} routeSegments={routeSegments} />
@@ -1015,12 +1028,14 @@ function ConcertMap({ rows, selectedId, onSelect }) {
       trailArtist={trailArtist}
       setTrailArtist={setTrailArtist}
       artists={artists}
+      mapType={mapType}
+      setMapType={setMapType}
     >
       <div className="relative">
-        <div ref={mapRef} aria-label="Concert location map" className="h-[620px] w-full bg-zinc-950" />
+        <div ref={mapRef} aria-label="Concert location map" className="h-[620px] w-full bg-[#e9ddc0]" />
         {!mapReady && (
-          <div className="pointer-events-none absolute inset-0 grid place-items-center bg-zinc-950/80 text-sm text-zinc-400">
-            Loading Google Maps...
+          <div className="pointer-events-none absolute inset-0 grid place-items-center bg-[#f1e7d0]/80 text-sm text-black/60">
+            Unrolling the map…
           </div>
         )}
       </div>
@@ -1028,7 +1043,9 @@ function ConcertMap({ rows, selectedId, onSelect }) {
   );
 }
 
-function MapShell({ children, count, showLabels, setShowLabels, trailArtist, setTrailArtist, artists, fallbackReason }) {
+const MAP_TYPES = [{ id: 'paper', label: 'Paper' }, { id: 'satellite', label: 'Satellite' }, { id: 'terrain', label: 'Terrain' }];
+
+function MapShell({ children, count, showLabels, setShowLabels, trailArtist, setTrailArtist, artists, mapType, setMapType, fallbackReason }) {
   const reasonText = fallbackReason
     ? fallbackReason === 'missing-key'
       ? 'Google Maps key is missing, so Cohere is showing its built-in coordinate map.'
@@ -1042,6 +1059,19 @@ function MapShell({ children, count, showLabels, setShowLabels, trailArtist, set
           <p className="mt-1 text-xs text-zinc-500">{reasonText}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {setMapType && !fallbackReason && (
+            <div className="flex overflow-hidden rounded-lg border border-white/10">
+              {MAP_TYPES.map((t) => (
+                <button
+                  key={t.id}
+                  className={`px-3 py-2 text-xs font-semibold ${mapType === t.id ? 'bg-amber-300/[0.16] text-amber-100' : 'bg-black/20 text-zinc-400 hover:text-zinc-100'}`}
+                  onClick={() => setMapType(t.id)}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          )}
           <button
             className={`rounded-lg border px-3 py-2 text-xs font-semibold ${showLabels ? 'border-cyan-300/40 bg-cyan-300/[0.12] text-cyan-100' : 'border-white/10 bg-black/20 text-zinc-400 hover:text-zinc-100'}`}
             onClick={() => setShowLabels((v) => !v)}
@@ -1775,13 +1805,3 @@ function RefreshIcon({ spinning }) {
   );
 }
 
-const GOOGLE_DARK_MAP = [
-  { elementType: 'geometry', stylers: [{ color: '#17191f' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#a1a1aa' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#09090b' }] },
-  { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#3f3f46' }] },
-  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#27272a' }] },
-  { featureType: 'road', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
-];
