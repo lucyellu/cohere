@@ -308,6 +308,76 @@ button:disabled {
   box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.22);
 }
 
+/* Live room — a tiled dashboard of independently resizable panels. */
+.cohear-live-grid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.cohear-room-panel {
+  flex: 0 0 auto;
+  resize: both;
+  overflow: auto;
+  min-width: 280px;
+  min-height: 220px;
+  max-width: 100%;
+}
+
+/* Ticket stub — a tear-off admission ticket collectible. */
+.cohear-ticket-stub {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px;
+  align-items: stretch;
+  border: 1px solid rgba(34, 211, 238, 0.28);
+  border-radius: 10px;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, rgba(34, 211, 238, 0.08), rgba(0, 0, 0, 0.25)),
+    rgba(255, 255, 255, 0.02);
+}
+
+.cohear-ticket-main {
+  padding: 0.9rem 1rem;
+}
+
+/* Perforated tear-off line between the ticket body and its stub. */
+.cohear-ticket-stub-end {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 0.6rem 0.35rem;
+  text-align: center;
+  border-left: 2px dashed rgba(34, 211, 238, 0.4);
+  background: rgba(0, 0, 0, 0.22);
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgb(165 243 252);
+}
+
+.cohear-ticket-barcode {
+  height: 26px;
+  width: 100%;
+  margin-top: 0.6rem;
+  border-radius: 2px;
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgba(228, 228, 231, 0.85) 0,
+    rgba(228, 228, 231, 0.85) 1px,
+    transparent 1px,
+    transparent 3px,
+    rgba(228, 228, 231, 0.85) 3px,
+    rgba(228, 228, 231, 0.85) 6px,
+    transparent 6px,
+    transparent 8px
+  );
+}
+
 .cohear-link {
   color: rgb(165 243 252);
   font-size: 0.875rem;
@@ -341,5 +411,13 @@ button:disabled {
 
   .cohear-resize-handle {
     display: none;
+  }
+
+  /* Stack panels and ignore saved desktop sizes on narrow screens. */
+  .cohear-room-panel {
+    width: 100% !important;
+    height: auto !important;
+    resize: none;
+    overflow: visible;
   }
 }

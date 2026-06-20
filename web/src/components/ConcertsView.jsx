@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fetchConcerts, getCachedConcerts, filterWhen, spotifyArtist, ticketmasterMatch, ticketWebEstimate, C_SORTS, defaultDir } from '../concerts.js';
 import { fmtCapacity, fmtDate } from '../tour.js';
 import { loadGoogleMaps, hasMapsKey } from '../live/maps.js';
-import { claimStamp, markAttended, recordConcertAction } from '../account.js';
+import { claimStamp, optOutConcert, recordConcertAction } from '../account.js';
 
 const VIEW_MODES = [
   { id: 'list', label: 'List' },
@@ -806,11 +806,11 @@ function ConcertInspector({ concert, saved, sources, userZone, currency, now, on
 
         <div className="grid gap-2">
           <div className="grid grid-cols-2 gap-2">
-            <button className="cohear-secondary w-full justify-center" onClick={() => markAttended(concert)}>
-              I was here
-            </button>
             <button className="cohear-secondary w-full justify-center" onClick={() => claimStamp(concert)}>
               Claim stamp
+            </button>
+            <button className="cohear-secondary w-full justify-center" onClick={() => optOutConcert(concert)} title="Remove this show from your passport">
+              I was never here
             </button>
           </div>
           {onEnterShow && (

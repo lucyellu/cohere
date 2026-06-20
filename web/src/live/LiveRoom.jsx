@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { getEvent, getWeather } from './liveApi.js';
 import { syncClock, syncedNow, nowPlaying, fmtClock, setWarpTo, clearWarp } from './clock.js';
 import { usePresence } from './presence.js';
 import { usePlayer } from './player.jsx';
+import { autoStampOnView, claimTicketStub } from '../account.js';
 import VenueMap from './VenueMap.jsx';
 import NowPlaying from './NowPlaying.jsx';
 import MoodBar from './MoodBar.jsx';
@@ -20,12 +21,27 @@ export default function LiveRoom({ event: initial, onBack }) {
   const [, tick] = useState(0); // force re-render each second
   const [synced, setSynced] = useState(false);
   const [panelOrder, setPanelOrder] = useState(() => readPanelOrder());
+  const [resetNonce, setResetNonce] = useState(0);
   const { count: presenceCount } = usePresence(event.id);
+  const player = usePlayer();
+  const sizeStore = useMemo(() => createSizeStore(), []);
 
   // 1) Clock handshake, once.
   useEffect(() => {
     syncClock().then(() => setSynced(true));
   }, []);
+
+  // Seeing the room stamps the passport by default (idempotent per show).
+  useEffect(() => {
+    autoStampOnView(event);
+  }, [event.id]);
+
+  // Listen to at least one song while here → mint a ticket stub. The persistent
+  // player can still hold a track from another room, so match the artist first.
+  useEffect(() => {
+    const t = player?.track;
+    if (t?.videoId && sameArtist(t.artist, event.artist)) claimTicketStub(event);
+  }, [player?.track?.videoId, event.id]);
 
   // 2) Poll the room (live setlist swap + duration refinement + crowd clips).
   useEffect(() => {
@@ -70,6 +86,13 @@ export default function LiveRoom({ event: initial, onBack }) {
     });
   }
 
+  function resetPanels() {
+    localStorage.removeItem('cohear_live_panel_order');
+    sizeStore.clear();
+    setPanelOrder(['video', 'lyrics', 'setlist', 'map', 'social']);
+    setResetNonce((n) => n + 1); // re-applies default size to every panel
+  }
+
   const panelIndex = useMemo(() => Object.fromEntries(panelOrder.map((id, i) => [id, i])), [panelOrder]);
 
   return (
@@ -95,13 +118,22 @@ export default function LiveRoom({ event: initial, onBack }) {
       {/* Accuracy / source bar — honest about prediction vs real setlist */}
       <AccuracyBar event={event} presenceCount={presenceCount} synced={synced} />
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(280px,.85fr)_minmax(280px,.85fr)]">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs text-zinc-600">Drag any panel's bottom-right corner to resize · use the arrows to reorder.</p>
+        <button onClick={resetPanels} className="cohear-secondary min-h-8 px-3 text-xs" title="Restore default panel layout">
+          ⤢ Reset panels
+        </button>
+      </div>
+
+      <div className="cohear-live-grid">
         <RoomPanel
           id="video"
           title="Video"
           subtitle="Shared YouTube surface for the selected song"
           order={panelIndex.video}
           onMove={movePanel}
+          sizeStore={sizeStore}
+          resetNonce={resetNonce}
         >
           <LiveVideoPanel event={event} np={np} />
           <NowPlaying np={np} event={event} syncedNow={now} />
@@ -119,6 +151,8 @@ export default function LiveRoom({ event: initial, onBack }) {
           subtitle={np.song ? np.song : 'Current-song lyrics'}
           order={panelIndex.lyrics}
           onMove={movePanel}
+          sizeStore={sizeStore}
+          resetNonce={resetNonce}
         >
           {np.song ? (
             <Lyrics artist={event.artist} song={np.song} />
@@ -133,6 +167,8 @@ export default function LiveRoom({ event: initial, onBack }) {
           subtitle="Predicted timing, current song, and quick play"
           order={panelIndex.setlist}
           onMove={movePanel}
+          sizeStore={sizeStore}
+          resetNonce={resetNonce}
         >
           <SetlistTimeline event={event} np={np} />
         </RoomPanel>
@@ -143,6 +179,8 @@ export default function LiveRoom({ event: initial, onBack }) {
           subtitle={`${event.venue} · ${event.city}`}
           order={panelIndex.map}
           onMove={movePanel}
+          sizeStore={sizeStore}
+          resetNonce={resetNonce}
         >
           <div className="aspect-[4/3] w-full overflow-hidden rounded-xl border border-white/10 xl:aspect-square">
             <VenueMap venue={event.venue} city={event.city} lat={event.lat} lng={event.lng} live={isLive} viewers={presenceCount != null ? presenceCount : null} />
@@ -156,6 +194,8 @@ export default function LiveRoom({ event: initial, onBack }) {
           subtitle="YouTube, TikTok, Instagram, X, and crowd links"
           order={panelIndex.social}
           onMove={movePanel}
+          sizeStore={sizeStore}
+          resetNonce={resetNonce}
         >
           <FanWall event={event} np={np} clips={event.clips || []} onClipsChanged={async () => {
             const fresh = await getEvent(event.id);
@@ -187,9 +227,77 @@ function EmptyPanelText({ children }) {
   return <p className="rounded-xl border border-white/10 bg-black/20 p-4 text-sm leading-6 text-zinc-500">{children}</p>;
 }
 
-function RoomPanel({ id, title, subtitle, order, onMove, children }) {
+// Per-panel saved widths/heights, persisted to localStorage. Applied
+// imperatively (not via React state) so the 1/sec clock re-render never
+// snaps a panel back while the user is dragging its corner.
+const PANEL_DEFAULT_SIZE = {
+  video: { w: 600, h: 560 },
+  lyrics: { w: 430, h: 560 },
+  setlist: { w: 430, h: 560 },
+  map: { w: 430, h: 560 },
+  social: { w: 470, h: 560 },
+};
+
+function createSizeStore() {
+  const KEY = 'cohear_live_panel_sizes';
+  const read = () => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(KEY) || '{}');
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
+    }
+  };
+  return {
+    get(id) {
+      return read()[id] || PANEL_DEFAULT_SIZE[id] || { w: 440, h: 540 };
+    },
+    save(id, w, h) {
+      const all = read();
+      const prev = all[id];
+      if (prev && Math.abs(prev.w - w) < 2 && Math.abs(prev.h - h) < 2) return;
+      all[id] = { w, h };
+      localStorage.setItem(KEY, JSON.stringify(all));
+    },
+    clear() {
+      localStorage.removeItem(KEY);
+    },
+  };
+}
+
+function sameArtist(a, b) {
+  const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const x = norm(a);
+  const y = norm(b);
+  return Boolean(x && y && (x === y || x.includes(y) || y.includes(x)));
+}
+
+function RoomPanel({ id, title, subtitle, order, onMove, sizeStore, resetNonce, children }) {
+  const ref = useRef(null);
+
+  // Apply the saved (or default) size on mount and whenever the layout is reset,
+  // then persist any user drag via a ResizeObserver.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !sizeStore) return undefined;
+    const { w, h } = sizeStore.get(id);
+    el.style.width = `${w}px`;
+    el.style.height = `${h}px`;
+
+    let raf = 0;
+    const ro = new ResizeObserver(() => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => sizeStore.save(id, Math.round(el.offsetWidth), Math.round(el.offsetHeight)));
+    });
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      cancelAnimationFrame(raf);
+    };
+  }, [id, sizeStore, resetNonce]);
+
   return (
-    <section className="cohear-panel h-fit min-w-0 p-3" style={{ order }}>
+    <section ref={ref} className="cohear-panel cohear-room-panel min-w-0 p-3" style={{ order }}>
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-white">{title}</h3>

@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { HISTORY_EVENT, claimStamp, markAttended, readHistory, readStamps } from '../account.js';
+import { HISTORY_EVENT, claimStamp, optOutConcert, readHistory, readStamps, readStubs } from '../account.js';
 import { supabase, supabaseEnabled } from '../live/supabase.js';
 
 export default function PassportView() {
   const [history, setHistory] = useState(() => readHistory());
   const [stamps, setStamps] = useState(() => readStamps());
+  const [stubs, setStubs] = useState(() => readStubs());
   const [session, setSession] = useState(null);
   const [email, setEmail] = useState('');
   const [authMessage, setAuthMessage] = useState('');
@@ -14,6 +15,7 @@ export default function PassportView() {
     function refresh() {
       setHistory(readHistory());
       setStamps(readStamps());
+      setStubs(readStubs());
     }
     window.addEventListener(HISTORY_EVENT, refresh);
     return () => window.removeEventListener(HISTORY_EVENT, refresh);
@@ -33,10 +35,9 @@ export default function PassportView() {
   }, []);
 
   const stats = useMemo(() => {
-    const attended = history.filter((item) => item.status === 'attended').length;
     const artists = new Set(history.map((item) => item.artist).filter(Boolean)).size;
-    return { total: history.length, attended, stamps: stamps.length, artists };
-  }, [history, stamps]);
+    return { total: history.length, stamps: stamps.length, stubs: stubs.length, artists };
+  }, [history, stamps, stubs]);
 
   async function sendMagicLink(e) {
     e.preventDefault();
@@ -102,9 +103,11 @@ export default function PassportView() {
     setSyncMessage(error ? error.message : 'Synced.');
   }
 
-  function mark(item) {
-    markAttended(item);
+  function neverHere(item) {
+    optOutConcert(item);
     setHistory(readHistory());
+    setStamps(readStamps());
+    setStubs(readStubs());
   }
 
   function stamp(item) {
@@ -121,10 +124,14 @@ export default function PassportView() {
           <h2 className="mt-2 text-3xl font-semibold tracking-tight text-white md:text-4xl">Concerts you have carried with you.</h2>
           <div className="mt-5 grid gap-3 sm:grid-cols-4">
             <Metric label="Records" value={stats.total} />
-            <Metric label="I was here" value={stats.attended} tone="green" />
             <Metric label="Stamps" value={stats.stamps} tone="amber" />
+            <Metric label="Ticket stubs" value={stats.stubs} tone="cyan" />
             <Metric label="Artists" value={stats.artists} />
           </div>
+          <p className="mt-4 text-xs leading-5 text-zinc-500">
+            Seeing a live room stamps your passport automatically. Listen to a song there and you also keep the ticket stub.
+            Don't want a show on your passport? Hit <span className="text-zinc-300">I was never here</span>.
+          </p>
         </div>
 
         <div className="cohear-panel p-5">
@@ -175,8 +182,8 @@ export default function PassportView() {
                     </div>
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <span className="text-xs text-zinc-600">{item.date || 'Date TBA'}</span>
-                      <button className="cohear-secondary min-h-8 px-2.5 text-xs" onClick={() => mark(item)}>I was here</button>
                       <button className="cohear-primary min-h-8 px-2.5 text-xs" onClick={() => stamp(item)}>Claim stamp</button>
+                      <button className="cohear-secondary min-h-8 px-2.5 text-xs" onClick={() => neverHere(item)} title="Remove this show from your passport">I was never here</button>
                     </div>
                   </article>
                 ))}
@@ -200,6 +207,22 @@ export default function PassportView() {
           </div>
         </div>
       </section>
+
+      <section className="cohear-panel overflow-hidden">
+        <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+          <h3 className="text-sm font-semibold text-white">Ticket stubs</h3>
+          <span className="text-xs text-zinc-600">Kept when you listen to a song in the room</span>
+        </div>
+        <div className="p-4">
+          {!stubs.length ? (
+            <EmptyState stub />
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {stubs.map((stub) => <StubCard key={stub.serial} stub={stub} />)}
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   );
 }
@@ -214,7 +237,7 @@ function Metric({ label, value, tone }) {
   return (
     <div className="rounded-lg border border-white/10 bg-black/20 p-3">
       <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-600">{label}</div>
-      <div className={`mt-2 text-2xl font-semibold tabular-nums ${tone === 'green' ? 'text-emerald-200' : tone === 'amber' ? 'text-amber-200' : 'text-white'}`}>{value}</div>
+      <div className={`mt-2 text-2xl font-semibold tabular-nums ${tone === 'green' ? 'text-emerald-200' : tone === 'amber' ? 'text-amber-200' : tone === 'cyan' ? 'text-cyan-200' : 'text-white'}`}>{value}</div>
     </div>
   );
 }
@@ -248,14 +271,44 @@ function StampCard({ stamp }) {
   );
 }
 
-function EmptyState({ stamp }) {
+function StubCard({ stub }) {
+  const seat = stub.seat || {};
+  return (
+    <article className="cohear-ticket-stub">
+      <div className="cohear-ticket-main">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-200">Admit one</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-500">#{String(stub.edition).padStart(4, '0')}</span>
+        </div>
+        <div className="mt-2 line-clamp-2 text-lg font-black uppercase leading-tight text-white">{stub.artist || 'Concert'}</div>
+        <div className="mt-1 truncate text-xs text-zinc-400">{stub.venue || stub.city}{stub.city && stub.venue ? ` · ${stub.city}` : ''}</div>
+        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-zinc-500">
+          <span>{stub.date || 'Date TBA'}</span>
+          <span>Sec {seat.section}</span>
+          <span>Row {seat.row}</span>
+          <span>Seat {seat.seat}</span>
+          <span>Gate {seat.gate}</span>
+        </div>
+        <div className="cohear-ticket-barcode" aria-hidden="true" />
+        <div className="mt-1 truncate text-[10px] font-bold tracking-[0.14em] text-zinc-600">{stub.serial}</div>
+      </div>
+      <div className="cohear-ticket-stub-end">Cohear · Admit one</div>
+    </article>
+  );
+}
+
+function EmptyState({ stamp, stub }) {
+  const kind = stub ? 'stub' : stamp ? 'stamp' : 'record';
+  const copy = {
+    stub: { title: 'No ticket stubs yet', body: 'Join a live room and play a song — the stub lands here.' },
+    stamp: { title: 'No stamps yet', body: 'Seeing a live room stamps your passport automatically.' },
+    record: { title: 'No concert records yet', body: 'Open a concert in Discover or join a live room to start the record.' },
+  }[kind];
   return (
     <div className="grid min-h-64 place-items-center rounded-lg border border-white/10 bg-black/20 p-6 text-center">
       <div>
-        <div className="text-sm font-semibold text-white">{stamp ? 'No stamps yet' : 'No concert records yet'}</div>
-        <p className="mt-2 max-w-sm text-sm leading-6 text-zinc-500">
-          {stamp ? 'Claim stamps from concerts in your history.' : 'Open a concert in Discover or join a live room to start the record.'}
-        </p>
+        <div className="text-sm font-semibold text-white">{copy.title}</div>
+        <p className="mt-2 max-w-sm text-sm leading-6 text-zinc-500">{copy.body}</p>
       </div>
     </div>
   );

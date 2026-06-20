@@ -8,7 +8,7 @@ import ConcertsView from './components/ConcertsView.jsx';
 import SettingsDrawer from './components/SettingsDrawer.jsx';
 import PassportView from './components/PassportView.jsx';
 import { readSettings, writeSettings } from './settings.js';
-import { recordConcertAction } from './account.js';
+import { recordConcertAction, autoStampOnView } from './account.js';
 
 const NAV = [
   { id: 'discover', label: 'Discover' },
@@ -45,6 +45,7 @@ export default function App() {
     });
     if (ev) {
       recordConcertAction(ev, ev.mode === 'replay' ? 'opened_replay' : 'joined_live', { source: 'live_room' });
+      autoStampOnView(ev); // seeing the room stamps the passport by default
       setLiveEvent(ev);
       setView('live');
     }
@@ -52,6 +53,7 @@ export default function App() {
 
   function joinLandingEvent(event) {
     recordConcertAction(event, event.mode === 'replay' ? 'opened_replay' : 'joined_live', { source: 'live_landing' });
+    autoStampOnView(event); // seeing the room stamps the passport by default
     setLiveEvent(event);
   }
 
