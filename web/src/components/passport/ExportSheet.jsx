@@ -19,7 +19,7 @@ const ExportSheet = forwardRef(function ExportSheet(
   return (
     <div className="cohear-export" ref={ref}>
       <div className="cohear-export__head">
-        <span className="cohear-export__brand">✦ Cohear</span>
+        <span className="cohear-export__brand">✦ Cohere</span>
         <span className="cohear-export__brand cohear-export__brand--right">Passport</span>
       </div>
 
@@ -31,7 +31,7 @@ const ExportSheet = forwardRef(function ExportSheet(
           <div className="cohear-export__name">{name}</div>
           <div className="cohear-export__meta">
             <span><b>No.</b> {passportNo}</span>
-            <span><b>Authority</b> COHEAR</span>
+            <span><b>Authority</b> COHERE</span>
             {profile?.homeCity && <span><b>Place of issue</b> {profile.homeCity}</span>}
             <span><b>Member since</b> {memberSince || '—'}</span>
           </div>
@@ -84,7 +84,7 @@ const ExportSheet = forwardRef(function ExportSheet(
                 <div className="cohear-export__stamp-sub">✈ Admitted</div>
                 <div className="cohear-export__stamp-city">{(e.city || 'Unknown').toUpperCase()}</div>
                 <div className="cohear-export__stamp-date">{fmtStamp(e.date || e.issuedAt)}</div>
-                <div className="cohear-export__stamp-sub">Cohear Border</div>
+                <div className="cohear-export__stamp-sub">Cohere Border</div>
               </div>
             );
           })}
@@ -116,7 +116,7 @@ const ExportSheet = forwardRef(function ExportSheet(
 
       <div className="cohear-export__foot">
         <pre>{mrz(name, passportNo, stats)}</pre>
-        <div className="cohear-export__issued">Issued {issued} · Cohear — Citizen of Live Music</div>
+        <div className="cohear-export__issued">Issued {issued} · Cohere — Citizen of Live Music</div>
       </div>
     </div>
   );

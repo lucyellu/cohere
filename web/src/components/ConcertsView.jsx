@@ -1031,8 +1031,8 @@ function ConcertMap({ rows, selectedId, onSelect }) {
 function MapShell({ children, count, showLabels, setShowLabels, trailArtist, setTrailArtist, artists, fallbackReason }) {
   const reasonText = fallbackReason
     ? fallbackReason === 'missing-key'
-      ? 'Google Maps key is missing, so Cohear is showing its built-in coordinate map.'
-      : `Google Maps did not finish loading (${fallbackReason}), so Cohear is showing its built-in coordinate map.`
+      ? 'Google Maps key is missing, so Cohere is showing its built-in coordinate map.'
+      : `Google Maps did not finish loading (${fallbackReason}), so Cohere is showing its built-in coordinate map.`
     : 'Google Maps markers sized by known attendance capacity. Tour trails use solid completed legs and dashed future legs.';
   return (
     <div className="cohear-panel overflow-hidden">

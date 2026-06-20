@@ -71,11 +71,9 @@ export default function App() {
         <div className="mx-auto flex min-h-screen w-full max-w-[1480px] flex-col px-4 py-5 pb-28 sm:px-6 lg:px-8">
           <header className="cohear-topbar">
             <button className="flex min-w-0 items-center gap-3 text-left" onClick={() => setView('discover')} aria-label="Open Discover">
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-amber-200/20 bg-amber-200/10 text-sm font-black text-amber-100">
-                C
-              </span>
+              <img src="/cohere-logo.png" alt="Cohere" className="h-10 w-10 shrink-0 rounded-lg" />
               <span className="min-w-0">
-                <span className="block text-lg font-semibold tracking-tight text-white">Cohear</span>
+                <span className="block text-lg font-semibold tracking-tight text-white">Cohere</span>
                 <span className="block truncate text-xs text-zinc-500">Find the biggest concerts happening now.</span>
               </span>
             </button>
