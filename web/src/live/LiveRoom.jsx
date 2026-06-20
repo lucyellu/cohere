@@ -347,7 +347,7 @@ function LiveVideoPanel({ event, np }) {
             allowFullScreen
           />
         ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-3 bg-[radial-gradient(circle_at_50%_25%,rgba(244,63,94,.18),transparent_35%),#050505] p-6 text-center">
+          <div className="flex h-full flex-col items-center justify-center gap-3 bg-[var(--paper-2)] p-6 text-center">
             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-600">Video surface</div>
             <div className="max-w-sm text-sm text-zinc-400">
               {canPlayCurrent ? `Play the current song to load the shared video here.` : 'The video panel will load once the show reaches a song.'}

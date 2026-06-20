@@ -112,7 +112,7 @@ export default function SettingsDrawer({ open, settings, onChange, onClose }) {
   return (
     <div className="fixed inset-0 z-50">
       <button className="absolute inset-0 cursor-default bg-black/62 backdrop-blur-sm" onClick={onClose} aria-label="Close settings" />
-      <aside className="absolute right-0 top-0 flex h-full w-full max-w-3xl flex-col border-l border-white/10 bg-[#090a0d] shadow-2xl shadow-black/60">
+      <aside className="absolute right-0 top-0 flex h-full w-full max-w-3xl flex-col border-l border-white/10 bg-[var(--paper-card)] shadow-2xl shadow-black/60">
         <header className="flex items-center justify-between gap-4 border-b border-white/10 px-5 py-4">
           <div>
             <p className="cohear-label">Settings</p>

@@ -1,97 +1,245 @@
 @import "tailwindcss";
 
+/* ──────────────────────────────────────────────────────────────────────────
+   DARK MONOCHROME — modelled on TimeGrid: a warm near-black page built almost
+   entirely from ONE hue (terracotta orange) in two shades. The whole app uses
+   Tailwind's zinc/white/black scale plus a few accent families; remapping those
+   tokens here tints every inline utility (text-zinc-500, border-white/10,
+   bg-black/20, text-indigo-300 …) into the same orange family in ONE place — no
+   need to touch the thousands of class names across the components. The neutral
+   ramp keeps its natural direction (low = dark surface, high = light text) but
+   is warmed toward cream/ember; indigo/cyan/sky/fuchsia all collapse onto the
+   orange accent so nothing reads blue or purple.
+   ────────────────────────────────────────────────────────────────────────── */
+@theme {
+  /* warm cream "ink" (text) + a deep ember-black for scrims & wells */
+  --color-white: #f3e8dd;
+  --color-black: #0c0705;
+
+  --color-zinc-50:  #fbf3ec;
+  --color-zinc-100: #f3e8dd;
+  --color-zinc-200: #e8d8cb;
+  --color-zinc-300: #d6c2b3;
+  --color-zinc-400: #b39e90;
+  --color-zinc-500: #94806f;
+  --color-zinc-600: #6f5d50;
+  --color-zinc-700: #4c3b30;
+  --color-zinc-800: #2c1f17;
+  --color-zinc-900: #221610;
+  --color-zinc-950: #160d08;
+  --color-neutral-100: #f3e8dd;
+  --color-neutral-400: #b39e90;
+  --color-neutral-500: #94806f;
+  --color-gray-400: #b39e90;
+  --color-gray-500: #94806f;
+
+  /* indigo / cyan / sky / fuchsia → the orange accent family (kills blue/purple) */
+  --color-indigo-200: #f2a877;
+  --color-indigo-300: #ee9760;
+  --color-indigo-400: #e9793c;
+  --color-indigo-500: #e0662f;
+  --color-indigo-600: #c44f1f;
+  --color-cyan-100:   #f4b88e;
+  --color-cyan-200:   #efa06a;
+  --color-cyan-300:   #ec8f54;
+  --color-cyan-400:   #e0662f;
+  --color-sky-200:    #efa06a;
+  --color-sky-300:    #e9793c;
+  --color-fuchsia-200: #f0a060;
+  --color-fuchsia-300: #ec8c46;
+  --color-fuchsia-400: #e67835;
+  --color-fuchsia-500: #e0662f;
+  --color-fuchsia-600: #c44f1f;
+
+  /* emerald / green → success, lightened to read on the dark page */
+  --color-emerald-100: #8fd0a8;
+  --color-emerald-200: #79c897;
+  --color-emerald-300: #62c186;
+  --color-emerald-400: #4fb878;
+  --color-emerald-500: #43ad6c;
+  --color-emerald-600: #3a9a5f;
+  --color-green-300: #62c186;
+  --color-green-400: #4fb878;
+  --color-green-500: #43ad6c;
+
+  /* amber / yellow → warm gold (blends into the orange monochrome) */
+  --color-amber-100: #f3cf94;
+  --color-amber-200: #efbd72;
+  --color-amber-300: #ecae57;
+  --color-amber-400: #e89a3f;
+  --color-amber-500: #e08a2a;
+  --color-amber-600: #c4731a;
+  --color-yellow-300: #ecae57;
+  --color-yellow-400: #e89a3f;
+
+  /* red / rose → ember brick, lightened for the dark page */
+  --color-red-200: #e88670;
+  --color-red-300: #e36e55;
+  --color-red-400: #df5b43;
+  --color-red-500: #d8462e;
+  --color-red-600: #c0381f;
+  --color-red-700: #a32c17;
+  --color-rose-100: #e88f7f;
+  --color-rose-200: #e37f6c;
+  --color-rose-300: #df6f5a;
+  --color-rose-400: #db634d;
+}
+
 :root {
   color-scheme: dark;
   /* Accent colour — overridden at runtime by applyAccent() in App.jsx */
-  --accent: #f5c04a;
-  --accent-dim: #c49a3b;
-  --accent-text: #17110a;
-  --accent-r: 245;
-  --accent-g: 192;
-  --accent-b: 74;
+  --accent: #e0662f;
+  --accent-dim: #b8431c;
+  --accent-text: #fff5ef;
+  --accent-r: 224;
+  --accent-g: 102;
+  --accent-b: 47;
+
+  /* dark warm surfaces + cream ink (one hue, two shades) */
+  --paper: #181009;
+  --paper-2: #241710;
+  --paper-card: #1f150e;
+  --ink: #f3e8dd;
+  --ink-2: #b39e90;
+  --ink-3: #8a766a;
+  --line: rgba(224, 102, 47, 0.18);
+  --line-soft: rgba(224, 102, 47, 0.10);
+  /* translucent frosted surfaces (TimeGrid-style glass) */
+  --surface: rgba(243, 232, 221, 0.05);
+  --surface-2: rgba(243, 232, 221, 0.09);
+  /* One typeface everywhere — Helvetica. */
+  --ff-serif: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --ff-sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --ff-mono: "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 
 html, body, #root { height: 100%; }
 body {
   margin: 0;
-  background: #07080b;
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--paper-2);
+  color: var(--ink);
+  font-family: var(--ff-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
-button, input, select {
-  font: inherit;
+h1, h2, h3 {
+  font-family: var(--ff-sans);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+h1 em, h2 em, h3 em { font-style: italic; color: var(--accent); }
+
+/* Grain overlay — a faint tooth over the dark page (TimeGrid). */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+  opacity: 0.06;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
 }
 
-button {
-  cursor: pointer;
-}
+button, input, select { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
 
-button:disabled {
-  cursor: not-allowed;
-}
-
+/* Soft vignette between the two page shades + a gentle accent bloom — the
+   whole field is the accent hue, so bg and accent always move together. */
 .bg-cohear {
   background:
-    radial-gradient(circle at 18% -10%, rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.10), transparent 34rem),
-    radial-gradient(circle at 78% 4%, rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.06), transparent 30rem),
-    linear-gradient(180deg, #08090d 0%, #07080b 48%, #050609 100%);
+    radial-gradient(ellipse 90% 55% at 50% 20%, rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.14), transparent 60%),
+    radial-gradient(ellipse 85% 65% at 50% 32%, var(--paper) 0%, var(--paper-2) 100%);
 }
+
+/* Keep text legible on the few intentionally-dark surfaces (map pins, photo
+   overlays, saturated solid buttons). Unlayered rules beat Tailwind utilities. */
+.text-white[class*="bg-indigo-4"],
+.text-white[class*="bg-indigo-5"],
+.text-white[class*="bg-fuchsia-4"],
+.text-white[class*="bg-fuchsia-5"],
+.text-white[class*="from-indigo"],
+.text-white[class*="bg-red-5"],
+.text-white[class*="bg-rose-4"],
+.text-white[class*="bg-rose-5"],
+.text-white[class*="bg-emerald-4"],
+.text-white[class*="bg-emerald-5"] { color: #fff5ef; }
 
 .cohear-topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  background: rgba(12, 14, 19, 0.82);
-  backdrop-filter: blur(16px);
-  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-radius: 16px;
   padding: 0.75rem;
-  box-shadow: 0 20px 70px rgba(0, 0, 0, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 18px 44px rgba(0, 0, 0, 0.32);
 }
 
 .cohear-nav {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(0, 0, 0, 0.25);
-  border-radius: 8px;
+  border: 1px solid var(--line-soft);
+  background: var(--surface-2);
+  border-radius: 999px;
   padding: 0.25rem;
 }
 
 .cohear-nav button {
   min-height: 2.25rem;
-  border-radius: 6px;
-  padding: 0 0.9rem;
-  color: rgb(161 161 170);
-  font-size: 0.8125rem;
-  font-weight: 700;
+  border-radius: 999px;
+  padding: 0 1rem;
+  color: var(--ink-2);
+  font-family: var(--ff-sans);
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
   transition: color 160ms ease, background 160ms ease;
 }
 
 .cohear-nav button:hover {
-  color: white;
+  color: var(--ink);
 }
 
 .cohear-nav button.active {
-  background: white;
-  color: #09090b;
+  background: linear-gradient(180deg, var(--accent), var(--accent-dim));
+  color: var(--accent-text);
+  box-shadow: 0 6px 18px rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.28);
 }
 
 .cohear-panel {
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  background: rgba(13, 15, 20, 0.78);
-  border-radius: 10px;
-  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.22);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-radius: 16px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 16px 40px rgba(0, 0, 0, 0.28);
 }
 
 .cohear-label {
-  color: rgb(113 113 122);
-  font-size: 0.72rem;
-  font-weight: 800;
+  color: var(--ink-3);
+  font-family: var(--ff-sans);
+  font-size: 0.66rem;
+  font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
+}
+
+/* Selected-concert hero band — a warm espresso header so the terracotta
+   Join / Soon badges pop and the title stays legible in light text. */
+.cohear-detail-hero {
+  border-bottom: 1px solid var(--line);
+  background:
+    radial-gradient(circle at 68% 32%, rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.36), transparent 46%),
+    linear-gradient(135deg, color-mix(in srgb, var(--accent) 32%, #0b0705), #0b0705);
 }
 
 .cohear-primary,
@@ -100,18 +248,20 @@ button:disabled {
   min-height: 2.5rem;
   align-items: center;
   gap: 0.5rem;
-  border-radius: 8px;
-  padding: 0 1rem;
-  font-size: 0.875rem;
-  font-weight: 800;
+  border-radius: 999px;
+  padding: 0 1.2rem;
+  font-family: var(--ff-sans);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, opacity 160ms ease;
 }
 
 .cohear-primary {
-  border: 1px solid rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.36);
+  border: 1px solid var(--accent-dim);
   background: linear-gradient(180deg, var(--accent), var(--accent-dim));
-  color: var(--accent-text, #17110a);
-  box-shadow: 0 12px 30px rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.16);
+  color: var(--accent-text, #fff);
+  box-shadow: 0 8px 20px rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.22);
 }
 
 .cohear-primary:hover {
@@ -124,14 +274,16 @@ button:disabled {
 }
 
 .cohear-secondary {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgb(228 228 231);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: var(--ink);
 }
 
 .cohear-secondary:hover {
-  border-color: rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.5);
+  background: var(--surface-2);
 }
 
 .cohear-icon-button {
@@ -139,17 +291,19 @@ button:disabled {
   width: 2.25rem;
   height: 2.25rem;
   place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.22);
-  color: rgb(212 212 216);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: var(--ink-2);
   transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
 }
 
 .cohear-icon-button:hover {
-  border-color: rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.07);
-  color: white;
+  border-color: rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.5);
+  background: var(--surface-2);
+  color: var(--ink);
 }
 
 .cohear-icon-button:disabled {
@@ -160,37 +314,39 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(0, 0, 0, 0.25);
-  border-radius: 8px;
+  border: 1px solid var(--line-soft);
+  background: var(--surface-2);
+  border-radius: 999px;
   padding: 0.25rem;
 }
 
 .cohear-tabs button {
   min-height: 2.2rem;
-  border-radius: 6px;
-  padding: 0 0.85rem;
-  color: rgb(161 161 170);
-  font-size: 0.8125rem;
-  font-weight: 750;
+  border-radius: 999px;
+  padding: 0 0.95rem;
+  color: var(--ink-2);
+  font-family: var(--ff-sans);
+  font-size: 0.76rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
   transition: color 160ms ease, background 160ms ease;
 }
 
 .cohear-tabs button:hover {
-  color: white;
+  color: var(--ink);
 }
 
 .cohear-tabs button.active {
-  background: white;
-  color: #09090b;
+  background: linear-gradient(180deg, var(--accent), var(--accent-dim));
+  color: var(--accent-text);
 }
 
 .cohear-settings-section {
   display: grid;
   gap: 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  border-radius: 16px;
   padding: 1rem;
 }
 
@@ -198,28 +354,28 @@ button:disabled {
 .cohear-select {
   min-height: 2.6rem;
   width: 100%;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.28);
-  padding: 0 0.8rem;
-  color: white;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.22);
+  padding: 0 0.95rem;
+  color: var(--ink);
   outline: none;
 }
 
 .cohear-input:focus,
 .cohear-select:focus {
-  border-color: rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.42);
-  box-shadow: 0 0 0 3px rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.08);
+  border-color: rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.6);
+  box-shadow: 0 0 0 3px rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.12);
 }
 
 .cohear-input:disabled {
-  color: rgb(82 82 91);
+  color: var(--ink-3);
   cursor: not-allowed;
 }
 
 .cohear-select option {
-  background: #09090b;
-  color: white;
+  background: var(--paper-card);
+  color: var(--ink);
 }
 
 .cohear-field {
@@ -227,17 +383,17 @@ button:disabled {
   min-height: 2.75rem;
   align-items: center;
   gap: 0.65rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.24);
-  padding: 0 0.85rem;
-  color: rgb(113 113 122);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.22);
+  padding: 0 1rem;
+  color: var(--ink-3);
 }
 
 .cohear-field:focus-within {
-  border-color: rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.42);
+  border-color: rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.6);
   color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
-  box-shadow: 0 0 0 3px rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.08);
+  box-shadow: 0 0 0 3px rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.12);
 }
 
 .cohear-field input,
@@ -246,7 +402,7 @@ button:disabled {
   width: 100%;
   border: 0;
   background: transparent;
-  color: white;
+  color: var(--ink);
   outline: none;
   font-size: 0.875rem;
 }
@@ -256,12 +412,12 @@ button:disabled {
 }
 
 .cohear-field option {
-  background: #09090b;
-  color: white;
+  background: var(--paper-card);
+  color: var(--ink);
 }
 
 .cohear-field input::placeholder {
-  color: rgb(82 82 91);
+  color: var(--ink-3);
 }
 
 .cohear-resizable-layout {
@@ -283,22 +439,22 @@ button:disabled {
   width: 3px;
   height: 4rem;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--line);
   transition: background 160ms ease, height 160ms ease;
 }
 
 .cohear-resize-handle:hover span,
 .cohear-resize-handle:focus-visible span {
   height: 6rem;
-  background: rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.55);
+  background: rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.7);
 }
 
 .cohear-stamp-card {
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--line);
   background:
-    linear-gradient(135deg, rgba(244, 244, 245, 0.05), rgba(0, 0, 0, 0.18)),
-    rgba(255, 255, 255, 0.025);
-  border-radius: 10px;
+    radial-gradient(120% 80% at 0% 0%, rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.10), transparent 60%),
+    var(--paper-card);
+  border-radius: 12px;
   padding: 1rem;
 }
 
@@ -306,15 +462,15 @@ button:disabled {
   display: grid;
   min-height: 10rem;
   place-items: center;
-  border: 3px double rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.78);
+  border: 3px double rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.85);
   border-radius: 999px;
   background:
-    radial-gradient(circle at 50% 45%, rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.11), transparent 55%),
-    rgba(0, 0, 0, 0.22);
+    radial-gradient(circle at 50% 45%, rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.18), transparent 55%),
+    rgba(0, 0, 0, 0.25);
   color: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
   text-align: center;
   transform: rotate(-2deg);
-  box-shadow: inset 0 0 0 1px rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.22);
+  box-shadow: inset 0 0 0 1px rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.25);
 }
 
 /* ---- Animated mesh blobs behind all content ---- */
@@ -326,9 +482,10 @@ button:disabled {
 .cohear-mesh-blob {
   position: fixed;
   border-radius: 50%;
-  filter: blur(88px);
+  filter: blur(90px);
   pointer-events: none;
   z-index: 0;
+  mix-blend-mode: screen;
   background: rgb(var(--accent-r) var(--accent-g) var(--accent-b));
   animation: cohear-blob-drift ease-in-out infinite alternate;
 }
@@ -338,14 +495,14 @@ button:disabled {
   -webkit-appearance: none;
   width: 32px;
   height: 32px;
-  border: 1px solid rgba(255,255,255,0.15);
+  border: 1px solid var(--line);
   border-radius: 50%;
   background: none;
   cursor: pointer;
   padding: 2px;
   transition: border-color 0.2s;
 }
-.cohear-color-picker:hover { border-color: rgba(255,255,255,0.4); }
+.cohear-color-picker:hover { border-color: var(--ink-3); }
 .cohear-color-picker::-webkit-color-swatch-wrapper { padding: 0; }
 .cohear-color-picker::-webkit-color-swatch { border: none; border-radius: 50%; }
 
@@ -697,15 +854,15 @@ button:disabled {
   position: relative;
   overflow: hidden;
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--line);
   background:
-    radial-gradient(120% 120% at 100% 0%, rgba(232, 201, 119, 0.12), transparent 55%),
-    linear-gradient(160deg, #16233f, #0d1626);
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.4);
+    radial-gradient(130% 120% at 100% 0%, rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.34), transparent 55%),
+    linear-gradient(160deg, color-mix(in srgb, var(--accent) 28%, #0b0705), #0b0705);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
 }
 .cohear-city-hero__bar {
   height: 6px;
-  background: linear-gradient(90deg, #c79a3e, #e8c977, #c79a3e);
+  background: linear-gradient(90deg, var(--accent-dim), var(--accent), var(--accent-dim));
 }
 
 /* ---- Export sheet (html2canvas-safe; off-screen source for PNG/PDF) ---- */
@@ -865,9 +1022,9 @@ button:disabled {
 .cohear-export__issued { margin-top: 8px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; opacity: 0.55; }
 
 .cohear-link {
-  color: rgb(165 243 252);
+  color: var(--accent);
   font-size: 0.875rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .cohear-link:hover {

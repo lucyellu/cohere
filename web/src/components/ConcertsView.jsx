@@ -445,7 +445,7 @@ function DiscoverHeader({ artist, browse, biggest, loading, stats, spotify, user
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="cohear-label">{browse ? 'Discover' : 'Artist timeline'}</p>
-            <h2 className="mt-2 max-w-3xl text-3xl font-semibold tracking-tight text-white md:text-4xl">
+            <h2 className="mt-2 max-w-3xl text-4xl italic tracking-tight text-[var(--accent)] md:text-5xl">
               {browse ? 'Biggest concerts happening now and soon.' : artist}
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-400">
@@ -765,7 +765,7 @@ function ConcertInspector({ concert, saved, sources, userZone, currency, now, on
 
   return (
     <aside className="cohear-panel sticky top-5 self-start overflow-hidden">
-      <div className="h-40 border-b border-white/10 bg-[radial-gradient(circle_at_65%_35%,rgba(34,211,238,.22),transparent_28%),linear-gradient(135deg,#15171c,#090a0d)] p-4">
+      <div className="cohear-detail-hero h-40 p-4">
         <div className="flex h-full flex-col justify-between">
           <div className="flex items-center justify-between">
             <StatusPill when={concert.when} />
@@ -781,8 +781,8 @@ function ConcertInspector({ concert, saved, sources, userZone, currency, now, on
             </div>
           </div>
           <div>
-            <div className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-500">Selected concert</div>
-            <h3 className="mt-2 line-clamp-2 text-2xl font-semibold text-white">{concert.artist || concert.venue}</h3>
+            <div className="text-xs font-medium uppercase tracking-[0.14em] text-[#c9bba9]">Selected concert</div>
+            <h3 className="mt-2 line-clamp-2 text-2xl font-semibold text-[#fdf7ee]">{concert.artist || concert.venue}</h3>
           </div>
         </div>
       </div>
@@ -1102,7 +1102,7 @@ function FallbackMap({ rows, selectedId, onSelect, showLabels, trailRows, routeS
   return (
     <div
       aria-label="Concert location map"
-      className="relative h-[620px] overflow-hidden bg-[radial-gradient(circle_at_30%_20%,rgba(34,211,238,.18),transparent_30%),linear-gradient(145deg,#09090b,#101216)]"
+      className="relative h-[620px] overflow-hidden bg-[var(--paper)]"
     >
       <div className="absolute inset-x-8 top-1/2 border-t border-white/10" />
       <div className="absolute inset-y-8 left-1/2 border-l border-white/10" />
@@ -1251,7 +1251,7 @@ function ConcertCalendar({ rows, selectedId, onSelect }) {
 
 function MiniMap({ concert }) {
   return (
-    <div className="relative h-32 overflow-hidden rounded-lg border border-white/10 bg-[linear-gradient(135deg,#0c1117,#111827)]">
+    <div className="relative h-32 overflow-hidden rounded-lg border border-white/10 bg-[var(--paper-card)]">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_58%_42%,rgba(34,211,238,.28),transparent_18%),linear-gradient(90deg,rgba(255,255,255,.04)_1px,transparent_1px),linear-gradient(0deg,rgba(255,255,255,.04)_1px,transparent_1px)] bg-[size:auto,36px_36px,36px_36px]" />
       <div className="absolute left-4 top-4 rounded bg-black/45 px-2 py-1 text-xs font-medium text-zinc-300">
         {[concert.city, concert.country].filter(Boolean).join(', ') || 'Venue location'}

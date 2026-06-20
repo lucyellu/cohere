@@ -5,7 +5,7 @@ export const SETTINGS_KEY = 'cohear_settings_v1';
 export const DEFAULT_SETTINGS = {
   timezone: DETECTED_TIME_ZONE,
   currency: 'USD',
-  themeAccent: '#f5c04a',
+  themeAccent: '#e0662f',
   // How long an ended concert stays visible in Discover (hours). 0 = hide the
   // moment it ends; up to 8 = linger so you can still join to collect the stamp.
   endedGraceHours: 2,
