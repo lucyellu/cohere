@@ -1,14 +1,46 @@
+import { useRef, useState } from 'react';
 import { hashString } from './palette.js';
+import { fileToAvatar, generateAvatar } from './avatar.js';
 
 // The passport "data page" — identity + stats + a machine-readable zone, ported
 // from the Tailwind passport pen. Name is editable; everything else is derived.
-export default function PassportBook({ profile, onName, identitySeed, memberSince, stats }) {
+export default function PassportBook({ profile, onName, onAvatar, identitySeed, memberSince, stats }) {
   const name = (profile.name || '').trim();
   const display = name || 'Guest Traveller';
   const seed = identitySeed || name || 'cohear-guest';
   const passportNo = 'CO' + String(hashString(seed) % 9000000 + 1000000);
   const initials = display.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
   const tint = hashString(`${seed}:tint`) % 360;
+  const fileRef = useRef(null);
+  const [busy, setBusy] = useState('');
+  const [error, setError] = useState('');
+
+  async function onFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setError('');
+    setBusy('upload');
+    try {
+      onAvatar?.(await fileToAvatar(file));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy('');
+    }
+  }
+
+  async function onGenerate() {
+    setError('');
+    setBusy('generate');
+    try {
+      onAvatar?.(await generateAvatar(name));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy('');
+    }
+  }
 
   return (
     <div className="cohear-passport-page overflow-hidden p-5">
@@ -22,11 +54,49 @@ export default function PassportBook({ profile, onName, identitySeed, memberSinc
         {/* Photo / monogram */}
         <div className="space-y-2">
           <div
-            className="grid h-[120px] w-[108px] place-items-center rounded text-3xl font-black text-white/90"
-            style={{ background: `linear-gradient(150deg, hsl(${tint} 45% 42%), hsl(${(tint + 40) % 360} 40% 28%))` }}
+            className="relative grid h-[120px] w-[108px] place-items-center overflow-hidden rounded text-3xl font-black text-white/90"
+            style={profile.avatar ? undefined : { background: `linear-gradient(150deg, hsl(${tint} 45% 42%), hsl(${(tint + 40) % 360} 40% 28%))` }}
           >
-            {initials || '☻'}
+            {profile.avatar ? (
+              <img src={profile.avatar} alt="Passport photo" className="absolute inset-0 h-full w-full object-cover" />
+            ) : (
+              <span>{initials || '☻'}</span>
+            )}
+            {busy && (
+              <div className="absolute inset-0 grid place-items-center bg-black/55 text-[10px] font-semibold uppercase tracking-wider text-white">
+                {busy === 'generate' ? 'Generating…' : 'Loading…'}
+              </div>
+            )}
           </div>
+
+          <div className="flex gap-1.5">
+            <button
+              type="button"
+              className="rounded border border-black/25 bg-black/[0.04] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide hover:bg-black/[0.08] disabled:opacity-50"
+              onClick={() => fileRef.current?.click()}
+              disabled={Boolean(busy)}
+              title="Upload a photo"
+            >
+              Upload
+            </button>
+            <button
+              type="button"
+              className="rounded border border-black/25 bg-black/[0.04] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide hover:bg-black/[0.08] disabled:opacity-50"
+              onClick={onGenerate}
+              disabled={Boolean(busy)}
+              title="Generate an AI passport photo"
+            >
+              ✨ Generate
+            </button>
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onFile} />
+          </div>
+          {profile.avatar && (
+            <button type="button" className="text-[10px] underline opacity-60 hover:opacity-100" onClick={() => onAvatar?.('')} disabled={Boolean(busy)}>
+              Remove photo
+            </button>
+          )}
+          {error && <p className="text-[10px] leading-tight text-red-700">{error}</p>}
+
           <div className="font-mono text-[10px] leading-tight opacity-70">
             <div>No. {passportNo}</div>
             <div>Since {memberSince || '—'}</div>

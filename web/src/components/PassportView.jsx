@@ -134,6 +134,7 @@ export default function PassportView() {
         <PassportBook
           profile={profile}
           onName={(name) => setProfile(writeProfile({ name }))}
+          onAvatar={(avatar) => setProfile(writeProfile({ avatar }))}
           identitySeed={session?.user?.email || profile.name || ''}
           memberSince={memberSince}
           stats={stats}

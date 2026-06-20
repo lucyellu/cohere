@@ -5,6 +5,9 @@ export const SETTINGS_KEY = 'cohear_settings_v1';
 export const DEFAULT_SETTINGS = {
   timezone: DETECTED_TIME_ZONE,
   currency: 'USD',
+  // How long an ended concert stays visible in Discover (hours). 0 = hide the
+  // moment it ends; up to 8 = linger so you can still join to collect the stamp.
+  endedGraceHours: 2,
   apiKeys: {
     ticketmaster: '',
     gemini: '',
@@ -88,7 +91,15 @@ export function normalizeSettings(settings) {
   };
   if (!TIME_ZONES.some((tz) => tz.zone === merged.timezone)) merged.timezone = DETECTED_TIME_ZONE;
   if (!CURRENCIES.some((c) => c.code === merged.currency)) merged.currency = 'USD';
+  merged.endedGraceHours = clampHours(merged.endedGraceHours);
   return merged;
+}
+
+export const ENDED_GRACE_OPTIONS = [0, 1, 2, 3, 4, 6, 8];
+function clampHours(value) {
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n)) return 2;
+  return Math.min(8, Math.max(0, n));
 }
 
 function withDetectedZone(zones) {

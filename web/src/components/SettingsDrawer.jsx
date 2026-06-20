@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import ControlRoom from './ControlRoom.jsx';
-import { CURRENCIES, TIME_ZONES } from '../settings.js';
+import { CURRENCIES, TIME_ZONES, ENDED_GRACE_OPTIONS } from '../settings.js';
 
 const TABS = [
   { id: 'preferences', label: 'Preferences' },
@@ -154,6 +154,27 @@ export default function SettingsDrawer({ open, settings, onChange, onClose }) {
 
               <section className="cohear-settings-section">
                 <div>
+                  <h3 className="text-sm font-semibold text-white">Recently-ended concerts</h3>
+                  <p className="mt-1 text-sm leading-6 text-zinc-500">
+                    How long a show stays in Discover after it ends — long enough to still join and collect its passport stamp + ticket stub. Past shows always live in the Archive.
+                  </p>
+                </div>
+                <label className="grid max-w-xs gap-2 text-sm font-medium text-zinc-300">
+                  Keep ended shows visible for
+                  <select
+                    className="cohear-select"
+                    value={settings.endedGraceHours ?? 2}
+                    onChange={(e) => update({ endedGraceHours: Number(e.target.value) })}
+                  >
+                    {ENDED_GRACE_OPTIONS.map((h) => (
+                      <option key={h} value={h}>{graceLabel(h)}</option>
+                    ))}
+                  </select>
+                </label>
+              </section>
+
+              <section className="cohear-settings-section">
+                <div>
                   <h3 className="text-sm font-semibold text-white">Layout</h3>
                   <p className="mt-1 text-sm leading-6 text-zinc-500">Restore the Discover panels to the default list view and inspector width.</p>
                 </div>
@@ -222,6 +243,11 @@ export default function SettingsDrawer({ open, settings, onChange, onClose }) {
       </aside>
     </div>
   );
+}
+
+function graceLabel(h) {
+  if (h === 0) return 'Hide as soon as they end';
+  return `${h} hour${h === 1 ? '' : 's'} after ending${h === 2 ? ' (default)' : ''}`;
 }
 
 function CloseIcon() {
