@@ -10,6 +10,9 @@ import {
   readProfile,
   writeProfile,
   resyncTokens,
+  resolveHome,
+  travelItinerary,
+  cityCoords,
 } from '../account.js';
 import { supabase, supabaseEnabled } from '../live/supabase.js';
 import { readArtMap, generateArtFor } from './passport/passportArt.js';
@@ -18,7 +21,7 @@ import VisaCard from './passport/VisaCard.jsx';
 import EntryStamp from './passport/EntryStamp.jsx';
 import TicketStub from './passport/TicketStub.jsx';
 
-export default function PassportView() {
+export default function PassportView({ onOpenCity }) {
   const [history, setHistory] = useState(() => readHistory());
   const [visas, setVisas] = useState(() => readVisas());
   const [entries, setEntries] = useState(() => readEntries());
@@ -88,6 +91,14 @@ export default function PassportView() {
     return dates.length ? dates[0].slice(0, 10) : '';
   }, [history]);
 
+  const home = useMemo(() => resolveHome(profile), [profile]);
+  const travel = useMemo(() => travelItinerary(entries, home), [entries, home]);
+
+  function setHome(value) {
+    const coords = cityCoords(value);
+    setProfile(writeProfile({ homeCity: value, homeLat: coords?.lat ?? null, homeLng: coords?.lng ?? null }));
+  }
+
   async function sendMagicLink(e) {
     e.preventDefault();
     if (!supabase || !email.trim()) return;
@@ -152,9 +163,12 @@ export default function PassportView() {
           profile={profile}
           onName={(name) => setProfile(writeProfile({ name }))}
           onAvatar={(avatar) => setProfile(writeProfile({ avatar }))}
+          onHome={setHome}
           identitySeed={session?.user?.email || profile.name || ''}
           memberSince={memberSince}
           stats={stats}
+          travel={travel}
+          home={home}
         />
 
         <div className="cohear-panel p-5">
@@ -215,7 +229,7 @@ export default function PassportView() {
           <Empty>No entry stamps yet — each city + date you turn up earns one.</Empty>
         ) : (
           <div className="grid grid-cols-2 gap-5 px-1 py-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-            {entries.map((entry) => <EntryStamp key={entry.id} entry={entry} />)}
+            {entries.map((entry) => <EntryStamp key={entry.id} entry={entry} onOpen={onOpenCity} />)}
           </div>
         )}
       </PageSection>
@@ -235,6 +249,7 @@ export default function PassportView() {
                   art={art[stub.id]}
                   onGenerate={() => generate(stub)}
                   generating={genId === stub.id}
+                  onOpen={onOpenCity}
                 />
               ))}
             </div>

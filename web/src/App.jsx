@@ -7,6 +7,7 @@ import { resolveEvent } from './live/liveApi.js';
 import ConcertsView from './components/ConcertsView.jsx';
 import SettingsDrawer from './components/SettingsDrawer.jsx';
 import PassportView from './components/PassportView.jsx';
+import CityView from './components/CityView.jsx';
 import { readSettings, writeSettings } from './settings.js';
 import { recordConcertAction, autoStampOnView } from './account.js';
 
@@ -19,8 +20,15 @@ const NAV = [
 export default function App() {
   const [view, setView] = useState('discover');
   const [liveEvent, setLiveEvent] = useState(null);
+  const [cityTarget, setCityTarget] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settings, setSettings] = useState(() => readSettings());
+
+  function openCity(city, country) {
+    if (!city) return;
+    setCityTarget({ city, country: country || '' });
+    setView('city');
+  }
 
   function updateSettings(nextSettings) {
     setSettings((prev) => {
@@ -94,7 +102,16 @@ export default function App() {
           <main className="mt-5 flex-1">
             {view === 'discover' && <ConcertsView onSyncLive={syncLive} settings={settings} onSettingsChange={updateSettings} />}
 
-            {view === 'passport' && <PassportView />}
+            {view === 'passport' && <PassportView onOpenCity={openCity} />}
+
+            {view === 'city' && cityTarget && (
+              <CityView
+                city={cityTarget.city}
+                country={cityTarget.country}
+                onBack={() => setView('passport')}
+                onSyncLive={syncLive}
+              />
+            )}
 
             {view === 'live' &&
               (liveEvent ? (

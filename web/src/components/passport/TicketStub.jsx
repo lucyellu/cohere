@@ -2,15 +2,24 @@ import { ticketPalette } from './palette.js';
 
 // Vintage admit-one ticket, ported from the css-grid-train-ticket pen: a grid
 // body + a perforated tear-off stub. Paper color is deterministic per artist.
-export default function TicketStub({ stub, art, onGenerate, generating }) {
+export default function TicketStub({ stub, art, onGenerate, generating, onOpen }) {
   const seat = stub.seat || {};
   const pal = ticketPalette(stub.artist || stub.id);
   const style = { '--paper': pal.paper, '--ink': pal.ink, '--accent': pal.accent };
   const mint = String(stub.mintNo ?? stub.edition ?? 1).padStart(4, '0');
   const place = [stub.city, stub.country].filter(Boolean).join(', ');
+  const clickable = Boolean(onOpen && stub.city);
 
   return (
-    <article className="cohear-stub" style={style}>
+    <article
+      className={`cohear-stub ${clickable ? 'cohear-stub--link' : ''}`}
+      style={style}
+      onClick={clickable ? () => onOpen(stub.city, stub.country) : undefined}
+      onKeyDown={clickable ? (e) => { if (e.key === 'Enter') onOpen(stub.city, stub.country); } : undefined}
+      role={clickable ? 'button' : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      title={clickable ? `${place} — view city` : undefined}
+    >
       <div className="cohear-stub__main">
         <header className="cohear-stub__head">
           <span className="cohear-stub__artist">{stub.artist || 'Live Concert'}</span>
@@ -20,7 +29,7 @@ export default function TicketStub({ stub, art, onGenerate, generating }) {
                 type="button"
                 className="rounded bg-white/15 px-1.5 py-0.5 text-[9px] font-bold hover:bg-white/30 disabled:opacity-60"
                 style={{ color: 'var(--paper)' }}
-                onClick={onGenerate}
+                onClick={(e) => { e.stopPropagation(); onGenerate(); }}
                 disabled={generating}
                 title="Generate AI poster art for this ticket"
               >

@@ -35,16 +35,75 @@ const COUNTRY_ALIASES = {
   'great-britain': 'united-kingdom', england: 'united-kingdom', scotland: 'united-kingdom',
   uae: 'united-arab-emirates', korea: 'south-korea', holland: 'netherlands',
 };
-// Fallback country inference for common concert cities lacking explicit country data.
-const CITY_COUNTRY = {
-  toronto: 'Canada', montreal: 'Canada', vancouver: 'Canada', calgary: 'Canada', ottawa: 'Canada',
-  london: 'United Kingdom', manchester: 'United Kingdom', glasgow: 'United Kingdom', dublin: 'Ireland',
-  paris: 'France', berlin: 'Germany', madrid: 'Spain', barcelona: 'Spain', amsterdam: 'Netherlands',
-  rome: 'Italy', milan: 'Italy', lisbon: 'Portugal', zurich: 'Switzerland', vienna: 'Austria',
-  tokyo: 'Japan', osaka: 'Japan', seoul: 'South Korea', singapore: 'Singapore', sydney: 'Australia',
-  melbourne: 'Australia', auckland: 'New Zealand', 'mexico-city': 'Mexico', 'sao-paulo': 'Brazil',
-  'rio-de-janeiro': 'Brazil', mumbai: 'India', dubai: 'United Arab Emirates',
+// Bundled city geocoords (no API): used to (a) infer a country for cities lacking
+// explicit country data, and (b) compute "as if you travelled there" mileage on
+// the passport. Keyed by slug(city). Coords are city-center approximations.
+const CITY_COORDS = {
+  toronto: { lat: 43.65, lng: -79.38, country: 'Canada' },
+  montreal: { lat: 45.50, lng: -73.57, country: 'Canada' },
+  vancouver: { lat: 49.28, lng: -123.12, country: 'Canada' },
+  calgary: { lat: 51.05, lng: -114.07, country: 'Canada' },
+  ottawa: { lat: 45.42, lng: -75.70, country: 'Canada' },
+  london: { lat: 51.51, lng: -0.13, country: 'United Kingdom' },
+  manchester: { lat: 53.48, lng: -2.24, country: 'United Kingdom' },
+  glasgow: { lat: 55.86, lng: -4.25, country: 'United Kingdom' },
+  dublin: { lat: 53.35, lng: -6.26, country: 'Ireland' },
+  paris: { lat: 48.85, lng: 2.35, country: 'France' },
+  'saint-denis': { lat: 48.94, lng: 2.36, country: 'France' },
+  berlin: { lat: 52.52, lng: 13.40, country: 'Germany' },
+  madrid: { lat: 40.42, lng: -3.70, country: 'Spain' },
+  barcelona: { lat: 41.39, lng: 2.17, country: 'Spain' },
+  amsterdam: { lat: 52.37, lng: 4.90, country: 'Netherlands' },
+  rome: { lat: 41.90, lng: 12.50, country: 'Italy' },
+  milan: { lat: 45.46, lng: 9.19, country: 'Italy' },
+  lisbon: { lat: 38.72, lng: -9.14, country: 'Portugal' },
+  zurich: { lat: 47.37, lng: 8.54, country: 'Switzerland' },
+  vienna: { lat: 48.21, lng: 16.37, country: 'Austria' },
+  stockholm: { lat: 59.33, lng: 18.07, country: 'Sweden' },
+  tokyo: { lat: 35.68, lng: 139.69, country: 'Japan' },
+  osaka: { lat: 34.69, lng: 135.50, country: 'Japan' },
+  seoul: { lat: 37.57, lng: 126.98, country: 'South Korea' },
+  singapore: { lat: 1.35, lng: 103.82, country: 'Singapore' },
+  sydney: { lat: -33.87, lng: 151.21, country: 'Australia' },
+  melbourne: { lat: -37.81, lng: 144.96, country: 'Australia' },
+  auckland: { lat: -36.85, lng: 174.76, country: 'New Zealand' },
+  'mexico-city': { lat: 19.43, lng: -99.13, country: 'Mexico' },
+  'sao-paulo': { lat: -23.55, lng: -46.63, country: 'Brazil' },
+  'rio-de-janeiro': { lat: -22.91, lng: -43.17, country: 'Brazil' },
+  mumbai: { lat: 19.08, lng: 72.88, country: 'India' },
+  dubai: { lat: 25.20, lng: 55.27, country: 'United Arab Emirates' },
+  'new-york': { lat: 40.71, lng: -74.01, country: 'United States' },
+  inglewood: { lat: 33.96, lng: -118.35, country: 'United States' },
+  'los-angeles': { lat: 34.05, lng: -118.24, country: 'United States' },
+  miami: { lat: 25.76, lng: -80.19, country: 'United States' },
+  'las-vegas': { lat: 36.17, lng: -115.14, country: 'United States' },
+  chicago: { lat: 41.88, lng: -87.63, country: 'United States' },
+  boston: { lat: 42.36, lng: -71.06, country: 'United States' },
+  atlanta: { lat: 33.75, lng: -84.39, country: 'United States' },
+  nashville: { lat: 36.16, lng: -86.78, country: 'United States' },
+  austin: { lat: 30.27, lng: -97.74, country: 'United States' },
+  seattle: { lat: 47.61, lng: -122.33, country: 'United States' },
+  'san-francisco': { lat: 37.77, lng: -122.42, country: 'United States' },
+  denver: { lat: 39.74, lng: -104.99, country: 'United States' },
+  philadelphia: { lat: 39.95, lng: -75.17, country: 'United States' },
+  washington: { lat: 38.91, lng: -77.04, country: 'United States' },
+  houston: { lat: 29.76, lng: -95.37, country: 'United States' },
+  dallas: { lat: 32.78, lng: -96.80, country: 'United States' },
 };
+// Fallback country inference for common concert cities lacking explicit country data.
+const CITY_COUNTRY = Object.fromEntries(
+  Object.entries(CITY_COORDS).map(([city, { country }]) => [city, country]),
+);
+
+// City-center coords for a place. Prefers explicit lat/lng (e.g. from a concert
+// record), then the bundled table; returns null if we can't place it.
+export function cityCoords(city, lat, lng) {
+  if (lat != null && lng != null && Number.isFinite(+lat) && Number.isFinite(+lng)) {
+    return { lat: +lat, lng: +lng };
+  }
+  const c = CITY_COORDS[slug(city)];
+  return c ? { lat: c.lat, lng: c.lng } : null;
+}
 
 export function visaRuleFor(country) {
   const key = canonicalCountryKey(country);
@@ -186,12 +245,15 @@ export function addEntryStamp(input) {
   if (prev) return prev;
   const country = resolveCountry(concert);
   const edition = entries.length + 1;
+  const coords = cityCoords(concert.city, concert.lat, concert.lng);
   const stamp = {
     id,
     type: 'entry',
     city: concert.city,
     country,
     date,
+    lat: coords?.lat ?? null,
+    lng: coords?.lng ?? null,
     artist: concert.artist,
     venue: concert.venue,
     concertId: concert.id,
@@ -346,6 +408,60 @@ function addDays(iso, days) {
 }
 function isoDate(d) {
   return d.toISOString().slice(0, 10);
+}
+
+// --- Travel mileage ("as if you actually went there") ------------------------
+// Resolve the passport's home base from the profile: an explicit lat/lng if the
+// typed city was geocoded against the bundled table, otherwise null.
+export function resolveHome(profile = {}) {
+  const city = (profile.homeCity || '').trim();
+  if (!city) return null;
+  const coords = cityCoords(city, profile.homeLat, profile.homeLng);
+  return coords ? { city, ...coords } : { city, lat: null, lng: null };
+}
+
+function entryCoords(entry) {
+  return cityCoords(entry.city, entry.lat, entry.lng);
+}
+
+// Great-circle distance between two {lat,lng} points, in kilometres.
+export function haversineKm(a, b) {
+  if (!a || !b || a.lat == null || b.lat == null) return 0;
+  const R = 6371;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+// Build the "concert-hopping itinerary": order entry stamps by date and sum the
+// great-circle hops between consecutive cities. If a home base is set, the route
+// departs from and returns to home (a real round-trip). Legs to/from unplaced
+// cities are skipped. Returns { km, miles, legs, stops }.
+export function travelItinerary(entries = [], home = null) {
+  const placed = entries
+    .map((e) => ({ entry: e, coords: entryCoords(e) }))
+    .filter((x) => x.coords)
+    .sort((a, b) => String(a.entry.date || '').localeCompare(String(b.entry.date || '')));
+
+  const homePt = home && home.lat != null ? { city: home.city, ...home } : null;
+  const points = [];
+  if (homePt) points.push(homePt);
+  for (const { entry, coords } of placed) points.push({ city: entry.city, ...coords });
+  if (homePt && placed.length) points.push(homePt); // fly home
+
+  let km = 0;
+  const legs = [];
+  for (let i = 1; i < points.length; i += 1) {
+    const d = haversineKm(points[i - 1], points[i]);
+    if (d < 1) continue; // same city / no real hop
+    legs.push({ from: points[i - 1].city, to: points[i].city, km: d });
+    km += d;
+  }
+  return { km, miles: km * 0.621371, legs, stops: placed.length };
 }
 
 // --- Token layer (Ed25519 signing + Supabase registry, via the gateway) ------
