@@ -82,6 +82,6 @@ const COUNTRY_EMOJI = {
   Singapore: '🦁', Australia: '🦘', 'New Zealand': '🥝', Mexico: '🌮', Brazil: '🎉',
   India: '🛕', 'United Arab Emirates': '🕌',
 };
-function countryEmoji(country) {
+export function countryEmoji(country) {
   return COUNTRY_EMOJI[country] || '🛂';
 }

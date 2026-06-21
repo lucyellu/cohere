@@ -45,10 +45,6 @@ services:
         sync: false
       - key: RAPIDAPI_KEY
         sync: false
-      - key: CYANITE_API_KEY
-        sync: false
-      - key: CYANITE_WEBHOOK_SECRET
-        sync: false
       - key: LALALAI_API_KEY
         sync: false
       - key: ELEVENLABS_API_KEY

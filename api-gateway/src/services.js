@@ -128,16 +128,6 @@ export const SERVICES = {
     // not wired here). Text only — no image generation. From the ai-free workbench.
     description: 'Free-tier text generation (lore, prompts, summaries)',
   },
-  cyanite: {
-    label: 'Cyanite',
-    category: 'ai',
-    envKey: 'CYANITE_API_KEY',
-    live: true,
-    // GraphQL. Ingests a YouTube source on Cyanite's side (no audio hosting on
-    // ours) -> real mood/energy/BPM for the actual setlist song. Async: enqueue
-    // then poll; results disk-cached so credits aren't re-spent across restarts.
-    description: 'AI mood / energy / BPM tagging (via YouTube ingestion)',
-  },
   lalalai: {
     label: 'LALAL.AI',
     category: 'audio',

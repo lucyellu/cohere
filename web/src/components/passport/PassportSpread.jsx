@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
-import { hashString } from './palette.js';
+import { hashString, ticketPalette } from './palette.js';
+import { countryEmoji } from './VisaCard.jsx';
 import { fileToAvatar, generateAvatar } from './avatar.js';
 import { COUNTRY_OPTIONS, visaRuleFor } from '../../account.js';
 
@@ -183,6 +184,14 @@ export default function PassportSpread({
           </span>
         </div>
 
+        {/* Side-mounted page navigation — arrows hug the page edges */}
+        {pageCount > 1 && (
+          <>
+            <SideArrow side="left" onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={safePage === 0}>‹</SideArrow>
+            <SideArrow side="right" onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))} disabled={safePage === pageCount - 1}>›</SideArrow>
+          </>
+        )}
+
         {items.length === 0 ? (
           <div className="grid min-h-[280px] place-items-center px-6 text-center text-sm leading-6 opacity-60">
             Your visas, entry stamps and ticket stubs land on these pages automatically as you attend shows.
@@ -194,19 +203,15 @@ export default function PassportSpread({
         )}
 
         {pageCount > 1 && (
-          <div className="mt-1 flex items-center justify-center gap-3">
-            <PageArrow onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={safePage === 0}>‹</PageArrow>
-            <div className="flex gap-1.5">
-              {Array.from({ length: pageCount }, (_, i) => (
-                <button
-                  key={i}
-                  className={`h-2 w-2 rounded-full border border-black/40 transition ${i === safePage ? 'bg-black/70' : 'bg-transparent hover:bg-black/20'}`}
-                  onClick={() => setPage(i)}
-                  aria-label={`Page ${i + 1}`}
-                />
-              ))}
-            </div>
-            <PageArrow onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))} disabled={safePage === pageCount - 1}>›</PageArrow>
+          <div className="mt-auto flex items-center justify-center gap-1.5 pt-2">
+            {Array.from({ length: pageCount }, (_, i) => (
+              <button
+                key={i}
+                className={`h-2 w-2 rounded-full border border-black/40 transition ${i === safePage ? 'bg-black/70' : 'bg-transparent hover:bg-black/20'}`}
+                onClick={() => setPage(i)}
+                aria-label={`Page ${i + 1}`}
+              />
+            ))}
           </div>
         )}
       </div>
@@ -216,23 +221,31 @@ export default function PassportSpread({
 
 // --- Stamp tiles --------------------------------------------------------------
 function StampTile({ item, i, onOpenCity }) {
-  const rot = ((i * 53) % 11) - 5; // gentle scatter, like a real page
+  const rot = ((i * 53) % 9) - 4; // gentle scatter, like a real page
   if (item.kind === 'visa') return <VisaStamp visa={item.data} rot={rot} />;
   if (item.kind === 'entry') return <EntryRubberStamp entry={item.data} rot={rot} onOpenCity={onOpenCity} />;
-  return <TicketStamp stub={item.data} rot={rot} />;
+  return <MiniStub stub={item.data} rot={rot} onOpenCity={onOpenCity} />;
 }
 
+// A postage-stamp-style country visa: perforated edge, denomination, seal.
 function VisaStamp({ visa, rot }) {
   const rule = visa.rule || visaRuleFor(visa.country);
+  const accent = rule?.accent || '#3b82f6';
   return (
     <div
-      className="grid h-[72px] w-full place-items-center rounded-md border-2 px-1.5 text-center"
-      style={{ borderColor: rule?.accent || '#3b82f6', color: rule?.accent || '#3b82f6', transform: `rotate(${rot}deg)`, borderStyle: 'double' }}
+      className="cohear-mvisa cohear-perf"
+      style={{ '--accent': accent, transform: `rotate(${rot}deg)` }}
       title={`${visa.country} — ${rule?.label || 'Visa'}`}
     >
-      <div className="text-[7px] font-black tracking-[0.2em]">✦ VISA ✦</div>
-      <div className="text-[12px] font-black uppercase leading-tight">{visa.country}</div>
-      <div className="text-[7px] font-semibold uppercase tracking-wide opacity-80">{rule?.label || 'Tourist Visa'}</div>
+      <div className="cohear-mvisa__inner">
+        <div className="flex items-center justify-between text-[6px] font-black uppercase tracking-[0.16em]">
+          <span>Cohere</span>
+          <span>Visa</span>
+        </div>
+        <div className="cohear-mvisa__seal">{countryEmoji(visa.country)}</div>
+        <div className="text-[11px] font-black uppercase leading-none">{visa.country}</div>
+        <div className="text-[6px] font-semibold uppercase tracking-[0.12em] opacity-75">{rule?.label || 'Tourist Visa'}</div>
+      </div>
     </div>
   );
 }
@@ -242,32 +255,51 @@ function EntryRubberStamp({ entry, rot, onOpenCity }) {
   return (
     <div
       className={`cohear-entry ${interactive ? 'cohear-entry--link' : ''}`}
-      style={{ '--rot': `${rot}deg`, minHeight: 72, width: '100%', padding: '0.4rem 0.3rem' }}
+      style={{ '--rot': `${rot}deg`, minHeight: 84, width: '100%', padding: '0.45rem 0.35rem' }}
       onClick={interactive ? () => onOpenCity(entry) : undefined}
       role={interactive ? 'button' : undefined}
       tabIndex={interactive ? 0 : undefined}
       onKeyDown={interactive ? (e) => (e.key === 'Enter' || e.key === ' ') && onOpenCity(entry) : undefined}
       title={`${entry.city}${entry.date ? ` · ${entry.date}` : ''}`}
     >
-      <div className="cohear-entry__city" style={{ fontSize: 11 }}>{entry.city}</div>
+      <div className="cohear-entry__sub" style={{ fontSize: 7 }}>✈ Admitted</div>
+      <div className="cohear-entry__city" style={{ fontSize: 12 }}>{(entry.city || '').toUpperCase()}</div>
       <div className="cohear-entry__date" style={{ fontSize: 8 }}>{(entry.date || '').slice(5) || '—'}</div>
-      <div className="cohear-entry__sub" style={{ fontSize: 7 }}>Entry</div>
+      <div className="cohear-entry__sub" style={{ fontSize: 6 }}>Cohere Border</div>
     </div>
   );
 }
 
-function TicketStamp({ stub, rot }) {
+// A miniature of the real ticket stub — same dark header / paper body /
+// perforated counterfoil — scaled to drop onto a passport page.
+function MiniStub({ stub, rot, onOpenCity }) {
+  const pal = ticketPalette(stub.artist || stub.id);
+  const mint = String(stub.mintNo ?? stub.edition ?? 1).padStart(4, '0');
+  const interactive = Boolean(onOpenCity && stub.city);
   return (
-    <div
-      className="grid h-[72px] w-full place-content-center rounded border border-black/40 bg-black/[0.04] px-1.5 text-center"
-      style={{ transform: `rotate(${rot}deg)` }}
+    <article
+      className={`cohear-ministub ${interactive ? 'cohear-stub--link' : ''}`}
+      style={{ '--paper': pal.paper, '--ink': pal.ink, '--accent': pal.accent, transform: `rotate(${rot}deg)` }}
+      onClick={interactive ? () => onOpenCity(stub.city, stub.country) : undefined}
+      role={interactive ? 'button' : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      onKeyDown={interactive ? (e) => (e.key === 'Enter' || e.key === ' ') && onOpenCity(stub.city, stub.country) : undefined}
       title={`${stub.artist || ''}${stub.venue ? ` · ${stub.venue}` : ''}`}
     >
-      <div className="text-[7px] font-black tracking-[0.18em] text-[color:var(--accent,#b4452f)]">ADMIT ONE</div>
-      <div className="truncate text-[11px] font-black leading-tight">{stub.artist || stub.venue}</div>
-      <div className="truncate text-[7px] opacity-65">{stub.city || ''}</div>
-      {stub.seat && <div className="font-mono text-[7px] opacity-60">{stub.seat.section} {stub.seat.row}{stub.seat.seat}</div>}
-    </div>
+      <div className="cohear-ministub__main">
+        <div className="cohear-ministub__head">
+          <span className="truncate">{stub.artist || 'Live Concert'}</span>
+          <span className="cohear-ministub__admit">Admit One</span>
+        </div>
+        <div className="cohear-ministub__venue">{stub.venue || '—'}</div>
+        <div className="cohear-ministub__meta">{[stub.city, (stub.date || '').slice(0, 10)].filter(Boolean).join(' · ') || '—'}</div>
+        <div className="cohear-ministub__barcode" aria-hidden="true" />
+      </div>
+      <div className="cohear-ministub__side">
+        <span className="cohear-ministub__side-label">Admit</span>
+        <span className="cohear-ministub__no">#{mint}</span>
+      </div>
+    </article>
   );
 }
 
@@ -284,11 +316,12 @@ function PhotoBtn({ children, ...props }) {
   );
 }
 
-function PageArrow({ children, ...props }) {
+function SideArrow({ side, children, ...props }) {
   return (
     <button
       type="button"
-      className="grid h-7 w-7 place-items-center rounded-full border border-black/30 bg-black/[0.04] text-base font-bold leading-none hover:bg-black/[0.1] disabled:opacity-30"
+      className={`cohear-spread__nav cohear-spread__nav--${side}`}
+      aria-label={side === 'left' ? 'Previous page' : 'Next page'}
       {...props}
     >
       {children}

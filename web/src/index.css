@@ -936,10 +936,16 @@ button:disabled { cursor: not-allowed; }
 }
 
 /* ---- Open passport spread (two pages: identity + stamps) ---- */
+/* Sized like a real open passport booklet: fixed max width, centred, the two
+   pages always equal halves — so it never stretches to fill an arbitrary
+   container or leave a page half-empty. */
 .cohear-spread {
   position: relative;
   display: grid;
   grid-template-columns: 1fr 1fr;
+  width: 100%;
+  max-width: 960px;
+  margin-inline: auto;
   border-radius: 14px;
   overflow: hidden;
   box-shadow:
@@ -965,16 +971,130 @@ button:disabled { cursor: not-allowed; }
   border-radius: 0;
 }
 .cohear-spread__page.left { box-shadow: inset -24px 0 32px -24px rgba(0, 0, 0, 0.45); }
-.cohear-spread__page.right { box-shadow: inset 24px 0 32px -24px rgba(0, 0, 0, 0.45); }
+.cohear-spread__page.right {
+  box-shadow: inset 24px 0 32px -24px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+}
 .cohear-spread__stamps {
+  flex: 1;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px 12px;
-  padding: 16px 4px 12px;
+  align-content: start;
+  gap: 18px 14px;
+  /* horizontal room so the side arrows never sit on top of a stamp */
+  padding: 18px 30px 12px;
 }
 @media (min-width: 1024px) {
   .cohear-spread__stamps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+
+/* Side-mounted page navigation arrows (hug the page edges, vertically centred) */
+.cohear-spread__nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.22);
+  background: rgba(255, 255, 255, 0.7);
+  color: rgba(0, 0, 0, 0.7);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+.cohear-spread__nav:hover:not(:disabled) { background: rgba(255, 255, 255, 0.96); }
+.cohear-spread__nav:disabled { opacity: 0.25; cursor: default; }
+.cohear-spread__nav--left { left: 4px; }
+.cohear-spread__nav--right { right: 4px; }
+
+/* Mini country visa (postage-stamp styled) for the spread pages */
+.cohear-mvisa {
+  --accent: #3b82f6;
+  width: 100%;
+  padding: 5px;
+  background:
+    repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.04) 0 5px, transparent 5px 10px),
+    #f7f1e3;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.3));
+}
+.cohear-mvisa__inner {
+  min-height: 78px;
+  border: 1.5px solid var(--accent);
+  border-radius: 2px;
+  color: var(--accent);
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  padding: 6px 4px;
+  text-align: center;
+}
+.cohear-mvisa__seal { font-size: 1.5rem; line-height: 1; }
+
+/* Mini ticket stub — same anatomy as .cohear-stub, scaled for a passport page */
+.cohear-ministub {
+  --paper: #f3ead0;
+  --ink: #2a2118;
+  --accent: #c02a28;
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 30px;
+  width: 100%;
+  color: var(--ink);
+  background: var(--paper);
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.4);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.32);
+  overflow: hidden;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  -webkit-mask:
+    radial-gradient(circle 5px at calc(100% - 30px) -2px, #0000 5px, #000 0),
+    radial-gradient(circle 5px at calc(100% - 30px) calc(100% + 2px), #0000 5px, #000 0);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+.cohear-ministub__main { padding: 5px 7px; display: grid; gap: 3px; align-content: start; }
+.cohear-ministub__head {
+  margin: -5px -7px 1px;
+  padding: 3px 7px;
+  background: var(--ink);
+  color: var(--paper);
+  font: 900 10px/1.2 ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px;
+}
+.cohear-ministub__head > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cohear-ministub__admit { font-size: 6px; letter-spacing: 0.12em; color: var(--accent); background: var(--paper); padding: 1px 3px; border-radius: 2px; white-space: nowrap; }
+.cohear-ministub__venue { font: 800 11px/1.1 ui-monospace, "Courier New", monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cohear-ministub__meta { font-size: 8px; opacity: 0.7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cohear-ministub__barcode {
+  height: 16px;
+  margin-top: 2px;
+  border-radius: 1px;
+  background-image: repeating-linear-gradient(90deg, #1c1712 0 1px, transparent 1px 3px, #1c1712 3px 5px, transparent 5px 8px, #1c1712 8px 9px, transparent 9px 12px);
+}
+.cohear-ministub__side {
+  background: color-mix(in srgb, var(--accent) 16%, var(--paper));
+  border-left: 1.5px dashed rgba(0, 0, 0, 0.45);
+  display: grid;
+  place-content: center;
+  gap: 4px;
+  padding: 4px 2px;
+  text-align: center;
+}
+.cohear-ministub__side-label { writing-mode: vertical-rl; transform: rotate(180deg); justify-self: center; font: 900 7px/1 ui-sans-serif, system-ui, sans-serif; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink); }
+.cohear-ministub__no { font: 700 7px/1.1 ui-monospace, "Courier New", monospace; color: var(--accent); }
 @media (max-width: 820px) {
   .cohear-spread { grid-template-columns: 1fr; }
   .cohear-spread::before { display: none; }

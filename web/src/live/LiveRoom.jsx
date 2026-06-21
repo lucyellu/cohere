@@ -2,11 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { getEvent, getWeather } from './liveApi.js';
 import { syncClock, syncedNow, nowPlaying, fmtClock, setWarpTo, clearWarp } from './clock.js';
 import { usePresence } from './presence.js';
+import { roomUrl } from './roomShare.js';
 import { usePlayer } from './player.jsx';
 import { autoStampOnView, claimTicketStub } from '../account.js';
 import VenueMap from './VenueMap.jsx';
 import NowPlaying from './NowPlaying.jsx';
-import MoodBar from './MoodBar.jsx';
 import SetlistTimeline from './SetlistTimeline.jsx';
 import FanWall from './FanWall.jsx';
 import Lyrics from './Lyrics.jsx';
@@ -118,7 +118,8 @@ export default function LiveRoom({ event: initial, onBack }) {
             {event.venue} · {event.city} · {event.mode === 'replay' ? `replay of ${event.setlistDate || 'a past show'}` : 'tonight'}
           </p>
         </div>
-        <div className="ml-auto flex items-center gap-4 text-right text-xs">
+        <div className="ml-auto flex items-center gap-3 text-right text-xs">
+          <InviteButton event={event} />
           <Clocks event={event} now={now} />
         </div>
       </div>
@@ -145,9 +146,6 @@ export default function LiveRoom({ event: initial, onBack }) {
         >
           <LiveVideoPanel event={event} np={np} />
           <NowPlaying np={np} event={event} syncedNow={now} />
-
-          {/* Real mood/energy of the current song (Cyanite) — tints the room */}
-          {np.song && <MoodBar artist={event.artist} song={np.song} />}
 
           {/* Demo time-warp */}
           <DemoWarp event={event} onWarp={warpToSong} />
@@ -229,6 +227,35 @@ function readPanelOrder() {
     /* ignore bad saved layout */
   }
   return fallback;
+}
+
+// Copy a shareable link to THIS room — friends who open it land right here.
+function InviteButton({ event }) {
+  const [copied, setCopied] = useState(false);
+  async function share() {
+    const url = roomUrl(event);
+    const text = `Join me in the crowd for ${event.artist} on Cohere →`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Cohere', text, url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2200);
+      }
+    } catch {
+      /* user dismissed the share sheet — no-op */
+    }
+  }
+  return (
+    <button
+      onClick={share}
+      className="cohear-primary min-h-8 shrink-0 px-3 text-xs"
+      title="Copy a link that drops your friends into this exact room"
+    >
+      {copied ? '✓ Link copied' : '🎟 Invite crew'}
+    </button>
+  );
 }
 
 function EmptyPanelText({ children }) {

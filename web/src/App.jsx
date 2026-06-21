@@ -2,12 +2,14 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { PlayerProvider } from './live/player.jsx';
 import BottomPlayer from './live/BottomPlayer.jsx';
 import { resolveEvent } from './live/liveApi.js';
+import { eventFromRoomCode, syncRoomUrl, currentRoomCode } from './live/roomShare.js';
 import ConcertsView from './components/ConcertsView.jsx';
 import SettingsDrawer from './components/SettingsDrawer.jsx';
 import AccountButton from './components/AccountButton.jsx';
 import { readSettings, writeSettings } from './settings.js';
 import { recordConcertAction, autoStampOnView } from './account.js';
 import { applyTheme } from './theme.js';
+import Onboarding, { shouldOnboard } from './components/Onboarding.jsx';
 
 // Non-landing views are split into their own chunks so the Discover view (what
 // loads first) ships far less JavaScript on the first visit. They fetch on
@@ -29,10 +31,40 @@ export default function App() {
   const [cityTarget, setCityTarget] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settings, setSettings] = useState(() => readSettings());
+  const [roomLoading, setRoomLoading] = useState(() => Boolean(currentRoomCode()));
+  // First-run welcome — but not when arriving via a share link (let friends land
+  // straight in the room instead of hitting a wall of onboarding).
+  const [onboarding, setOnboarding] = useState(() => shouldOnboard() && !currentRoomCode());
 
   useEffect(() => {
     applyTheme(settings.themeAccent || '#2f86d6', Boolean(settings.themeInverted));
   }, [settings.themeAccent, settings.themeInverted]);
+
+  // Open a shared room link (?room=…) on first load so friends land in the room.
+  useEffect(() => {
+    const code = currentRoomCode();
+    if (!code) return;
+    let alive = true;
+    setView('live');
+    (async () => {
+      try {
+        const ev = await eventFromRoomCode(code);
+        if (alive && ev) {
+          autoStampOnView(ev);
+          recordConcertAction(ev, ev.mode === 'replay' ? 'opened_replay' : 'joined_live', { source: 'share_link' });
+          setLiveEvent(ev);
+        }
+      } finally {
+        if (alive) setRoomLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  // Keep the address bar pointed at the open room so the URL stays shareable.
+  useEffect(() => {
+    syncRoomUrl(view === 'live' && liveEvent ? liveEvent : null);
+  }, [view, liveEvent]);
 
   function openCity(city, country) {
     if (!city) return;
@@ -132,7 +164,11 @@ export default function App() {
 
               {view === 'live' &&
                 (liveEvent ? (
-                  <LiveRoom event={liveEvent} onBack={() => setLiveEvent(null)} />
+                  <LiveRoom event={liveEvent} onBack={() => { setLiveEvent(null); setRoomLoading(false); }} />
+                ) : roomLoading ? (
+                  <section className="cohear-panel grid min-h-64 place-items-center p-8 text-sm text-zinc-500">
+                    Joining your crew's room…
+                  </section>
                 ) : (
                   <section className="cohear-panel p-5">
                     <LiveLanding onJoin={joinLandingEvent} />
@@ -143,6 +179,7 @@ export default function App() {
         </div>
         <BottomPlayer />
         <SettingsDrawer open={settingsOpen} settings={settings} onChange={updateSettings} onClose={() => setSettingsOpen(false)} />
+        {onboarding && <Onboarding onClose={() => setOnboarding(false)} />}
       </div>
     </PlayerProvider>
   );

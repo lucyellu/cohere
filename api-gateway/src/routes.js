@@ -873,9 +873,8 @@ router.get('/weather', async (req, res) => {
 // --- Spotify: track/artist popularity + art (Client-Credentials flow) -----
 // App-level catalog data (no user login). Token cached ~1h. NOTE: Spotify
 // deprecated audio-features/recommendations for new apps — we use it only for
-// popularity (0-100), followers, genres, and album/artist art (Cyanite already
-// covers mood/energy). Needs SPOTIFY_CLIENT_ID + SECRET; mock until the secret
-// is set.
+// popularity (0-100), followers, genres, and album/artist art. Needs
+// SPOTIFY_CLIENT_ID + SECRET; mock until the secret is set.
 let spotifyTok = { value: null, exp: 0 };
 async function spotifyAuth() {
   const id = process.env.SPOTIFY_CLIENT_ID;
@@ -1268,155 +1267,6 @@ for (const id of ['cerebras', 'groq']) {
   });
 }
 
-// --- Cyanite: real mood / energy / BPM for the actual setlist song -------
-// Cyanite is GraphQL and analyzes AUDIO — but it ingests a YouTube source on
-// ITS side, so we never host or split the master (unlike a stem API). Flow:
-//   youTubeTrackEnqueue(videoUrl) -> libraryTrack.id -> poll audioAnalysisV6.
-// Analysis is async (~45s) and costs a credit per distinct song, so results are
-// cached to disk: `node --watch` restarts (and replays) never re-spend. The
-// client calls this repeatedly for the current song; we enqueue once, then each
-// call polls until FINISHED.
-const CYANITE_GQL = 'https://api.cyanite.ai/graphql';
-const CYANITE_CACHE_FILE = new URL('../.cyanite-cache.json', import.meta.url);
-
-function loadCyaniteCache() {
-  try { return new Map(Object.entries(JSON.parse(readFileSync(CYANITE_CACHE_FILE, 'utf8')))); }
-  catch { return new Map(); }
-}
-const cyaniteCache = loadCyaniteCache(); // 'artist|song' -> { status, trackId, result }
-function saveCyaniteCache() {
-  try { writeFileSync(CYANITE_CACHE_FILE, JSON.stringify(Object.fromEntries(cyaniteCache))); } catch { /* ignore */ }
-}
-
-async function cyaniteGql(query, variables) {
-  return callLive('cyanite', CYANITE_GQL, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${process.env.CYANITE_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, variables }),
-  });
-}
-
-// Resolve a song to a YouTube videoId (Cyanite's ingestion source). Reuses the
-// YouTube key; cached implicitly because we only call it once per new song.
-async function youtubeVideoId(q) {
-  const key = process.env.YOUTUBE_API_KEY;
-  if (!key) return null;
-  const r = await callLive('youtube', `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=1&q=${encodeURIComponent(q)}&key=${key}`);
-  return r.data?.items?.[0]?.id?.videoId || null;
-}
-
-// Russell circumplex -> a room accent color (valence/arousal in ~[-1,1]).
-function moodColor(valence, arousal) {
-  if (valence == null) return '#a78bfa';
-  if (valence >= 0.2 && (arousal ?? 0) >= 0) return '#fb7185'; // happy + energetic
-  if (valence >= 0.2) return '#f59e0b'; // warm / content
-  if (valence < -0.1 && (arousal ?? 0) >= 0.1) return '#f43f5e'; // tense / intense
-  if (valence < -0.1) return '#6366f1'; // sad / calm
-  return '#a78bfa'; // neutral
-}
-
-function simplifyMood(r) {
-  if (!r) return null;
-  return {
-    valence: r.valence ?? null,
-    arousal: r.arousal ?? null,
-    bpm: Math.round(r.bpmRangeAdjusted || 0) || null,
-    energyLevel: r.energyLevel || null,
-    moodTags: r.moodTags || [],
-    genreTags: r.genreTags || [],
-    characterTags: r.characterTags || [],
-    movementTags: r.movementTags || [],
-    caption: r.transformerCaption || '',
-    color: moodColor(r.valence, r.arousal),
-  };
-}
-
-const CYANITE_ENQUEUE = `mutation Enqueue($input: YouTubeTrackEnqueueInput!) {
-  youTubeTrackEnqueue(input: $input) {
-    __typename
-    ... on YouTubeTrackEnqueueSuccess { enqueuedLibraryTrack { id } }
-    ... on YouTubeTrackEnqueueError { message code }
-  }
-}`;
-const CYANITE_ANALYSIS = `query Analysis($id: ID!) {
-  libraryTrack(id: $id) {
-    __typename
-    ... on LibraryTrack {
-      id
-      audioAnalysisV6 {
-        __typename
-        ... on AudioAnalysisV6Finished {
-          result { valence arousal bpmRangeAdjusted energyLevel moodTags genreTags characterTags movementTags transformerCaption }
-        }
-      }
-    }
-  }
-}`;
-
-// Deterministic mock so the feature renders identically with no key / in mock mode.
-function mockMood(song) {
-  const h = [...String(song)].reduce((a, c) => a + c.charCodeAt(0), 0);
-  const valence = ((h % 200) - 100) / 100; // -1..1
-  const arousal = (((h * 7) % 200) - 100) / 100;
-  const energy = ['low', 'medium', 'high'][h % 3];
-  const moods = [['uplifting', 'happy'], ['romantic', 'sad'], ['energetic', 'powerful'], ['dreamy', 'chilled']][h % 4];
-  return {
-    valence, arousal, bpm: 80 + (h % 80), energyLevel: energy,
-    moodTags: moods, genreTags: ['pop'], characterTags: ['warm'], movementTags: ['flowing'],
-    caption: `${energy} ${moods[0]} track (demo mood — set CYANITE_API_KEY for real analysis)`,
-    color: moodColor(valence, arousal),
-  };
-}
-
-router.post('/cyanite/analyze', express.json(), async (req, res) => {
-  const song = String(req.body?.song || '').trim();
-  const artist = String(req.body?.artist || '').trim();
-  let videoId = String(req.body?.videoId || '').trim();
-  if (!song) return res.status(400).json({ ok: false, error: 'song required' });
-  const ck = `${artist}|${song}`.toLowerCase();
-
-  if (isMock('cyanite')) {
-    record('cyanite', { status: 200, latencyMs: 0, bytes: song.length, mode: 'mock', error: null });
-    return res.json({ ok: true, mode: 'mock', status: 'finished', result: mockMood(song) });
-  }
-
-  const entry = cyaniteCache.get(ck) || {};
-  if (entry.status === 'finished' && entry.result) {
-    return res.json({ ok: true, mode: 'live', status: 'finished', result: entry.result, cached: true });
-  }
-
-  // Enqueue once (needs a YouTube source).
-  let trackId = entry.trackId;
-  if (!trackId) {
-    if (!videoId) videoId = await youtubeVideoId(`${artist} ${song} official audio`);
-    if (!videoId) return res.json({ ok: false, status: 'error', error: 'no youtube source for song' });
-    const enq = await cyaniteGql(CYANITE_ENQUEUE, { input: { videoUrl: `https://www.youtube.com/watch?v=${videoId}` } });
-    const out = enq.data?.data?.youTubeTrackEnqueue;
-    if (out?.__typename !== 'YouTubeTrackEnqueueSuccess') {
-      return res.status(502).json({ ok: false, status: 'error', error: out?.message || enq.data?.errors?.[0]?.message || 'enqueue failed' });
-    }
-    trackId = out.enqueuedLibraryTrack.id;
-    cyaniteCache.set(ck, { status: 'pending', trackId });
-    saveCyaniteCache();
-  }
-
-  // Poll once; the client re-calls until finished.
-  const pr = await cyaniteGql(CYANITE_ANALYSIS, { id: trackId });
-  const a = pr.data?.data?.libraryTrack?.audioAnalysisV6;
-  if (a?.__typename === 'AudioAnalysisV6Finished') {
-    const result = simplifyMood(a.result);
-    cyaniteCache.set(ck, { status: 'finished', trackId, result });
-    saveCyaniteCache();
-    return res.json({ ok: true, mode: 'live', status: 'finished', result });
-  }
-  if (a && /Failed|NotAuthorized|NotFound/.test(a.__typename)) {
-    cyaniteCache.set(ck, { status: 'error', trackId });
-    saveCyaniteCache();
-    return res.json({ ok: false, mode: 'live', status: 'error', error: a.__typename });
-  }
-  return res.json({ ok: true, mode: 'live', status: 'pending', trackId });
-});
-
 // --- LALAL.AI: stem separation (Suno tracks -> karaoke instrumental) ------
 // Async, metered API (charges processing minutes). Flow:
 //   upload bytes -> /split (stem) -> poll /check until task.state === success.
@@ -1791,32 +1641,85 @@ router.get('/live/youtube', async (req, res) => {
   res.json({ ok: !error, items, error });
 });
 
-// Multi-platform fan footage via RapidAPI (TikTok / Instagram / X). `platform`
-// = 'all' (default) fans out to all three concurrently; or a single platform.
-// Returns normalized items (source, url, title, author, views, ts) the live
-// feed merges with YouTube + embeds with a source badge.
+// Multi-platform fan footage. Two providers, picked per platform:
+//   • Google Programmable Search (reuses the ticket-search CSE key + engine) —
+//     TikTok / IG / X video pages are indexed by Google, so this finds real
+//     permalinks the client embeds, with NO scraper subscription. Ranked by
+//     relevance not recency, and Google doesn't expose play counts (views=null).
+//   • RapidAPI scrapers (rapid.js) — real keyword search with views + recency,
+//     but metered. Used where still available.
+// We prefer CSE for TikTok (the scraper quota tends to run out) and keep X/IG on
+// RapidAPI when it's configured. Both return the same normalized shape
+// (source, url, title, author, views, ts) the live feed merges with YouTube.
+const SOCIAL_SITES = { tiktok: 'tiktok.com', instagram: 'instagram.com', x: 'x.com' };
+
+function cseConfig(req) {
+  const key = String(req.get('x-cohear-google-cse-key') || process.env.GOOGLE_CSE_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
+  const cx = String(req.get('x-cohear-google-cse-id') || process.env.GOOGLE_CSE_ID || '').trim();
+  return { key, cx, ok: Boolean(key && cx) };
+}
+
+// Restrict a CSE query to one social domain and keep only real post/video URLs.
+async function cseSocial(platform, q, { key, cx }, limit = 12) {
+  const site = SOCIAL_SITES[platform];
+  if (!site || !q) return [];
+  const params = new URLSearchParams({
+    key, cx, q: `${q} concert live`, num: '10', safe: 'active',
+    siteSearch: site, siteSearchFilter: 'i',
+  });
+  const result = await callLive('websearch', `https://customsearch.googleapis.com/customsearch/v1?${params.toString()}`);
+  const items = Array.isArray(result.data?.items) ? result.data.items : [];
+  return items.map((it) => normalizeCseSocial(platform, it)).filter(Boolean).slice(0, limit);
+}
+
+function normalizeCseSocial(platform, item) {
+  const url = item.link;
+  if (!url) return null;
+  // Permalinks only — drop profile, hashtag and explore pages.
+  if (platform === 'tiktok' && !/\/video\/\d+/.test(url)) return null;
+  if (platform === 'instagram' && !/\/(p|reel)\//.test(url)) return null;
+  if (platform === 'x' && !/\/status\/\d+/.test(url)) return null;
+  const handle = (url.match(/@([\w.]+)/) || url.match(/(?:instagram\.com|x\.com|twitter\.com)\/([\w.]+)/) || [])[1] || '';
+  const meta = item.pagemap?.metatags?.[0] || {};
+  const ts = Date.parse(meta['article:published_time'] || meta['og:updated_time'] || '') || 0;
+  return {
+    source: platform,
+    url,
+    title: (item.title || meta['og:title'] || '').replace(/\s*[|·-]\s*(TikTok|Instagram|X).*$/i, '').slice(0, 140),
+    author: handle,
+    views: null,
+    ts,
+    thumb: item.pagemap?.cse_image?.[0]?.src || meta['og:image'] || null,
+  };
+}
+
 router.get('/live/social', async (req, res) => {
-  if (!rapid.hasRapid()) return res.json({ ok: false, error: 'no RapidAPI key', items: [] });
   const q = String(req.query.q || '').trim();
   const artist = String(req.query.artist || '').trim();
   const platform = String(req.query.platform || 'all');
   const igUser = String(req.query.username || '') || rapid.igHandle(artist);
+  const cse = cseConfig(req);
+
+  if (!rapid.hasRapid() && !cse.ok) {
+    return res.json({ ok: false, error: 'no search provider (set RAPIDAPI_KEY or GOOGLE_CSE_ID + key)', items: [] });
+  }
+
+  // Per-platform fetchers: prefer CSE for TikTok, RapidAPI for X/IG, with the
+  // other provider as a fallback when one isn't configured.
+  const fetchers = {
+    tiktok: () => (cse.ok ? cseSocial('tiktok', q, cse) : rapid.searchTikTok(q)),
+    x: () => (rapid.hasRapid() ? rapid.searchX(q) : cse.ok ? cseSocial('x', q, cse) : Promise.resolve([])),
+    instagram: () => (rapid.hasRapid() ? rapid.searchInstagram(igUser) : cse.ok ? cseSocial('instagram', q, cse) : Promise.resolve([])),
+  };
 
   try {
     if (platform !== 'all') {
-      const r = await rapid.searchSocial(platform, { q, username: igUser });
-      return res.json(r);
+      const fn = fetchers[platform];
+      if (!fn) return res.json({ ok: false, error: `unknown platform: ${platform}`, items: [] });
+      return res.json({ ok: true, items: await fn() });
     }
-    const [tt, x, ig] = await Promise.allSettled([
-      rapid.searchTikTok(q),
-      rapid.searchX(q),
-      rapid.searchInstagram(igUser),
-    ]);
-    const items = [
-      ...(tt.status === 'fulfilled' ? tt.value : []),
-      ...(x.status === 'fulfilled' ? x.value : []),
-      ...(ig.status === 'fulfilled' ? ig.value : []),
-    ];
+    const settled = await Promise.allSettled([fetchers.tiktok(), fetchers.x(), fetchers.instagram()]);
+    const items = settled.flatMap((r) => (r.status === 'fulfilled' ? r.value : []));
     res.json({ ok: true, items });
   } catch (e) {
     res.status(502).json({ ok: false, error: e.message, items: [] });

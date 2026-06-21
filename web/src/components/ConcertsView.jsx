@@ -4,6 +4,7 @@ import { fmtCapacity, fmtDate } from '../tour.js';
 import { loadGoogleMaps, hasMapsKey } from '../live/maps.js';
 import { GOOGLE_PAPER_MAP } from '../live/mapStyle.js';
 import { claimStamp, optOutConcert, recordConcertAction, personalStats, backfillStubs, pruneDuplicates, HISTORY_EVENT } from '../account.js';
+import { readCalendar, addToCalendar, scheduleReminders } from '../calendar.js';
 
 const VIEW_MODES = [
   { id: 'list', label: 'List' },
@@ -105,6 +106,7 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
   const [selectedId, setSelectedId] = useState(initialState.selectedId);
   const [spotify, setSpotify] = useState(null);
   const [saved, setSaved] = useState(() => new Set(JSON.parse(localStorage.getItem('cohear_saved_shows') || '[]')));
+  const [calendared, setCalendared] = useState(() => new Set(readCalendar().map((e) => e.id)));
   const [fallbackUserZone, setFallbackUserZone] = useState(() => settings?.timezone || localStorage.getItem(USER_ZONE_KEY) || DETECTED_TIME_ZONE);
   const [now, setNow] = useState(() => Date.now());
   const [inspectorWidth, setInspectorWidth] = useState(() => readInspectorWidth());
@@ -244,6 +246,17 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
       return next;
     });
   }
+
+  // Add (or remove) a show from the device calendar: downloads an .ics with
+  // built-in reminders and records it locally so the month view highlights it.
+  function addCalendar(c) {
+    const start = showStartMs(c);
+    if (!start) return;
+    addToCalendar(c, start, showEndMs(c));
+    setCalendared(new Set(readCalendar().map((e) => e.id)));
+  }
+
+  useEffect(() => { scheduleReminders(); }, []);
 
   function setUserZone(zone) {
     setFallbackUserZone(zone);
@@ -400,6 +413,8 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
                 selectedId={selected?.id}
                 onSelect={setSelectedId}
                 saved={saved}
+                calendared={calendared}
+                onAddCalendar={addCalendar}
                 userZone={userZone}
                 now={now}
                 sortKey={sortKey}
@@ -409,7 +424,7 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
               />
             )}
             {mode === 'map' && <ConcertMap rows={visible} selectedId={selected?.id} onSelect={setSelectedId} />}
-            {mode === 'calendar' && <ConcertCalendar rows={visible} selectedId={selected?.id} onSelect={setSelectedId} />}
+            {mode === 'calendar' && <ConcertCalendar rows={visible} selectedId={selected?.id} onSelect={setSelectedId} calendared={calendared} />}
           </main>
 
           <button
@@ -425,11 +440,13 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
           <ConcertInspector
             concert={selected}
             saved={selected ? saved.has(selected.id) : false}
+            calendared={selected ? calendared.has(selected.id) : false}
             sources={sources}
             userZone={userZone}
             currency={preferredCurrency}
             now={now}
             onSave={() => selected && toggleSave(selected.id)}
+            onAddCalendar={() => selected && addCalendar(selected)}
             onEnterShow={onEnterShow}
             onSyncLive={onSyncLive}
           />
@@ -643,10 +660,10 @@ function clampFr(value, fallback) {
 // flexible tracks keep a sane min width (so a city never clips to a couple of
 // letters) and otherwise split the leftover space by the user's fr ratios.
 function colsTemplate(c) {
-  return `56px minmax(150px, ${c.artist}fr) minmax(130px, ${c.venue}fr) minmax(160px, ${c.city}fr) minmax(150px, ${c.time}fr) 88px 88px`;
+  return `56px minmax(150px, ${c.artist}fr) minmax(130px, ${c.venue}fr) minmax(160px, ${c.city}fr) minmax(150px, ${c.time}fr) 88px 140px`;
 }
 
-function ConcertTable({ rows, selectedId, onSelect, saved, userZone, now, sortKey, dir, onSort, onSyncLive }) {
+function ConcertTable({ rows, selectedId, onSelect, saved, calendared, onAddCalendar, userZone, now, sortKey, dir, onSort, onSyncLive }) {
   const [syncingId, setSyncingId] = useState(null);
   const [cols, setCols] = useState(() => readCols());
   const headerRef = useRef(null);
@@ -763,13 +780,26 @@ function ConcertTable({ rows, selectedId, onSelect, saved, userZone, now, sortKe
                 <TimeStack concert={c} userZone={userZone} now={now} />
                 <span className="text-left text-sm font-semibold tabular-nums text-amber-200 lg:text-right">{fmtCapacity(c.capacity)}</span>
               </button>
-              <button
-                className="cohear-primary min-h-9 justify-center px-3 text-xs lg:justify-self-end"
-                onClick={() => join(c)}
-                disabled={syncingId === c.id}
-              >
-                {syncingId === c.id ? 'Opening' : 'Join'}
-              </button>
+              <span className="flex items-center gap-1.5 lg:justify-self-end">
+                {showStartMs(c) && (
+                  <button
+                    type="button"
+                    className={`cohear-icon-button h-9 w-9 shrink-0 ${calendared?.has(c.id) ? 'text-cyan-300' : ''}`}
+                    onClick={() => onAddCalendar?.(c)}
+                    title={calendared?.has(c.id) ? 'On your calendar — click to remove' : 'Add to calendar (downloads an .ics with reminders)'}
+                    aria-pressed={calendared?.has(c.id) || false}
+                  >
+                    <CalendarPlusIcon added={calendared?.has(c.id)} />
+                  </button>
+                )}
+                <button
+                  className="cohear-primary min-h-9 justify-center px-3 text-xs"
+                  onClick={() => join(c)}
+                  disabled={syncingId === c.id}
+                >
+                  {syncingId === c.id ? 'Opening' : 'Join'}
+                </button>
+              </span>
             </li>
           );
         })}
@@ -795,7 +825,7 @@ function SortHeader({ id, label, sortKey, dir, onSort, align = 'left' }) {
   );
 }
 
-function ConcertInspector({ concert, saved, sources, userZone, currency, now, onSave, onEnterShow, onSyncLive }) {
+function ConcertInspector({ concert, saved, calendared, sources, userZone, currency, now, onSave, onAddCalendar, onEnterShow, onSyncLive }) {
   const [syncing, setSyncing] = useState(false);
   const [ticket, setTicket] = useState(null);
   const [webTicket, setWebTicket] = useState(null);
@@ -863,6 +893,16 @@ function ConcertInspector({ concert, saved, sources, userZone, currency, now, on
               {onSyncLive && (
                 <button className="cohear-primary min-h-9 px-3 text-xs" onClick={sync} disabled={syncing}>
                   {syncing ? 'Opening' : 'Join live'}
+                </button>
+              )}
+              {concert.when !== 'past' && onAddCalendar && (
+                <button
+                  className={`cohear-icon-button ${calendared ? 'text-cyan-300' : ''}`}
+                  onClick={onAddCalendar}
+                  title={calendared ? 'On your calendar — click to remove' : 'Add to calendar (downloads an .ics with reminders)'}
+                  aria-pressed={calendared || false}
+                >
+                  <CalendarPlusIcon added={calendared} />
                 </button>
               )}
               <button className="cohear-icon-button" onClick={onSave} title={saved ? 'Remove saved concert' : 'Save concert'}>
@@ -1248,7 +1288,7 @@ function FallbackMap({ rows, selectedId, onSelect, showLabels, trailRows, routeS
   );
 }
 
-function ConcertCalendar({ rows, selectedId, onSelect }) {
+function ConcertCalendar({ rows, selectedId, onSelect, calendared }) {
   const firstIso = rows.map((c) => c.date).filter(Boolean).sort()[0] || new Date().toISOString().slice(0, 10);
   const [monthAnchor, setMonthAnchor] = useState(() => firstIso.slice(0, 7));
 
@@ -1299,19 +1339,25 @@ function ConcertCalendar({ rows, selectedId, onSelect }) {
                 {shows.length > 3 && <span className="text-[10px] text-zinc-600">+{shows.length - 3}</span>}
               </div>
               <div className="mt-2 grid gap-1">
-                {shows.slice(0, 3).map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => onSelect(c.id)}
-                    className={`rounded border px-2 py-1 text-left transition ${
-                      c.id === selectedId ? 'border-cyan-300/50 bg-cyan-300/[0.1]' : 'border-white/10 bg-black/20 hover:border-white/25'
-                    }`}
-                    title={`${c.artist} at ${c.venue}`}
-                  >
-                    <span className="block truncate text-[11px] font-semibold text-white">{c.artist}</span>
-                    <span className="block truncate text-[10px] text-zinc-500">{fmtCapacity(c.capacity)}</span>
-                  </button>
-                ))}
+                {shows.slice(0, 3).map((c) => {
+                  const onCal = calendared?.has(c.id);
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => onSelect(c.id)}
+                      className={`rounded border px-2 py-1 text-left transition ${
+                        c.id === selectedId ? 'border-cyan-300/50 bg-cyan-300/[0.1]' : onCal ? 'border-cyan-300/30 bg-cyan-300/[0.05]' : 'border-white/10 bg-black/20 hover:border-white/25'
+                      }`}
+                      title={`${c.artist} at ${c.venue}${onCal ? ' · on your calendar' : ''}`}
+                    >
+                      <span className="flex items-center gap-1">
+                        {onCal && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-300" title="On your calendar" />}
+                        <span className="block truncate text-[11px] font-semibold text-white">{c.artist}</span>
+                      </span>
+                      <span className="block truncate text-[10px] text-zinc-500">{fmtCapacity(c.capacity)}</span>
+                    </button>
+                  );
+                })}
               </div>
             </section>
           );
@@ -1884,6 +1930,15 @@ function ClockIcon() {
 }
 function BookmarkIcon({ filled }) {
   return <svg viewBox="0 0 24 24" className="h-4 w-4" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2"><path d="M6 4.8A1.8 1.8 0 0 1 7.8 3h8.4A1.8 1.8 0 0 1 18 4.8V21l-6-3.4L6 21V4.8Z" /></svg>;
+}
+function CalendarPlusIcon({ added }) {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="4.5" width="18" height="16" rx="2" />
+      <path d="M3 9h18M8 3v3M16 3v3" />
+      {added ? <path d="m9 14.5 2 2 4-4" /> : <path d="M12 12.5v5M9.5 15h5" />}
+    </svg>
+  );
 }
 function SortFlipIcon({ dir }) {
   return (

@@ -1,4 +1,5 @@
 // Cohear gateway client (same-origin via the Vite proxy) + anonymous identity.
+import { readSettings, readApiKey } from '../settings.js';
 
 // --- Anonymous guest identity -------------------------------------------
 // Zero-friction: a judge opens the URL and is instantly "in the crowd". We mint
@@ -92,12 +93,22 @@ export async function liveYoutube(q, { live = false, since, hours } = {}) {
   return r || { items: [], error: 'api' };
 }
 
-// --- Multi-platform social search (TikTok / Instagram / X via RapidAPI) ---
-// Returns normalized items [{source, url, title, author, views, ts}] the feed
-// merges with YouTube and embeds with a source badge.
+// --- Multi-platform social search (TikTok / Instagram / X) ---------------
+// Backed by Google Programmable Search (TikTok) and/or RapidAPI scrapers on the
+// gateway. Returns normalized items [{source, url, title, author, views, ts}]
+// the feed merges with YouTube and embeds with a source badge.
 export async function socialSearch({ q, artist, platform = 'all' }) {
   const p = new URLSearchParams({ q, artist, platform });
-  const r = await fetch(`/api/live/social?${p.toString()}`).then((x) => x.json()).catch(() => null);
+  // Forward the user's own Google Programmable Search key + engine id (same BYOK
+  // pair the ticket search uses) so the gateway can find TikTok footage via CSE.
+  const settings = readSettings();
+  const cseKey = readApiKey('googleCse');
+  const cseId = settings?.searchEngineIds?.googleCse || '';
+  const headers = {
+    ...(cseKey ? { 'x-cohear-google-cse-key': cseKey } : {}),
+    ...(cseId ? { 'x-cohear-google-cse-id': cseId } : {}),
+  };
+  const r = await fetch(`/api/live/social?${p.toString()}`, { headers }).then((x) => x.json()).catch(() => null);
   return r?.items || [];
 }
 
@@ -109,19 +120,6 @@ export async function getWeather({ lat, lng, date } = {}) {
   if (date) p.set('date', date);
   const r = await fetch(`/api/weather?${p.toString()}`).then((x) => x.json()).catch(() => null);
   return r?.ok ? r : null;
-}
-
-// --- Cyanite mood/energy/BPM for the current song ------------------------
-// Async on the server (enqueue a YouTube source -> poll). Returns
-// { status: 'pending'|'finished'|'error', result?, mode }. Call repeatedly for
-// the same song until status === 'finished'; the server caches so it's cheap.
-export async function analyzeMood({ song, artist, videoId } = {}) {
-  const r = await fetch('/api/cyanite/analyze', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ song, artist, videoId }),
-  }).then((x) => x.json()).catch(() => null);
-  return r || { status: 'error' };
 }
 
 // --- YouTube top result for a song (drives the persistent player) --------

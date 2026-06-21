@@ -1,0 +1,985 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monochrome generator</title>
+  <meta name="generator" content="CodePen Library Saver">
+  <meta name="codepen:source" content="https://codepen.io/ikrprojects/pen/MYKgvza">
+  <style>
+    html, body {
+      min-height: 100%;
+    }
+  </style>
+  <style>
+  @import url("https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap");
+
+  :root {
+  	--bgC: #fff;
+  	--textC: #000;
+  	--lowC: #fff;
+  	--highC: #000;
+  	--midBgC: #888;
+  	--midTextC: #000;
+  	--bgImgC: #fff;
+  }
+
+  * {
+  	position: relative;
+  }
+
+  html,
+  body {
+  	font-family: "Poppins", sans-serif;
+  	margin: 0;
+  	padding: 0px;
+  }
+
+  body {
+  	background: var(--bgC);
+  	color: var(--textC);
+  	position: relative;
+  	overflow-x: clip;
+  	min-height: 100vh;
+  	padding: 10px;
+  	font-size: 18px;
+  }
+
+  h1 {
+  	display: block;
+  	text-align: center;
+  	white-space: nowrap;
+  	text-wrap: nowrap;
+  	font-size: clamp(1em, 8vw, 6em);
+  	font-weight: 900;
+  	margin: 0px;
+  	padding: 0px;
+  	padding-bottom: 25px;
+  }
+
+  h2 {
+  	font-size: 30px;
+  	sup {
+  		display: block;
+  		font-size: 18px;
+  		line-height: 30px;
+  		padding: 0px;
+  		padding-top: 10px;
+  		margin: 0px;
+  	}
+  }
+  h3 {
+  	font-size: 24px;
+  }
+
+  .range {
+  	position: relative;
+  	width: 100%;
+  	margin-bottom: 20px;
+
+  	#line {
+  		position: absolute;
+  		left: 0px;
+  		top: 2px;
+  		bottom: 2px;
+  		z-index: 10;
+  		width: 8.333%;
+  		border-radius: 6px;
+  		outline: solid 4px var(--textC);
+  		cursor: default;
+  		opacity: 0;
+  	}
+
+  	.cTabW {
+  		display: inline-block;
+  		width: 8.333%;
+  		padding: 0px;
+  		margin: 0px;
+  		cursor: pointer;
+
+  		&:first-child .cTab {
+  			border-top-left-radius: 8px;
+  			border-bottom-left-radius: 8px;
+  		}
+
+  		&:last-child .cTab {
+  			border-top-right-radius: 8px;
+  			border-bottom-right-radius: 8px;
+  		}
+
+  		.cTab {
+  			display: block;
+  			height: 100px;
+
+  			&.txtTab {
+  				position: relative;
+
+  				&::after {
+  					display: flex;
+  					justify-content: center;
+  					align-items: center;
+  					font-family: "Times New Roman", Times, serif;
+  					font-size: 50px;
+  					content: "T";
+  					color: var(--bgC);
+  					position: absolute;
+  					width: 100%;
+  					height: 100%;
+  				}
+  			}
+  		}
+  	}
+  }
+  #spacer01 {
+  	border-top: solid 3px var(--textC);
+  	border-bottom: solid 3px var(--textC);
+  	font-weight: 600;
+  	padding-top: 10px;
+  	padding-bottom: 10px;
+  	margin-bottom: 20px;
+  }
+
+  #headline {
+  	background-color: var(--textC);
+  	color: var(--bgC);
+  	border-radius: 8px;
+  	overflow: hidden;
+
+  	#header1 {
+  		position: relative;
+  		z-index: 5;
+  		color: var(--midTextC);
+  	}
+
+  	@media (min-width: 769px) {
+  		&::before,
+  		&::after {
+  			position: absolute;
+  			display: block;
+  			content: "";
+  			top: 50%;
+  			left: 0px;
+  			transform: translate(-50%, -50%);
+  			z-index: 0;
+  			border-radius: 50%;
+  			background: var(--midBgC);
+  		}
+  		&::before {
+  			padding: 55%;
+  		}
+  		&::after {
+  			padding: 57%;
+  			padding: calc(55% + 20px);
+  			opacity: 0.5;
+  			box-shadow: 10px 0px 20px #0008;
+  		}
+  	}
+
+  	@media (max-width: 768px) {
+  		background-image: none;
+
+  		#header1 {
+  			background-color: var(--midBgC);
+  		}
+  		#header2 {
+  			height: 20px;
+  			background-image: linear-gradient(
+  				2deg,
+  				var(--textC) 0%,
+  				var(--textC) 50%,
+  				var(--midBgC) calc(55% + 1px),
+  				var(--midBgC) 100%
+  			);
+  		}
+  		#header3 {
+  			background-color: var(--textC);
+  		}
+  	}
+  }
+
+  .newsPhotoWrapper {
+  	display: block;
+  	width: 100%;
+  	height: 100%;
+  	min-height: 125px;
+  	background-color: var(--bgImgC);
+  	margin-bottom: 15px;
+
+  	.newsPhoto {
+  		display: block;
+  		position: relative;
+  		width: 100%;
+  		height: 100%;
+  		min-height: 125px;
+  		background-repeat: no-repeat;
+  		background-size: cover;
+  		background-position: center;
+  		mix-blend-mode: multiply;
+  		filter: contrast(1) brightness(150%) grayscale();
+
+  		&.min300 {
+  			min-height: 300px;
+  		}
+  	}
+  }
+
+  .newsItem {
+  	display: block;
+  	display: flex;
+  	flex-direction: column;
+  	height: 100%;
+  	position: relative;
+  	padding: 15px;
+  	border-radius: 8px;
+  	overflow: hidden;
+  	font-size: 14px;
+  	cursor: pointer;
+  	background-color: var(--lowC);
+  	color: var(--highC);
+
+  	&.min300 {
+  		min-height: 300px;
+  	}
+
+  	&:has(.newsPhotoWrapper) {
+  		padding-top: 135px;
+  	}
+
+  	&:hover {
+  		opacity: 0.8;
+  	}
+
+  	.newsPhotoWrapper {
+  		position: absolute;
+  		top: 0px;
+  		left: 0px;
+  		right: 0px;
+  		height: 125px;
+  	}
+
+  	h4 {
+  		font-size: 18px;
+  		font-weight: 600;
+  		margin: 0px;
+  		margin-bottom: 5px;
+  	}
+  	h5 {
+  		font-size: 26px;
+  		font-weight: 600;
+  		margin: 0px;
+  		margin-bottom: 5px;
+  	}
+  	svg {
+  		max-width: 280px;
+  		aspect-ratio: 1/1;
+  		margin-left: auto;
+  		margin-right: auto;
+  	}
+  	svg + h5 {
+  		text-align: right;
+  	}
+  }
+
+  #footerBanner {
+  	background-color: var(--midBgC);
+  	color: var(--midTextC);
+  	border-radius: 8px;
+  	border-top-right-radius: 0;
+  	overflow: hidden;
+
+  	#footerB1 {
+  		position: relative;
+  		padding-bottom: 150px !important;
+  		z-index: 5;
+  		font-size: 25px;
+  		line-height: normal;
+  		min-height: 350px;
+  		@media (max-width: 992px) {
+  			font-size: 20px;
+  			padding-bottom: 150px !important;
+  		}
+  		@media (max-width: 800px) {
+  			font-size: 20px;
+  			padding-bottom: 150px !important;
+  		}
+
+  		h6 {
+  			font-size: 60px;
+  			line-height: 60px;
+  			max-width: 600px;
+  			margin-left: auto;
+  			line-height: normal;
+  			text-align: right;
+  			font-weight: 900;
+
+  			@media (max-width: 1400px) {
+  				font-size: 50px;
+  				line-height: 50px;
+  			}
+  			@media (max-width: 1200px) {
+  				font-size: 40px;
+  				line-height: 40px;
+  			}
+  			@media (max-width: 992px) {
+  				font-size: 30px;
+  				line-height: 30px;
+  			}
+  			@media (max-width: 700px) {
+  				font-size: 20px;
+  				line-height: 20px;
+  			}
+  		}
+
+  		div {
+  			position: absolute;
+  			bottom: 20px;
+  			left: 20px;
+  			right: 20px;
+  			sup {
+  				display: block;
+  				padding-top: 40px;
+  				font-size: 18px;
+  				line-height: 26px;
+  				height: auto;
+
+  				a {
+  					text-decoration: underline;
+  					cursor: pointer;
+  				}
+  			}
+  		}
+  	}
+  	#footerB2 {
+  		position: relative;
+  		width: 100%;
+  		max-width: 120px;
+  		margin: 0px;
+  		padding: 0px;
+
+  		@media (max-width: 962px) {
+  			max-width: 100px;
+  		}
+
+  		&::after {
+  			color: var(--midTextC);
+  			position: absolute;
+  			font-family: "Poppins", sans-serif;
+  			content: "PRO";
+  			font-size: 140px;
+  			line-height: 140px;
+  			font-weight: 900;
+  			transform-origin: 0% 0%;
+  			transform: rotate(90deg) translate(-10px, -128px);
+  			@media (max-width: 962px) {
+  				font-size: 120px;
+  				line-height: 120px;
+  				transform: rotate(90deg) translate(-10px, -110px);
+  			}
+  		}
+  		&::before {
+  			display: block;
+  			position: absolute;
+  			content: "";
+  			left: 8px;
+  			width: 102px;
+  			height: 100%;
+  			z-index: 1;
+  			background-color: var(--midTextC);
+  			opacity: 0.25;
+  			@media (max-width: 962px) {
+  				left: 6px;
+  				width: 90px;
+  			}
+  		}
+  	}
+
+  	#footerB3 {
+  		width: 100%;
+  		max-width: 500px;
+
+  		svg {
+  			width: 100%;
+  			aspect-ratio: 1/1;
+  			margin-left: auto;
+  			margin-bottom: auto;
+
+  			.shadow {
+  				fill: var(--midBgC);
+  			}
+  			.hand {
+  				fill: var(--bgC);
+  			}
+  			.biscuit {
+  				fill: var(--lowC);
+  			}
+  			.wetbiscuit {
+  				fill: var(--midBg);
+  				fill-opacity: 0;
+  			}
+  		}
+  	}
+  }
+
+  #resetWrapper {
+  	display: flex;
+  	justify-content: center;
+  	align-items: center;
+  	position: absolute;
+  	right: 20px;
+  	top: 20px;
+  	z-index: 10;
+  	width: 75px;
+  	height: 75px;
+  	font-size: 70px;
+  	line-height: 70px;
+  	color: var(--textC);
+  	cursor: pointer;
+  	opacity: 0.5;
+  	background-color: #fff4;
+  	border-radius: 50%;
+
+  	&:hover {
+  		opacity: 1;
+  	}
+  }
+  </style>
+</head>
+<body>
+<div class="container-lg mx-auto py-5">
+
+	<section class="range p-0 m-0">
+		<div class="row p-0 m-0">
+			<div class="cTabW">
+				<div id="tb0" class="cTab"></div>
+			</div>
+			<div class="cTabW">
+				<div id="tb1" class="cTab"></div>
+			</div>
+			<div class="cTabW">
+				<div id="tb2" class="cTab"></div>
+			</div>
+			<div class="cTabW">
+				<div id="tb3" class="cTab"></div>
+			</div>
+			<div class="cTabW">
+				<div id="tb4" class="cTab"></div>
+			</div>
+			<div class="cTabW">
+				<div id="tb5" class="cTab"></div>
+			</div>
+			<div class="cTabW">
+				<div id="tb6" class="cTab"></div>
+			</div>
+			<div class="cTabW">
+				<div id="tb7" class="cTab"></div>
+			</div>
+			<div class="cTabW">
+				<div id="tb8" class="cTab"></div>
+			</div>
+			<div class="cTabW">
+				<div id="tb9" class="cTab"></div>
+			</div>
+			<div class="cTabW">
+				<div id="tb10" class="cTab"></div>
+			</div>
+			<div class="cTabW">
+				<div id="tb11" class="cTab"></div>
+			</div>
+		</div>
+		<div id="line"></div>
+	</section>
+
+	<section id="header">
+		<h1>THE DIGITAL NEWS</h1>
+	</section>
+
+	<section id="spacer01" class="row">
+		<div class="col-4 text-start">No.959094</div>
+		<div class="col-4 text-center"></div>
+		<div class="col-4 text-end">15&cent;</div>
+	</section>
+
+	<section id="main">
+
+		<div class="row">
+			<div class="col-md-9 pe-md-4">
+
+				<div id="headline" class="row p-0 p-md-4">
+					<div id="header1" class="col-md-6 p-4 pe-0">
+						<h3>It's official - most popular color used on the NET... designers scrambling to catch up with bombshell discovery:<br>
+							<sup class="d-block pt-5">FRANK LEE SURPRISED</sup>
+						</h3>
+					</div>
+					<div id="header2" class="col-md-1"></div>
+					<div id="header3" class="col-md-5 p-4 p-md-3 d-flex text-center">
+						<h2 class="m-auto"></h2>
+					</div>
+				</div>
+
+				<div class="row px-2 pe-lg-0 py-4">
+					<h4 class="fs-1 p-0">America in for a rude awakening</h4>
+					<span class="px-0 pb-3 fs-4">As southern trade relations strain and stocks rapidly diminish, an increasing number are forced to seek alternatives to their favorite morning beverage.</span>
+
+					<div class="row px-0 mx-0 pt-2 pb-4">
+						<div class="col-lg-7 ps-0 pb-3">
+							Top of the list is a little-known substitute called tea. An aromatic drink prepared by pouring hot water over fresh evergreen shrub leaves!!!<br><br>
+							Tea is widely consumed outside of the US and is the most likely replacement for our dwindling coffee supply.<br><br>
+							Alarmingly, THE DIGITAL NEWS has received leaked information that would suggest tea has little or no caffeine. As a matter of urgency, we have asked the US government to confirm whether or not this is correct, but we have yet to receive a reply.
+						</div>
+						<div class="col-lg-5 px-0 ps-lg-3">
+							<div class="newsPhotoWrapper">
+								<div id="main" class="newsPhoto min300"></div>
+							</div>
+						</div>
+					</div>
+					<span class="px-0 fs-4">Once we have further details, we will endeavour to keep the US people informed.</span>
+				</div>
+			</div>
+
+			<div class="col-md-3 pe-md-0">
+
+				<div class="row">
+					<div class="col-12 col-sm-6 col-md-12 mb-3 mb-md-4">
+						<div class="newsItem">
+							<div class="newsPhotoWrapper">
+								<div id="new1" class="newsPhoto"></div>
+							</div>
+							<h4>European productivity rises</h4>
+							Workforce claims a new spring in their steps. Early indications point to a massive increase in caffeine consumption.
+						</div>
+					</div>
+					<div class="col-12 col-sm-6 col-md-12 mb-3 mb-md-4">
+						<div class="newsItem">
+							<div class="newsPhotoWrapper">
+								<div id="new2" class="newsPhoto"></div>
+							</div>
+							<h4>Brookline beast finally apprehended</h4>
+							Retired postal worker credited with ending terror on Brookline streets.
+						</div>
+					</div>
+
+					<div class="col-12 mb-3 mb-md-4">
+						<div class="newsItem d-flex justify-content-center" style="display: block; min-height:350px;">
+							<h5>Need to ease those jitters</h5>
+							<svg xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg" id="jittersFace" fill="currentColor" stroke="none" version="1.1" viewBox="0 0 400 400">
+								<path id="head" filter="url(#outline)" d="M 105,87.3 C 98.6,93 92.6,99.2 87.2,105.9 39.35,165.19 44.44,249.25 94.35,302.68 99.83,308.55 105.85,314.05 112.4,319.1 c 59.31,45.78 144.6,41.1 198.4,-13.2 6.2,-6.3 11.9,-13.1 16.9,-20.3 37.5,-54.2 35.4,-127.9 -7,-180.1 C 315.4,99 309.6,92.9 303.2,87.4 246.7,37.7 161.5,37.7 105,87.4 Z m 192.7,6.3 c 6,5.2 11.5,11 16.5,17.1 40,49.2 42.1,118.8 6.6,170 -4.8,6.9 -10.1,13.3 -16,19.2 C 254,351.1 173.41,355.59 117.5,312.4 110.5,306.99 104.14,301.04 98.43,294.66 53.32,244.16 49.32,166.33 93.8,111.2 c 5.09,-6.31 10.7,-12.2 16.8,-17.5 53.3,-46.9 133.8,-46.9 187.1,0 z" />
+								<path id="lEye" filter="url(#outline)" d="m 159,166 c 0,0 -0,1 -0,1 -0,9 -8,16 -17,16 -9,0 -17,-7 -17,-16 -0,-0 -0,-1 -0,-1 0,-9 8,-17 17,-17 9,0 17,8 17,17 z" />
+								<path id="rEye" filter="url(#outline)" d="m 290,166 c 0,0 -0,0 -0,1 -0,9 -8,17 -17,17 -9,0 -17,-7 -17,-16 -0,-0 -0,-0 -0,-1 0,-9 8,-17 17,-17 9,0 17,8 17,17 z" />
+
+								<path id="mouth" filter="url(#outline)" d="m 204,221 c -27,1 -52,13 -67,35 -7,12 9,22 19,10 13,-16 31,-22 50,-22 C 226,243 247,251 261,269 c 8,9 22,1 19,-10 -17,-25 -46,-40 -76,-38 z" />
+							</svg>
+							<h5>Manage how you go through caffeine withdrawal</h5>
+						</div>
+					</div>
+
+				</div>
+
+			</div>
+
+		</div>
+	</section>
+
+	<section id="footerBanner" class="row p-0 mt-5">
+
+		<div id="footerB1" class="col p-4">
+			<h6>Learn how to dunk a biscuit (&nbsp;cookie&nbsp;) like a</h6>
+			<div>
+				Essential skills you will need during the transition.<br>
+				<sup><a>Tutorials</a> &nbsp;|&nbsp; <a>Podcast</a> &nbsp;|&nbsp; <a>Dunk&nbsp;simulator</a></sup>
+			</div>
+		</div>
+		<div id="footerB2" class="col p-0 m-0"></div>
+		<div id="footerB3" class="col p-0 m-0 d-flex">
+
+			<svg xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg" xml:space="preserve" version="1.1" viewBox="0 0 400 400">
+
+				<g id="hand" stroke="none">
+
+					<g id="biscuitwrapper">
+						<g id="biscuit">
+							<path class="biscuit" d="m 124,213.8 c 8,14 21,26 36,32 24,10 53,3 71,-16 5,-5 8,-10 11,-16 z" />
+							<path class="wetbiscuit" d="m 124,213.8 c 8,14 21,26 36,32 24,10 53,3 71,-16 5,-5 8,-10 11,-16 z" />
+						</g>
+						<path id="biscuitTop" class="biscuit" d="M 183 118 C 114 125 117 181 117 187 C 117 196 120 206 124 214 L 242 214 C 251 196 251 175 243 157 C 233 134 208 118 183 118 z" />
+
+						<path class="shadow" opacity="0.5" d="M170.68 133.3c-8 0-13 9-9 16 4 8 18 6 19-3 3-11-10-13-10-13z" />
+						<path class="shadow" opacity="0.5" d="M214.68 163.3c-10 0-17 12-11 21 5 8 17 8 22 0 6-8-1-21-11-21z" />
+						<path class="shadow" opacity="0.5" d="M157.68 200.3c4 7 16 6 19-1 4-7-2-17-10-17 0 0-16 3-9 18z" />
+						<ellipse class="shadow" opacity="0.5" cx="149.75" cy="163.21" rx="2.69" ry="2.82" />
+						<ellipse class="shadow" opacity="0.5" cx="196.04" cy="201.7" rx="3.4" ry="2.82" />
+					</g>
+					<path class="hand folded" opacity="0.8" d="m 224,68 c -10,0 -16,7 -23,14 -1,10 -4,21 3,29 9,7 27,4 36,3 4,-3 7,-7 9,-11 4,-7 4,-14 1,-21 -7,0 -11,3 -16,6 -1,0 -1,0 -2,-0 -0,-0 -0,-1 0,-1 L 245,76 c -8,-8 -21,-8 -21,-8 z" />
+					<path id="hand1" class="hand" style="mask: url('#handMask');" d="m 236,-2 c -7,3 -15,7 -18,10 l -68,69 c -1,1 -2,2 -2,4 0,16 -3,43 -1,64 1,14 10,16 17,16 2,0 14,0 16,-12 3,-16 2,-41 3,-46 0,-1 0,-2 1,-3 32,-32 -9,10 24,-24 4,-4 10,-7 15,-7 10,-0 21,7 23,10 C 249,81 256,97 244,110 l -6,5 -25,25 c -8,8 -8,22 0,30 8,8 20,8 28,2 l 48,-48 7,-5 c 14,-11 26,-25 35,-41 v 0 c 3,-5 7,-8 13,-9 l 59,-7 V -2 Z" />
+
+				</g>
+				<g id="cup" fill="currentColor" stroke="none">
+					<path d="m 65,208 v 14 c -2,9 -12,5 -23,7 -14,3 -25,15 -24,30 0,36 31,45 58,53 12,26 30,39 44,45 6,3 -1,5 -1,5 H 64 l -5,1 c 0,12 9,19 20,17 h 184 c 6,1 14,-7 16,-13 0,-2 0,-4 -2,-5 h -54 c 0,0 -8,-3 -2,-7 20,-10 46,-33 50,-79 2,-23 1,-45 1,-68 z m 0,36 c 0,18 -1,36 5,53 -21,-9 -42,-24 -34,-45 7,-9 19,-8 29,-8 z" />
+					<path id="teaBag" class="shadow" opacity="0.5" d="M98.72 117.73h-9.06v45.31h-9.49l-8.63 18.12v36.24h45.3v-36.24l-9.75-18.12h-8.37z" transform="matrix(-1.0238653,0,0,1.0238653,297.35088,87.313481)" />
+				</g>
+			</svg>
+		</div>
+
+	</section>
+
+</div>
+
+<div id="resetWrapper">
+	<i id="reset" class="bi bi-arrow-repeat"></i>
+</div>
+
+<svg xmlns="http://www.w3.org/2000/svg" role="none" width="0" width="0">
+
+	<defs>
+
+		<path id="hand1b" d="m 236,-2 c -7,3 -15,7 -18,10 l -68,69 c -1,1 -2,2 -2,4 0,16 -3,43 -1,64 1,14 10,16 17,16 2,0 14,0 16,-12 3,-16 2,-41 3,-46 0,-1 0,-2 1,-3 32,-32 -9,10 24,-24 4,-4 10,-7 15,-7 10,-0 21,7 23,10 C 249,81 256,97 244,110 l -6,5 -25,25 c -8,8 -8,22 0,30 8,8 20,8 28,2 l 48,-48 7,-5 c 14,-11 26,-25 35,-41 v 0 c 3,-5 7,-8 13,-9 l 59,-7 V -2 Z" />
+		<path id="hand2b" d="m 236,-2 c -7,3 -15,7 -18,10 l -65,67 c -1,1 -3,3 -4,7 -5,15 -10,32 -17,57 -3,12 3,16 9,18 7,2 16,4 21,-9 5,-16 15,-40 18,-45 2,-2 3,-3 4,-4 6,-8 12,-12 24,-23 4,-4 10,-7 15,-7 10,0 21,7 23,10 3,2 10,18 -2,31 l -6,5 -25,25 c -8,8 -8,22 0,30 8,8 20,8 28,2 l 48,-48 7,-5 c 14,-11 26,-25 35,-41 v 0 c 3,-5 7,-8 13,-9 l 59,-7 V -2 Z" />
+
+		<path id="head1b" d="M 68 50 C 59 50 52 57 52 66 L 52 339 C 52 348 59 355 68 355 L 338 355 C 347 355 354 348 354 339 L 354 66 C 354 57 347 50 338 50 L 68 50 z M 75 57 L 332 57 C 340 57 347 64 347 73 L 347 333 C 347 341 340 348 332 348 L 75 348 C 66 348 59 341 59 333 L 59 73 C 59 64 66 57 75 57 z" />
+		<path id="head2b" d="M 105,87.3 C 98.6,93 92.6,99.2 87.2,105.9 39.35,165.19 44.44,249.25 94.35,302.68 99.83,308.55 105.85,314.05 112.4,319.1 c 59.31,45.78 144.6,41.1 198.4,-13.2 6.2,-6.3 11.9,-13.1 16.9,-20.3 37.5,-54.2 35.4,-127.9 -7,-180.1 C 315.4,99 309.6,92.9 303.2,87.4 246.7,37.7 161.5,37.7 105,87.4 Z m 192.7,6.3 c 6,5.2 11.5,11 16.5,17.1 40,49.2 42.1,118.8 6.6,170 -4.8,6.9 -10.1,13.3 -16,19.2 C 254,351.1 173.41,355.59 117.5,312.4 110.5,306.99 104.14,301.04 98.43,294.66 53.32,244.16 49.32,166.33 93.8,111.2 c 5.09,-6.31 10.7,-12.2 16.8,-17.5 53.3,-46.9 133.8,-46.9 187.1,0 z" />
+
+		<path id="lEye1b" d="m 159,166 c 0,0 -0,1 -0,1 -0,9 -8,16 -17,16 -9,0 -17,-7 -17,-16 -0,-0 -0,-1 -0,-1 0,-9 8,-17 17,-17 9,0 17,8 17,17 z" />
+		<path id="lEye2b" d="m 159,161 v 11 c 0,9 -8,16 -17,16 -9,0 -17,-7 -17,-16 v -11 c 0,-9 8,-17 17,-17 9,0 17,8 17,17 z" />
+
+		<path id="rEye1b" d="m 290,166 c 0,0 -0,0 -0,1 -0,9 -8,17 -17,17 -9,0 -17,-7 -17,-16 -0,-0 -0,-0 -0,-1 0,-9 8,-17 17,-17 9,0 17,8 17,17 z" />
+		<path id="rEye2b" d="m 290,173 c 0,9 -8,17 -17,17 -9,0 -17,-7 -17,-16 v -11 c 0,-9 8,-17 17,-17 9,0 17,7 17,16 z" />
+
+		<path id="mouth1b" d="m 204,221 c -27,1 -52,13 -67,35 -7,12 9,22 19,10 13,-16 31,-22 50,-22 C 226,243 247,251 261,269 c 8,9 22,1 19,-10 -17,-25 -46,-40 -76,-38 z" />
+		<path id="mouth2b" d="M 147,234 H 207 268 c 14,0 14,22 0,22 H 207 147 c -14,0 -14,-22 0,-22 z" />
+		<path id="mouth3b" d="m 204,273 c -27,-1 -52,-13 -67,-35 -7,-12 9,-22 19,-10 13,16 31,22 50,22 20,1 41,-7 55,-25 8,-9 22,-1 19,10 -17,25 -46,40 -76,38 z" />
+
+		<mask id="handMask">
+			<rect fill="#FFFFFF" stroke="none" width="400" height="400" x="0" y="0" />
+			<path id="maskDown" fill="#000000" stroke="none" d="m 182,115 c -20,2 -35,8 -44,17 -8,7 10,35 27,38 16,-2 19,-8 27,-20 7,-12 12,-26 7,-30 -6,-5 -8,-4 -16,-4 z" />
+		</mask>
+
+		<filter id="outline" x="-50%" y="-50%" width="200%" height="200%" style="color-interpolation-filters:sRGB;">
+
+			<feColorMatrix in="SourceAlpha" values="0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0.2 0" />
+			<feMorphology in="mx" in2="var(--highC)" operator="dilate" radius="0" result="fMorph" />
+
+			<feFlood flood-color="var(--highC)" result="fFlood"></feFlood>
+			<feComposite in="fFlood" in2="fMorph" operator="in" result="fComp" />
+			<feOffset in="fComp" dx="0" dy="0" result="fill01" />
+			<feOffset in="fComp" dx="0" dy="0" result="fill02" />
+			<feOffset in="fComp" dx="0" dy="0" result="fill03" />
+
+			<feMerge>
+				<feMergeNode in="fill01" />
+				<feMergeNode in="fill02" />
+				<feMergeNode in="fill03" />
+				<feMergeNode in="SourceGraphic" />
+			</feMerge>
+
+		</filter>
+
+	</defs>
+
+</svg>
+<script type="module">
+import chroma from "https://cdn.jsdelivr.net/npm/chroma-js@3.1.2/+esm";
+import tinycolor2 from "https://esm.sh/tinycolor2";
+
+let select = (e) => document.querySelector(e);
+let selectAll = (e) => document.querySelectorAll(e);
+
+const theDate = new Date();
+const options = {
+	weekday: "short",
+	year: "numeric",
+	month: "short",
+	day: "numeric"
+};
+select("#spacer01 .col-4.text-center").innerHTML = theDate.toLocaleDateString(
+	undefined,
+	options
+);
+
+const tea = [63, 225, 326, 365],
+	coffee = [425, 431, 755, 766],
+	brookline = [1062];
+
+const wrapper = select(".range"),
+	line = select(".range #line");
+
+var newColor = chroma.random().hex();
+updateColor(true);
+
+const resizeObserver = new ResizeObserver((entries) => {
+	updateColor(false);
+});
+resizeObserver.observe(wrapper);
+
+function updateColor(adjust) {
+	var rgb = tinycolor2(newColor).toRgbString();
+	var hsl = tinycolor2(newColor).toHslString();
+	var hsv = tinycolor2(newColor).toHsvString();
+	var name = tinycolor2(newColor).toName();
+	var h2Text = newColor + "<br><sup>" + rgb + "<br>" + hsl + "<br>" + hsv;
+	if (name) h2Text += "<br>" + name;
+	h2Text += "</sup>";
+	select("h2").innerHTML = h2Text;
+
+	gsap.set(".newsPhoto#main", {
+		backgroundImage:
+			"url(https://picsum.photos/id/" +
+			tea[gsap.utils.random(0, tea.length - 1, 1)] +
+			"/800/800)"
+	});
+	gsap.set(".newsPhoto#new1", {
+		backgroundImage:
+			"url(https://picsum.photos/id/" +
+			coffee[gsap.utils.random(0, coffee.length - 1, 1)] +
+			"/400/400)"
+	});
+	gsap.set(".newsPhoto#new2", {
+		backgroundImage:
+			"url(https://picsum.photos/id/" +
+			brookline[gsap.utils.random(0, brookline.length - 1, 1)] +
+			"/400/400)"
+	});
+
+	let colors = tinycolor2(newColor).monochromatic(12);
+	let colorsSorted = sortColors(colors);
+	let targetIndex = 0;
+	for (var i = 0; i < 12; i++) {
+		var hexColor = colorsSorted[i].toHexString();
+		if (hexColor == newColor) targetIndex = i;
+		gsap.set("#tb" + i, { className: "cTab" });
+		gsap.set("#tb" + i, { backgroundColor: hexColor });
+	}
+
+	gsap.set("#tb" + targetIndex, { className: "cTab active" });
+	sortTab(select("#tb" + targetIndex));
+
+	let textColor = colorsSorted[0].toHexString();
+	let j = 0;
+	if (tinycolor2(newColor).isLight()) {
+		if (
+			tinycolor2.readability(newColor, colorsSorted[11].toHexString()) >
+			tinycolor2.readability(newColor, textColor)
+		) {
+			textColor = colorsSorted[11].toHexString();
+			j = 11;
+		}
+	} else {
+		textColor = colorsSorted[11].toHexString();
+		j = 11;
+		if (
+			tinycolor2.readability(newColor, colorsSorted[0].toHexString()) >
+			tinycolor2.readability(newColor, textColor)
+		) {
+			textColor = colorsSorted[0].toHexString();
+			j = 0;
+		}
+	}
+
+	let midBgColor = chroma.scale([newColor, textColor]).mode("rgb").colors(3);
+	let midTextColor = colorsSorted[0].toHexString();
+	if (
+		tinycolor2.readability(midBgColor[1], colorsSorted[11].toHexString()) >
+		tinycolor2.readability(midBgColor[1], midTextColor)
+	)
+		midTextColor = colorsSorted[11].toHexString();
+
+	var lowC = colorsSorted[9].toHexString();
+	if (targetIndex == 9) lowC = colorsSorted[11].toHexString();
+
+	var highC = colorsSorted[2].toHexString();
+	if (targetIndex == 2) var highC = colorsSorted[0].toHexString();
+
+	gsap.set("#tb" + j, { className: "cTab txtTab" });
+	gsap.set("body", {
+		"--bgC": newColor,
+		"--textC": textColor,
+		"--lowC": lowC,
+		"--highC": highC,
+		"--midBgC": midBgColor[1],
+		"--midTextC": midTextColor,
+		"--bgImgC": colorsSorted[9].toHexString()
+	});
+}
+
+function sortTab(cTab) {
+	var wrapperXLeft = wrapper.getBoundingClientRect().left;
+	var wrapperW = wrapper.getBoundingClientRect().width;
+	var wrapperXRight = wrapper.getBoundingClientRect().right;
+
+	var lineXLeft = line.getBoundingClientRect().left - wrapperXLeft;
+
+	var rect = cTab.getBoundingClientRect();
+	let startX = rect.left - wrapperXLeft;
+	let startW = rect.width + startX;
+	let endX = wrapperXRight - rect.right;
+
+	if (lineXLeft < startX) {
+		let t1 = gsap
+			.timeline()
+			.to(line, { right: endX, width: "auto", duration: 0.3, ease: "sine" })
+			.to(line, { left: startX, ease: "elastic.out(0.6,0.4,0.2)" }, "-=0.1")
+			.to(line, { width: "8.333%", ease: "elastic.out(0.6,0.4,0.2)" }, "-=0.3")
+			.to(line, { opacity: 1 });
+	} else if (lineXLeft > startX) {
+		let t1 = gsap
+			.timeline()
+			.to(line, { left: startX, width: "auto", duration: 0.3, ease: "sine" })
+			.to(line, { right: endX, ease: "elastic.out(0.6,0.4,0.2)" }, "-=0.1")
+			.to(line, { width: "8.333%", ease: "elastic.out(0.6,0.4,0.2)" }, "-=0.3")
+			.to(line, { opacity: 1, duration: 1 });
+	}
+}
+
+function sortColors(colors) {
+	return colors.sort((c1, c2) => {
+		let c1Lum = chroma(c1.toHexString()).luminance();
+		let c2Lum = chroma(c2.toHexString()).luminance();
+
+		if (c1Lum < c2Lum) return -1;
+		else if (c1Lum > c2Lum) return 1;
+		else return 0;
+	});
+}
+
+let cTabs = selectAll(".cTab");
+cTabs.forEach((cTab, index) => {
+	cTab.addEventListener("click", resetPallet2);
+	function resetPallet2() {
+		if (!cTab.classList.contains("active")) {
+			let tabColor = cTab.style.backgroundColor;
+			newColor = tinycolor2(tabColor).toHexString();
+			updateColor(false);
+			resetJitter();
+		}
+	}
+});
+
+resetDunkTimeline();
+
+let tl1 = gsap
+	.timeline({ paused: true, defaults: { duration: 0.5 } })
+	.set("#hand", { opacity: 0, y: -150 })
+	.set("#hand1", { morphSVG: "#hand1b" })
+	.to("#footerBanner", { opacity: 1, scale: 1 })
+	.to("#hand", { opacity: 1, y: 0 })
+	.set(".wetbiscuit", { fillOpacity: 0.15 })
+	.to("#hand", { opacity: 1, y: -50 }, 3.5)
+	.to("#biscuit", { y: 100, duration: 0.25 })
+	.to("#hand1", { morphSVG: "#hand2b", duration: 0.25 }, "+=0.5")
+	.to("#biscuitwrapper", { y: 120, duration: 0.25 }, "-=0.25")
+	.to("#biscuit", { y: 0, duration: 0.25 }, "<")
+	.to("#maskDown", { y: 120, duration: 0.25 }, "<")
+	.to("#biscuitwrapper", { x: -25 })
+	.to("#teaBag", { rotate: 190, transformOrigin: "top 50%" }, "<")
+	.to("#biscuitwrapper", { x: -5 })
+	.to("#teaBag", { rotate: 175, transformOrigin: "top 50%" }, "<")
+	.to("#biscuitwrapper", { x: -15 })
+	.to("#teaBag", { rotate: 180, transformOrigin: "top 50%" }, "<");
+
+ScrollTrigger.create({
+	trigger: "#footerBanner",
+	start: "bottom 95%",
+	onEnter: () => {
+		resetDunkTimeline();
+		tl1.play(0);
+	}
+});
+
+ScrollTrigger.create({
+	trigger: "#footerBanner",
+	start: "top 100%",
+	onLeaveBack: () => {
+		tl1.pause(0);
+		resetDunkTimeline();
+	}
+});
+
+function resetDunkTimeline() {
+	gsap.set("#hand", { opacity: 0, y: -150 });
+	gsap.set(".wetbiscuit", { fillOpacity: 0 });
+	gsap.set("#biscuit", { y: 0, x: 0 });
+	gsap.set("#biscuitwrapper", { y: 0, x: 0 });
+	gsap.set("#maskDown", { y: 0, x: 0 });
+	gsap.set("#hand1", { morphSVG: "#hand1b" });
+}
+
+const feOffsetAll = selectAll("#outline feOffset");
+var offset = 20;
+const tl2 = gsap
+	.timeline({
+		repeat: -1,
+		duration: 0.2,
+		ease: "steps(2)"
+	})
+	.call(oIndexUpdate)
+	.to(feOffsetAll[0], { duration: 0.2 });
+
+function oIndexUpdate() {
+	feOffsetAll.forEach((target, index) => {
+		gsap.to(target, {
+			attr: {
+				dx: gsap.utils.random(-offset, offset, 1),
+				dy: gsap.utils.random(-offset, offset, 1),
+				ease: "steps(2)"
+			}
+		});
+	});
+}
+
+const tl3 = gsap
+	.timeline({ paused: true, defaults: { duration: 1, ease: "none" } })
+	.fromTo(
+		"#mouth",
+		{ morphSVG: "#mouth1b", onUpdate: updateVar },
+		{ morphSVG: "#mouth2b" }
+	)
+	.fromTo(
+		"#mouth",
+		{ morphSVG: "#mouth2b", onUpdate: updateVar },
+		{ morphSVG: "#mouth3b" }
+	)
+	.fromTo("#head", { morphSVG: "#head1b" }, { morphSVG: "#head2b" }, 0)
+	.fromTo("#lEye", { morphSVG: "#lEye1b" }, { morphSVG: "#lEye2b" }, 0)
+	.fromTo("#rEye", { morphSVG: "#rEye1b" }, { morphSVG: "#rEye2b" }, 0)
+	.to("#mouth", { onUpdate: updateVar, duration: 3 }, 0);
+
+function updateVar() {
+	if (offset > 0) offset -= 0.15;
+}
+function resetJitter() {
+	offset = 20;
+	gsap.set("#mouth", { morphSVG: "#mouth1b" });
+	gsap.set("#head", { morphSVG: "#head1b" });
+	gsap.set("#lEye", { morphSVG: "#lEye1b" });
+	gsap.set("#rEye", { morphSVG: "#rEye1b" });
+
+	ScrollTrigger.create({
+		trigger: "#jittersFace",
+		start: "center center",
+		once: true,
+		onEnter: () => {
+			tl3.play(0);
+		}
+	});
+}
+resetJitter();
+
+reset.addEventListener("click", resetPallet);
+function resetPallet() {
+	var tl = gsap
+		.timeline()
+		.fromTo(
+			"#resetWrapper",
+			0.5,
+			{ rotation: 0 },
+			{ rotation: 360, transformOrigin: "50% 50%" }
+		)
+		.to("#reset", 0.25, { repeat: 1, yoyo: true }, 0)
+		.to("#reset", 0.25, { repeat: 1, yoyo: true });
+	newColor = chroma.random().hex();
+	updateColor(true);
+
+	tl3.pause(0);
+	resetJitter();
+}
+</script>
+</body>
+</html>

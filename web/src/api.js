@@ -30,7 +30,6 @@ const PROBES = {
   huggingface: '/api/huggingface/probe',
   cerebras: '/api/cerebras/probe',
   groq: '/api/groq/probe',
-  cyanite: '/api/cyanite/ping',
   lalalai: '/api/lalalai/ping',
   elevenlabs: '/api/elevenlabs/ping',
 };
