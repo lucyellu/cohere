@@ -3,7 +3,7 @@ import { fetchConcerts, getCachedConcerts, filterWhen, spotifyArtist, ticketmast
 import { fmtCapacity, fmtDate } from '../tour.js';
 import { loadGoogleMaps, hasMapsKey } from '../live/maps.js';
 import { GOOGLE_PAPER_MAP } from '../live/mapStyle.js';
-import { claimStamp, optOutConcert, recordConcertAction, personalStats, backfillStubs, HISTORY_EVENT } from '../account.js';
+import { claimStamp, optOutConcert, recordConcertAction, personalStats, backfillStubs, pruneDuplicates, HISTORY_EVENT } from '../account.js';
 
 const VIEW_MODES = [
   { id: 'list', label: 'List' },
@@ -24,9 +24,9 @@ const WHEN = [
   { id: 'past', label: 'Past' },
 ];
 
-const SORT_KEYS = ['capacity', 'popularity', 'date', 'artist', 'venue', 'city'];
+const SORT_KEYS = ['soon', 'capacity', 'popularity', 'date', 'artist', 'venue', 'city'];
 const USER_ZONE_KEY = 'cohear_user_timezone';
-const DISCOVER_STATE_KEY = 'cohear_discover_state_v3';
+const DISCOVER_STATE_KEY = 'cohear_discover_state_v4';
 const DISCOVER_LAYOUT_KEY = 'cohear_discover_layout_v1';
 const DEFAULT_INSPECTOR_WIDTH = 380;
 const DETECTED_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Vancouver';
@@ -52,8 +52,8 @@ function readDiscoverState() {
     concerts: getCachedConcerts('', 'live', 'week')?.concerts || [],
     sources: getCachedConcerts('', 'live', 'week')?.sources || {},
     mode: 'list',
-    sortKey: 'capacity',
-    dir: 'desc',
+    sortKey: 'soon',
+    dir: 'asc',
     when: 'all',
     hideEnded: true,
     selectedId: null,
@@ -114,6 +114,7 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
   // Personal passport stats for the header — backfill any missing stubs once,
   // then keep the numbers live as you stamp shows.
   useEffect(() => {
+    pruneDuplicates(); // collapse any duplicate stubs/stamps from older data or cloud merges
     backfillStubs();
     const refresh = () => setMe(personalStats());
     refresh();
@@ -133,8 +134,8 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
       setConcerts(cached.concerts);
       setSources(cached.sources || {});
       if (reset) {
-        setSortKey('capacity');
-        setDir('desc');
+        setSortKey('soon');
+        setDir('asc');
         setWhen('all');
       }
       setSelectedId(cached.concerts[0]?.id || null);
@@ -149,8 +150,8 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
       setConcerts(out.concerts);
       setSources(out.sources);
       if (reset) {
-        setSortKey('capacity');
-        setDir('desc');
+        setSortKey('soon');
+        setDir('asc');
         setWhen('all');
       }
       setSelectedId(out.concerts[0]?.id || null);
@@ -253,8 +254,8 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
   const resetDiscoverLayout = useCallback(() => {
     setInspectorWidth(DEFAULT_INSPECTOR_WIDTH);
     setMode('list');
-    setSortKey('capacity');
-    setDir('desc');
+    setSortKey('soon');
+    setDir('asc');
     setWhen('all');
     setHideEnded(true);
     try {
@@ -284,7 +285,7 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
       const locationText = [c.city, c.region, c.country, c.venue].filter(Boolean).join(' ').toLowerCase();
       return (!search || haystack.includes(search)) && (!loc || locationText.includes(loc));
     });
-    return sortVisibleConcerts(filtered, sortKey, dir, userZone);
+    return sortVisibleConcerts(filtered, sortKey, dir, userZone, now);
   }, [artist, browse, concerts, dir, hideEnded, location, now, query, settings?.endedGraceHours, sortKey, userZone, when]);
 
   useEffect(() => {
@@ -614,8 +615,87 @@ function ControlSurface(props) {
   );
 }
 
+const COLS_KEY = 'cohear_discover_cols_v1';
+const DEFAULT_COLS = { artist: 1.05, venue: 0.9, city: 1.05, time: 0.95 };
+
+function readCols() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(COLS_KEY) || 'null');
+    if (!parsed) return { ...DEFAULT_COLS };
+    return {
+      artist: clampFr(parsed.artist, DEFAULT_COLS.artist),
+      venue: clampFr(parsed.venue, DEFAULT_COLS.venue),
+      city: clampFr(parsed.city, DEFAULT_COLS.city),
+      time: clampFr(parsed.time, DEFAULT_COLS.time),
+    };
+  } catch {
+    return { ...DEFAULT_COLS };
+  }
+}
+
+function clampFr(value, fallback) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(0.45, Math.min(3, n));
+}
+
+// 56px rank · flexible artist/venue/city/time · 88px seats · 88px live. The
+// flexible tracks keep a sane min width (so a city never clips to a couple of
+// letters) and otherwise split the leftover space by the user's fr ratios.
+function colsTemplate(c) {
+  return `56px minmax(150px, ${c.artist}fr) minmax(130px, ${c.venue}fr) minmax(160px, ${c.city}fr) minmax(150px, ${c.time}fr) 88px 88px`;
+}
+
 function ConcertTable({ rows, selectedId, onSelect, saved, userZone, now, sortKey, dir, onSort, onSyncLive }) {
   const [syncingId, setSyncingId] = useState(null);
+  const [cols, setCols] = useState(() => readCols());
+  const headerRef = useRef(null);
+  const dragRef = useRef(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(COLS_KEY, JSON.stringify(cols));
+    } catch {
+      /* ignore storage failures */
+    }
+  }, [cols]);
+
+  useEffect(() => {
+    function move(e) {
+      const drag = dragRef.current;
+      if (!drag) return;
+      const deltaFr = (e.clientX - drag.startX) / drag.pxPerFr;
+      setCols((prev) => ({ ...prev, [drag.key]: clampFr(drag.startFr + deltaFr, prev[drag.key]) }));
+    }
+    function stop() {
+      if (!dragRef.current) return;
+      dragRef.current.handle?.classList.remove('dragging');
+      dragRef.current = null;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', stop);
+    window.addEventListener('pointercancel', stop);
+    return () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', stop);
+      window.removeEventListener('pointercancel', stop);
+    };
+  }, []);
+
+  function beginColResize(key, e) {
+    const headerWidth = headerRef.current?.getBoundingClientRect().width || 900;
+    const flexWidth = Math.max(200, headerWidth - 232); // minus the three fixed tracks
+    const sumFr = cols.artist + cols.venue + cols.city + cols.time;
+    dragRef.current = { key, startX: e.clientX, startFr: cols[key], pxPerFr: flexWidth / sumFr, handle: e.currentTarget };
+    e.currentTarget.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
   async function join(c) {
     if (!onSyncLive || syncingId) return;
     setSyncingId(c.id);
@@ -626,13 +706,24 @@ function ConcertTable({ rows, selectedId, onSelect, saved, userZone, now, sortKe
     }
   }
 
+  const template = colsTemplate(cols);
+
   return (
-    <div className="cohear-panel overflow-hidden">
-      <div className="grid grid-cols-[56px_minmax(155px,1.05fr)_minmax(140px,0.9fr)_minmax(120px,0.7fr)_minmax(155px,0.9fr)_88px_88px] border-b border-white/10 px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-zinc-500 max-lg:hidden">
+    <div className="cohear-panel overflow-hidden" style={{ '--cohear-cols': template }}>
+      <div ref={headerRef} className="cohear-concert-row grid border-b border-white/10 px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-zinc-500 max-lg:hidden">
         <span>Rank</span>
-        <SortHeader id="artist" label="Artist" sortKey={sortKey} dir={dir} onSort={onSort} />
-        <SortHeader id="venue" label="Venue" sortKey={sortKey} dir={dir} onSort={onSort} />
-        <SortHeader id="city" label="City" sortKey={sortKey} dir={dir} onSort={onSort} />
+        <div className="cohear-col-cell">
+          <SortHeader id="artist" label="Artist" sortKey={sortKey} dir={dir} onSort={onSort} />
+          <button type="button" className="cohear-col-resize" aria-label="Resize artist column" onPointerDown={(e) => beginColResize('artist', e)} />
+        </div>
+        <div className="cohear-col-cell">
+          <SortHeader id="venue" label="Venue" sortKey={sortKey} dir={dir} onSort={onSort} />
+          <button type="button" className="cohear-col-resize" aria-label="Resize venue column" onPointerDown={(e) => beginColResize('venue', e)} />
+        </div>
+        <div className="cohear-col-cell">
+          <SortHeader id="city" label="City" sortKey={sortKey} dir={dir} onSort={onSort} />
+          <button type="button" className="cohear-col-resize" aria-label="Resize city column" onPointerDown={(e) => beginColResize('city', e)} />
+        </div>
         <SortHeader id="date" label="Time" sortKey={sortKey} dir={dir} onSort={onSort} />
         <SortHeader id="capacity" label="Seats" align="right" sortKey={sortKey} dir={dir} onSort={onSort} />
         <span className="text-right">Live</span>
@@ -640,18 +731,17 @@ function ConcertTable({ rows, selectedId, onSelect, saved, userZone, now, sortKe
       <ol className="max-h-[660px] overflow-y-auto">
         {rows.map((c, i) => {
           const state = showState(c, now);
+          const tint = c.id === selectedId
+            ? 'ct-row-sel'
+            : state.current
+              ? 'ct-row-live'
+              : state.recentlyEnded
+                ? 'ct-row-ended'
+                : 'hover:bg-white/[0.035]';
           return (
             <li
               key={c.id}
-              className={`grid gap-3 border-b border-white/[0.06] px-4 py-4 last:border-b-0 lg:grid-cols-[56px_minmax(155px,1.05fr)_minmax(140px,0.9fr)_minmax(120px,0.7fr)_minmax(155px,0.9fr)_88px_88px] lg:items-center ${
-                c.id === selectedId
-                  ? 'bg-cyan-300/[0.08]'
-                  : state.current
-                    ? 'bg-emerald-300/[0.055] hover:bg-emerald-300/[0.09]'
-                    : state.recentlyEnded
-                      ? 'bg-rose-400/[0.04] hover:bg-rose-400/[0.07]'
-                      : 'hover:bg-white/[0.035]'
-              }`}
+              className={`cohear-concert-row grid gap-3 border-b border-white/[0.06] px-4 py-4 last:border-b-0 lg:items-center ${tint}`}
             >
               <button
                 onClick={() => onSelect(c.id)}
@@ -659,7 +749,7 @@ function ConcertTable({ rows, selectedId, onSelect, saved, userZone, now, sortKe
               >
                 <span className="flex items-center gap-3 text-sm font-semibold text-zinc-300">
                   <span className="w-7 tabular-nums text-zinc-500">{String(i + 1).padStart(2, '0')}</span>
-                  {state.current && <span className="h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_14px_rgba(110,231,183,.8)]" title="Happening now" />}
+                  {state.current && <span className="ct-dot-live h-2 w-2 rounded-full" title="Happening now" />}
                   {saved.has(c.id) && <span className="h-1.5 w-1.5 rounded-full bg-cyan-300" title="Saved" />}
                 </span>
                 <span className="min-w-0">
@@ -1132,7 +1222,7 @@ function FallbackMap({ rows, selectedId, onSelect, showLabels, trailRows, routeS
         <div key={c.id} className="absolute" style={{ left: `${c.point.x}%`, top: `${c.point.y}%` }}>
           <button
             className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full border transition ${
-              c.id === selectedId ? 'z-20 border-white bg-cyan-300 shadow-[0_0_24px_rgba(103,232,249,.5)]' : 'z-10 border-white/70 bg-amber-300/80 hover:bg-amber-200'
+              c.id === selectedId ? 'z-20 border-white bg-[var(--accent)] shadow-[0_0_24px_rgba(var(--accent-r),var(--accent-g),var(--accent-b),.55)]' : 'z-10 border-white/70 bg-zinc-400/80 hover:bg-zinc-300'
             }`}
             style={{
               left: `${c.point.x}%`,
@@ -1252,11 +1342,11 @@ function ConcertCalendar({ rows, selectedId, onSelect }) {
 function MiniMap({ concert }) {
   return (
     <div className="relative h-32 overflow-hidden rounded-lg border border-white/10 bg-[var(--paper-card)]">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_58%_42%,rgba(34,211,238,.28),transparent_18%),linear-gradient(90deg,rgba(255,255,255,.04)_1px,transparent_1px),linear-gradient(0deg,rgba(255,255,255,.04)_1px,transparent_1px)] bg-[size:auto,36px_36px,36px_36px]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_58%_42%,rgba(var(--accent-r),var(--accent-g),var(--accent-b),.28),transparent_18%),linear-gradient(90deg,rgba(255,255,255,.04)_1px,transparent_1px),linear-gradient(0deg,rgba(255,255,255,.04)_1px,transparent_1px)] bg-[size:auto,36px_36px,36px_36px]" />
       <div className="absolute left-4 top-4 rounded bg-black/45 px-2 py-1 text-xs font-medium text-zinc-300">
         {[concert.city, concert.country].filter(Boolean).join(', ') || 'Venue location'}
       </div>
-      <div className="absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-cyan-300 shadow-[0_0_28px_rgba(34,211,238,.55)]" />
+      <div className="absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-[var(--accent)] shadow-[0_0_28px_rgba(var(--accent-r),var(--accent-g),var(--accent-b),.55)]" />
     </div>
   );
 }
@@ -1338,8 +1428,8 @@ function SegmentedControl({ value, options, onChange }) {
 function StatusPill({ when }) {
   const upcoming = when === 'upcoming';
   return (
-    <span className={`inline-flex items-center gap-2 rounded-md border px-2 py-1 text-xs font-semibold ${upcoming ? 'border-rose-300/30 bg-rose-400/10 text-rose-100' : 'border-indigo-300/25 bg-indigo-400/10 text-indigo-100'}`}>
-      <span className={`h-1.5 w-1.5 rounded-full ${upcoming ? 'bg-rose-300' : 'bg-indigo-300'}`} />
+    <span className={`inline-flex items-center gap-2 rounded-md border px-2 py-1 text-xs font-semibold ${upcoming ? 'ct-pill-up' : 'ct-pill-down'}`}>
+      <span className="ct-dot h-1.5 w-1.5 rounded-full" />
       {upcoming ? 'Soon' : 'Past'}
     </span>
   );
@@ -1376,12 +1466,12 @@ function TimeStack({ concert, userZone, now }) {
   );
 }
 
-function sortVisibleConcerts(list, key, dir, userZone) {
+function sortVisibleConcerts(list, key, dir, userZone, now = Date.now()) {
   const sort = C_SORTS[key] || C_SORTS.date;
   const direction = (dir || sort.dir) === 'asc' ? 1 : -1;
   return [...list].sort((a, b) => {
-    const av = key === 'date' ? userLocalSortValue(a, userZone) : sort.get(a);
-    const bv = key === 'date' ? userLocalSortValue(b, userZone) : sort.get(b);
+    const av = key === 'soon' ? timeProximityValue(a, now) : key === 'date' ? userLocalSortValue(a, userZone) : sort.get(a);
+    const bv = key === 'soon' ? timeProximityValue(b, now) : key === 'date' ? userLocalSortValue(b, userZone) : sort.get(b);
     const aMissing = av == null || av === '';
     const bMissing = bv == null || bv === '';
     if (aMissing && !bMissing) return 1;
@@ -1395,6 +1485,19 @@ function sortVisibleConcerts(list, key, dir, userZone) {
     if (tieA > tieB) return 1;
     return 0;
   });
+}
+
+// Closeness-to-now ranking for the default "Happening soon" sort. Ascending, so
+// the smallest value sits at the top: shows live right now first, then the
+// soonest-upcoming, then the most-recently ended, with timeless shows last.
+function timeProximityValue(concert, now) {
+  const start = showStartMs(concert);
+  if (!start) return Number.POSITIVE_INFINITY;
+  const end = showEndMs(concert);
+  const live = now >= start && (end ? now <= end : now - start <= 3 * 3600_000);
+  if (live) return -1e13 + start; // live now → very top, ordered by start
+  if (start > now) return start - now; // upcoming → soonest first
+  return 1e13 + (now - start); // already started/ended → most recent first
 }
 
 function userLocalSortValue(concert, userZone) {
@@ -1420,11 +1523,9 @@ function userLocalSortValue(concert, userZone) {
 }
 
 function metricTone(tone) {
+  // Only the countdown's time-tones (green-*/red-*) carry real colour; every
+  // other "tone" collapses to the monochrome ink so the page stays one colour.
   if (tone?.startsWith?.('green') || tone?.startsWith?.('red')) return countdownClass(tone);
-  if (tone === 'green') return 'text-emerald-200';
-  if (tone === 'amber') return 'text-amber-200';
-  if (tone === 'rose') return 'text-rose-200';
-  if (tone === 'cyan') return 'text-cyan-200';
   return 'text-white';
 }
 
@@ -1482,14 +1583,13 @@ function countdownLabel(concert, now) {
 }
 
 function countdownClass(tone) {
-  if (tone === 'green-hot') return 'text-emerald-200';
-  if (tone === 'green') return 'text-green-300';
-  if (tone === 'green-soft') return 'text-lime-200';
-  if (tone === 'red-hot') return 'text-rose-200';
-  if (tone === 'red') return 'text-red-300';
-  if (tone === 'red-soft') return 'text-red-500';
-  if (tone === 'amber') return 'text-amber-200';
-  return 'text-zinc-500';
+  if (tone === 'green-hot') return 'ct-up-hot';
+  if (tone === 'green') return 'ct-up';
+  if (tone === 'green-soft') return 'ct-up-soft';
+  if (tone === 'red-hot') return 'ct-down-hot';
+  if (tone === 'red') return 'ct-down';
+  if (tone === 'red-soft') return 'ct-down-soft';
+  return 'ct-muted';
 }
 
 function showState(concert, now) {

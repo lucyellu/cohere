@@ -6,6 +6,8 @@ export const DEFAULT_SETTINGS = {
   timezone: DETECTED_TIME_ZONE,
   currency: 'USD',
   themeAccent: '#e0662f',
+  // Flips the monochrome ramp's light/dark poles — the "paper" (light) skin.
+  themeInverted: false,
   // How long an ended concert stays visible in Discover (hours). 0 = hide the
   // moment it ends; up to 8 = linger so you can still join to collect the stamp.
   endedGraceHours: 2,
@@ -94,6 +96,7 @@ export function normalizeSettings(settings) {
   if (!CURRENCIES.some((c) => c.code === merged.currency)) merged.currency = 'USD';
   merged.endedGraceHours = clampHours(merged.endedGraceHours);
   if (!/^#[0-9a-f]{6}$/i.test(merged.themeAccent)) merged.themeAccent = DEFAULT_SETTINGS.themeAccent;
+  merged.themeInverted = Boolean(merged.themeInverted);
   return merged;
 }
 

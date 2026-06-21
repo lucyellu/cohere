@@ -13,6 +13,7 @@ import {
   emptyTrash,
   findDuplicateStubs,
   deduplicateStubs,
+  pruneDuplicates,
   readProfile,
   writeProfile,
   resyncTokens,
@@ -68,6 +69,7 @@ export default function PassportView({ onOpenCity }) {
       setDupCount(findDuplicateStubs().reduce((n, g) => n + g.length - 1, 0));
     }
     window.addEventListener(HISTORY_EVENT, refresh);
+    pruneDuplicates(); // silently collapse any duplicate stubs/stamps before showing them
     resyncTokens(); // re-attempt signing for anything still "pending"
     return () => window.removeEventListener(HISTORY_EVENT, refresh);
   }, []);

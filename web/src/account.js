@@ -235,6 +235,61 @@ export function deduplicateStubs() {
   return removed;
 }
 
+// Silent, automatic de-duplication run on app start. Unlike deduplicateStubs()
+// this does NOT trash the extras (they're exact duplicates, not mistakes) — it
+// just collapses each ticket stub / entry stamp to a single canonical copy.
+//
+// Why duplicates can appear at all: stub ids come from the concert source and
+// can differ for the same show across sessions/devices, so a cloud merge (which
+// unions by id) can keep two stubs for one concert. Entry stamps are keyed
+// deterministically (city + date) so they rarely duplicate, but we guard them
+// too. The canonical copy kept is the verified one, else the earliest-issued.
+export function pruneDuplicates() {
+  let removed = 0;
+  removed += pruneArrayByKey(STUBS_KEY, (s) => contentKey(slug(s.artist || ''), s.date, s.id));
+  removed += pruneArrayByKey(ENTRIES_KEY, (e) => contentKey(slug(e.city || ''), e.date, e.id));
+  if (removed) {
+    reconcileVisas();
+    emitHistoryChanged();
+  }
+  return removed;
+}
+
+function contentKey(a, date, id) {
+  const d = date || '';
+  return a || d ? `${a}|${d}` : `id:${id}`;
+}
+
+function pruneArrayByKey(key, keyOf) {
+  const list = readArray(key);
+  const seen = new Map(); // contentKey -> index in `keep`
+  const keep = [];
+  let removed = 0;
+  for (const item of list) {
+    const k = keyOf(item);
+    if (!seen.has(k)) {
+      seen.set(k, keep.length);
+      keep.push(item);
+      continue;
+    }
+    const idx = seen.get(k);
+    keep[idx] = preferRecord(keep[idx], item);
+    removed += 1;
+  }
+  if (removed) writeArray(key, keep);
+  return removed;
+}
+
+// Of two duplicate records, keep the verified one; if neither (or both) are
+// verified, keep the one issued first (the original).
+function preferRecord(a, b) {
+  if (Boolean(a.verified) !== Boolean(b.verified)) return a.verified ? a : b;
+  const ta = String(a.issuedAt || '');
+  const tb = String(b.issuedAt || '');
+  if (ta && tb) return ta <= tb ? a : b;
+  return ta ? a : b;
+}
+
 // Editable passport identity (display name + chosen home city/avatar tint).
 export function readProfile() {
   try {

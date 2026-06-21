@@ -142,6 +142,10 @@ function readLocalSettings() {
 // Each sort has a key getter and a sensible default direction (numbers high→low,
 // text A→Z). The UI lets you flip direction; `dir` is just the starting point.
 export const C_SORTS = {
+  // "Happening soon" — ordered by proximity to now (live first, then soonest
+  // upcoming, then most-recently ended). The numeric value is computed in the
+  // view since it needs the live `now`; this entry supplies the label + dir.
+  soon: { label: 'Happening soon', get: (c) => timeSortKey(c), dir: 'asc' },
   date: { label: 'Date', get: (c) => timeSortKey(c), dir: 'asc' },
   capacity: { label: 'Attendance (capacity)', get: (c) => c.capacity ?? -1, dir: 'desc' },
   popularity: { label: 'Popularity', get: (c) => c.popularity ?? -1, dir: 'desc' },
