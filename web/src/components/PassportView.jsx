@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   HISTORY_EVENT,
-  claimStamp,
+  autoStampHistory,
   optOutConcert,
   readHistory,
   readVisas,
@@ -35,6 +35,7 @@ import EntryStamp from './passport/EntryStamp.jsx';
 import TicketStub from './passport/TicketStub.jsx';
 import ExportSheet from './passport/ExportSheet.jsx';
 import PassportMap from './passport/PassportMap.jsx';
+import ArtistTourMap from './passport/ArtistTourMap.jsx';
 import { exportPng, exportPdf } from './passport/passportExport.js';
 
 export default function PassportView({ onOpenCity }) {
@@ -70,6 +71,7 @@ export default function PassportView({ onOpenCity }) {
     }
     window.addEventListener(HISTORY_EVENT, refresh);
     pruneDuplicates(); // silently collapse any duplicate stubs/stamps before showing them
+    autoStampHistory(); // every show in the record stamps itself — no manual button
     resyncTokens(); // re-attempt signing for anything still "pending"
     return () => window.removeEventListener(HISTORY_EVENT, refresh);
   }, []);
@@ -247,10 +249,6 @@ export default function PassportView({ onOpenCity }) {
     optOutConcert(item);
   }
 
-  function claim(item) {
-    claimStamp(item);
-  }
-
   const isLoggedIn = !supabaseEnabled || (session?.user && !session.user.is_anonymous);
 
   if (supabaseEnabled && sessionLoading) {
@@ -317,7 +315,7 @@ export default function PassportView({ onOpenCity }) {
         </div>
         <div className="flex flex-wrap gap-2">
           {dupCount > 0 && (
-            <button className="cohear-secondary text-amber-300" onClick={handleDeduplicate} title="Remove duplicate stubs (same artist + date)">
+            <button className="cohear-secondary text-amber-300" onClick={handleDeduplicate} title="Remove duplicate stubs (same artist, venue and city)">
               Remove {dupCount} duplicate{dupCount !== 1 ? 's' : ''}
             </button>
           )}
@@ -388,6 +386,9 @@ export default function PassportView({ onOpenCity }) {
 
       {/* Chronological journey map */}
       {entries.length > 0 && <PassportMap entries={entries} home={home} />}
+
+      {/* Per-artist tour routes — your stops + the full tour */}
+      {(stubs.length > 0 || entries.length > 0) && <ArtistTourMap stubs={stubs} entries={entries} />}
 
       {/* Visas */}
       <PageSection title="Visas" caption={`${visas.length} ${visas.length === 1 ? 'country' : 'countries'}`}>
@@ -462,8 +463,8 @@ export default function PassportView({ onOpenCity }) {
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <span className="text-xs text-zinc-600">{item.date || 'Date TBA'}</span>
-                    <button className="cohear-primary min-h-8 px-2.5 text-xs" onClick={() => claim(item)}>Stamp passport</button>
-                    <button className="cohear-secondary min-h-8 px-2.5 text-xs" onClick={() => neverHere(item)} title="Delete this show — removes its stamp, ticket and city from your passport, map and mileage">✕ Delete</button>
+                    <span className="text-xs text-emerald-300/70">Stamped automatically</span>
+                    <button className="cohear-secondary ml-auto min-h-8 px-2.5 text-xs" onClick={() => neverHere(item)} title="Delete this show — removes its stamp, ticket and city from your passport, map and mileage">✕ Delete</button>
                   </div>
                 </article>
               ))}

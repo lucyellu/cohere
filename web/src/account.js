@@ -207,13 +207,28 @@ export function emptyTrash() {
   emitHistoryChanged();
 }
 
-// Find stubs that appear to be duplicates: same artist + date, different id.
-// Returns an array of groups where each group is [keepStub, ...dupStubs].
+// Canonical "this is the same show" key, independent of the source-assigned id,
+// the start time, or the (randomly-derived) seat. Same artist at the same
+// venue/city is treated as one show — so re-minting from a different session, a
+// cloud merge, or a slightly different start time collapses onto a single stub
+// instead of repeating. Falls back to artist+date, then the raw id, when the
+// venue/city are missing.
+export function showIdentity(c = {}) {
+  const a = slug(c.artist || '');
+  const v = slug(c.venue || '');
+  const ci = slug(c.city || '');
+  if (a && (v || ci)) return `${a}|${v}|${ci}`;
+  if (a && c.date) return `${a}|${c.date}`;
+  return `id:${c.id || ''}`;
+}
+
+// Find stubs that appear to be duplicates: same show (artist + venue/city),
+// different id. Returns an array of groups where each group is [keepStub, ...dupStubs].
 export function findDuplicateStubs() {
   const stubs = readStubs();
   const groups = new Map();
   for (const stub of stubs) {
-    const key = `${slug(stub.artist || '')}|${stub.date || ''}`;
+    const key = showIdentity(stub);
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(stub);
   }
@@ -246,7 +261,7 @@ export function deduplicateStubs() {
 // too. The canonical copy kept is the verified one, else the earliest-issued.
 export function pruneDuplicates() {
   let removed = 0;
-  removed += pruneArrayByKey(STUBS_KEY, (s) => contentKey(slug(s.artist || ''), s.date, s.id));
+  removed += pruneArrayByKey(STUBS_KEY, (s) => showIdentity(s));
   removed += pruneArrayByKey(ENTRIES_KEY, (e) => contentKey(slug(e.city || ''), e.date, e.id));
   if (removed) {
     reconcileVisas();
@@ -468,10 +483,8 @@ export function issueTicketStub(input) {
   const concert = normalizeConcert(input);
   if (!concert.id || isOptedOut(concert.id)) return null;
   const stubs = readStubs();
-  const prev = stubs.find((stub) => stub.id === concert.id)
-    || (concert.artist && concert.date
-      ? stubs.find((stub) => slug(stub.artist || '') === slug(concert.artist) && stub.date === concert.date)
-      : null);
+  const identity = showIdentity(concert);
+  const prev = stubs.find((stub) => stub.id === concert.id || showIdentity(stub) === identity);
   if (prev) return prev;
   // Prefer the richer history record (carries status/capacity) if we have it.
   const record = readHistory().find((h) => h.id === concert.id) || concert;
@@ -519,6 +532,25 @@ export function backfillStubs() {
     }
   }
   return made;
+}
+
+// Stamp every show in the record automatically. Anything you've viewed (and not
+// deleted with "I was never here") earns its visa, dated entry stamp and ticket
+// stub — no manual "stamp passport" button. Idempotent and dedup-safe, so
+// re-running on each Passport open never creates a second stamp or ticket.
+export function autoStampHistory() {
+  let stamped = 0;
+  for (const item of readHistory()) {
+    if (!item.id || isOptedOut(item.id)) continue;
+    issueVisa(item);
+    addEntryStamp(item);
+    issueTicketStub(item);
+    if (item.status !== 'attended') {
+      recordConcertAction(item, 'attended', { source: 'auto' });
+      stamped += 1;
+    }
+  }
+  return stamped;
 }
 
 // Aggregate "your live passport" stats for the Discover header.

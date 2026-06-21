@@ -48,12 +48,12 @@ function readDiscoverState() {
     query: '',
     artist: '',
     location: '',
-    windowKey: 'week',
-    concerts: getCachedConcerts('', 'live', 'week')?.concerts || [],
-    sources: getCachedConcerts('', 'live', 'week')?.sources || {},
+    windowKey: 'tonight',
+    concerts: getCachedConcerts('', 'live', 'tonight')?.concerts || [],
+    sources: getCachedConcerts('', 'live', 'tonight')?.sources || {},
     mode: 'list',
-    sortKey: 'soon',
-    dir: 'asc',
+    sortKey: 'date',
+    dir: 'desc',
     when: 'all',
     hideEnded: true,
     selectedId: null,
@@ -134,8 +134,8 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
       setConcerts(cached.concerts);
       setSources(cached.sources || {});
       if (reset) {
-        setSortKey('soon');
-        setDir('asc');
+        setSortKey('date');
+        setDir('desc');
         setWhen('all');
       }
       setSelectedId(cached.concerts[0]?.id || null);
@@ -150,8 +150,8 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
       setConcerts(out.concerts);
       setSources(out.sources);
       if (reset) {
-        setSortKey('soon');
-        setDir('asc');
+        setSortKey('date');
+        setDir('desc');
         setWhen('all');
       }
       setSelectedId(out.concerts[0]?.id || null);
@@ -254,8 +254,8 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
   const resetDiscoverLayout = useCallback(() => {
     setInspectorWidth(DEFAULT_INSPECTOR_WIDTH);
     setMode('list');
-    setSortKey('soon');
-    setDir('asc');
+    setSortKey('date');
+    setDir('desc');
     setWhen('all');
     setHideEnded(true);
     try {
@@ -447,11 +447,11 @@ function DiscoverHeader({ artist, browse, biggest, loading, stats, spotify, user
           <div className="min-w-0">
             <p className="cohear-label">{browse ? 'Discover' : 'Artist timeline'}</p>
             <h2 className="mt-2 max-w-3xl text-4xl italic tracking-tight text-[var(--accent)] md:text-5xl">
-              {browse ? 'Biggest concerts happening now and soon.' : artist}
+              {browse ? 'Concerts happening tonight.' : artist}
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-400">
               {browse
-                ? 'Ranked by venue capacity first, with quick filters for city, venue, artist, date, and live-room readiness.'
+                ? 'Ordered by most recent show time, with quick filters for city, venue, artist, date, and live-room readiness.'
                 : `${stats.upcoming} upcoming and ${stats.past} past shows from the available concert sources.`}
             </p>
           </div>
