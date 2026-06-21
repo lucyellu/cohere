@@ -100,11 +100,18 @@ export function normalizeSettings(settings) {
   return merged;
 }
 
-export const ENDED_GRACE_OPTIONS = [0, 1, 2, 3, 4, 6, 8];
+// Grace window, in hours. Sub-hour options (0.25 = 15 min, 0.5 = 30 min) sit
+// alongside the hourly steps up to 8 hours. Stored as hours so the legacy
+// integer values (and the `× 3600_000` math) keep working unchanged.
+export const ENDED_GRACE_OPTIONS = [0, 0.25, 0.5, 1, 2, 3, 4, 6, 8];
 function clampHours(value) {
-  const n = Math.round(Number(value));
+  const n = Number(value);
   if (!Number.isFinite(n)) return 2;
-  return Math.min(8, Math.max(0, n));
+  // Snap to the nearest offered option so saved values always map to a choice.
+  return ENDED_GRACE_OPTIONS.reduce(
+    (best, opt) => (Math.abs(opt - n) < Math.abs(best - n) ? opt : best),
+    ENDED_GRACE_OPTIONS[0],
+  );
 }
 
 function withDetectedZone(zones) {

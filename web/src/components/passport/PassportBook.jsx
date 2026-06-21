@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { hashString } from './palette.js';
 import { fileToAvatar, generateAvatar } from './avatar.js';
+import { COUNTRY_OPTIONS } from '../../account.js';
 
 // The passport as a real booklet: a navy gold-foil hardcover that flips open on
 // click to reveal the inside data page (photo + identity + machine-readable
@@ -10,6 +11,8 @@ export default function PassportBook({
   onName,
   onAvatar,
   onHome,
+  photoGender,
+  onPhotoGender,
   identitySeed,
   memberSince,
   stats,
@@ -47,7 +50,7 @@ export default function PassportBook({
     setError('');
     setBusy('generate');
     try {
-      onAvatar?.(await generateAvatar(name));
+      onAvatar?.(await generateAvatar(name, photoGender || 'neutral'));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -112,6 +115,19 @@ export default function PassportBook({
               </button>
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onFile} />
             </div>
+            <label className="block text-[9px] font-semibold uppercase tracking-wide opacity-60">
+              Photo style
+              <select
+                className="mt-0.5 w-full rounded border border-black/25 bg-black/[0.04] px-1.5 py-1 text-[10px] font-semibold uppercase tracking-wide outline-none focus:border-black/60"
+                value={photoGender || 'neutral'}
+                onChange={(e) => onPhotoGender?.(e.target.value)}
+                title="Steers the AI passport photo so it isn't always read as one gender"
+              >
+                <option value="neutral">Neutral</option>
+                <option value="female">Female</option>
+                <option value="male">Male</option>
+              </select>
+            </label>
             {profile.avatar && (
               <button type="button" className="text-[10px] underline opacity-60 hover:opacity-100" onClick={() => onAvatar?.('')} disabled={Boolean(busy)}>
                 Remove photo
@@ -136,20 +152,21 @@ export default function PassportBook({
                 maxLength={28}
               />
             </Field>
-            <Field label="Place of issue" wide>
-              <input
-                className="w-full border-b border-dashed border-black/30 bg-transparent font-mono text-sm font-bold outline-none placeholder:text-black/30 focus:border-black/60"
-                value={profile.homeCity || ''}
+            <Field label="Country of issue" wide>
+              <select
+                className="w-full border-b border-dashed border-black/30 bg-transparent font-mono text-sm font-bold outline-none focus:border-black/60"
+                value={profile.homeCountry || ''}
                 onChange={(e) => onHome?.(e.target.value)}
-                placeholder="Your home city"
-                maxLength={32}
-              />
+              >
+                <option value="">Select your country…</option>
+                {COUNTRY_OPTIONS.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
               <div className="mt-0.5 text-[9px] font-semibold uppercase tracking-wide opacity-60">
-                {profile.homeCity
-                  ? homeLocated
-                    ? '✓ Located — used as your travel origin'
-                    : '• Unrecognised city — add a major city to map it'
-                  : 'Sets where your journeys depart from'}
+                {profile.homeCountry
+                  ? '✓ Your travel origin — journeys depart from here'
+                  : 'Sets the country your journeys depart from'}
               </div>
             </Field>
             <Field label="Type"><span className="font-mono text-base font-bold">P</span></Field>

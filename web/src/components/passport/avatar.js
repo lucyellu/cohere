@@ -33,12 +33,19 @@ export function fileToAvatar(file) {
 }
 
 // Generate a vintage passport-style portrait with free FLUX (Pollinations).
-// `seed` (e.g. the traveller name) varies the result so re-rolling looks different.
-export async function generateAvatar(seed = '') {
+// `seed` (e.g. the traveller name) varies the result so re-rolling looks
+// different. `gender` ('female' | 'male' | 'neutral') steers the subject so it
+// isn't always read as one gender; 'neutral' leaves it androgynous.
+export async function generateAvatar(seed = '', gender = 'neutral') {
+  const subject = gender === 'male'
+    ? 'a stylish man, a male music fan'
+    : gender === 'female'
+      ? 'a stylish woman, a female music fan'
+      : 'a stylish androgynous person, a music fan of ambiguous gender';
   const flavor = seed ? `, inspired by the name ${seed}` : '';
   const variant = Math.floor(Math.random() * 100000);
   const prompt = [
-    'Vintage passport photo portrait, head and shoulders of a stylish music fan,',
+    `Vintage passport photo portrait, head and shoulders of ${subject},`,
     'neutral studio backdrop, warm sepia tone, soft analog film grain, centered, 1970s ID photo aesthetic,',
     `no text, no border${flavor}. v${variant}`,
   ].join(' ');

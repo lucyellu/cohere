@@ -935,6 +935,72 @@ button:disabled { cursor: not-allowed; }
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.25));
 }
 
+/* ---- Flip-through passport booklet (portrait pages) ---- */
+.cohear-pbook {
+  position: relative;
+  width: 320px;
+  max-width: 100%;
+  aspect-ratio: 5 / 7;
+  perspective: 1600px;
+}
+.cohear-pbook__leaf {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  will-change: transform;
+}
+.cohear-pbook__leaf.turn-next { animation: cohear-leaf-next 0.5s ease both; }
+.cohear-pbook__leaf.turn-prev { animation: cohear-leaf-prev 0.5s ease both; }
+@keyframes cohear-leaf-next {
+  from { transform: rotateY(-95deg); opacity: 0.25; }
+  to { transform: rotateY(0deg); opacity: 1; }
+}
+@keyframes cohear-leaf-prev {
+  from { transform: rotateY(95deg); opacity: 0.25; }
+  to { transform: rotateY(0deg); opacity: 1; }
+}
+.cohear-pbook__page {
+  position: absolute;
+  inset: 0;
+  padding: 16px 16px 16px 22px;
+  border-radius: 4px 12px 12px 4px;
+  overflow: hidden;
+  box-shadow:
+    inset 14px 0 22px -10px rgba(0, 0, 0, 0.35),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.08),
+    0 18px 36px -18px rgba(0, 0, 0, 0.6);
+}
+.cohear-pbook__page::before { /* spine shading on the bound edge */
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 10px;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.22), transparent);
+}
+.cohear-pbook__nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  background: rgba(255, 255, 255, 0.55);
+  color: #2c2418;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+  z-index: 5;
+}
+.cohear-pbook__nav:hover { background: rgba(255, 255, 255, 0.85); }
+.cohear-pbook__nav:disabled { opacity: 0.25; cursor: default; }
+.cohear-pbook__nav.left { left: -14px; }
+.cohear-pbook__nav.right { right: -14px; }
+
 /* Clickable stamps / stubs (open a city page). */
 .cohear-entry--link { cursor: pointer; transition: filter 0.15s ease, transform 0.15s ease; }
 .cohear-entry--link:hover { filter: brightness(1.08); transform: scale(1.03) rotate(var(--rot, 0deg)); }

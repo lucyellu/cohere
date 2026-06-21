@@ -357,6 +357,7 @@ function ShuffleIcon() {
 
 function graceLabel(h) {
   if (h === 0) return 'Hide as soon as they end';
+  if (h < 1) return `${Math.round(h * 60)} min after ending`;
   return `${h} hour${h === 1 ? '' : 's'} after ending${h === 2 ? ' (default)' : ''}`;
 }
 

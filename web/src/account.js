@@ -97,6 +97,53 @@ const CITY_COUNTRY = Object.fromEntries(
   Object.entries(CITY_COORDS).map(([city, { country }]) => [city, country]),
 );
 
+// Representative coordinates (capital / largest city) per country, so the
+// passport can use a chosen home *country* as the travel origin — like a real
+// passport's nationality — instead of needing a recognised home city.
+const COUNTRY_ORIGINS = {
+  'United States': { lat: 38.90, lng: -77.04 },
+  Canada: { lat: 45.42, lng: -75.70 },
+  'United Kingdom': { lat: 51.51, lng: -0.13 },
+  Ireland: { lat: 53.35, lng: -6.26 },
+  France: { lat: 48.85, lng: 2.35 },
+  Germany: { lat: 52.52, lng: 13.40 },
+  Spain: { lat: 40.42, lng: -3.70 },
+  Italy: { lat: 41.90, lng: 12.50 },
+  Netherlands: { lat: 52.37, lng: 4.90 },
+  Portugal: { lat: 38.72, lng: -9.14 },
+  Switzerland: { lat: 46.95, lng: 7.45 },
+  Austria: { lat: 48.21, lng: 16.37 },
+  Sweden: { lat: 59.33, lng: 18.07 },
+  Norway: { lat: 59.91, lng: 10.75 },
+  Denmark: { lat: 55.68, lng: 12.57 },
+  Belgium: { lat: 50.85, lng: 4.35 },
+  Poland: { lat: 52.23, lng: 21.01 },
+  Japan: { lat: 35.68, lng: 139.69 },
+  'South Korea': { lat: 37.57, lng: 126.98 },
+  Singapore: { lat: 1.35, lng: 103.82 },
+  India: { lat: 28.61, lng: 77.21 },
+  'United Arab Emirates': { lat: 25.20, lng: 55.27 },
+  Australia: { lat: -33.87, lng: 151.21 },
+  'New Zealand': { lat: -36.85, lng: 174.76 },
+  Mexico: { lat: 19.43, lng: -99.13 },
+  Brazil: { lat: -23.55, lng: -46.63 },
+  Argentina: { lat: -34.60, lng: -58.38 },
+  Chile: { lat: -33.45, lng: -70.67 },
+  'South Africa': { lat: -26.20, lng: 28.04 },
+  China: { lat: 39.90, lng: 116.40 },
+};
+// Country names for the passport "country of issue" picker, alphabetical.
+export const COUNTRY_OPTIONS = Object.keys(COUNTRY_ORIGINS).sort((a, b) => a.localeCompare(b));
+
+// Origin coords for a country name (tolerant of aliases like "USA"/"UK").
+export function countryOrigin(name) {
+  if (!name) return null;
+  if (COUNTRY_ORIGINS[name]) return COUNTRY_ORIGINS[name];
+  const key = canonicalCountryKey(name);
+  const match = Object.keys(COUNTRY_ORIGINS).find((c) => canonicalCountryKey(c) === key);
+  return match ? COUNTRY_ORIGINS[match] : null;
+}
+
 // City-center coords for a place. Prefers explicit lat/lng (e.g. from a concert
 // record), then the bundled table; returns null if we can't place it.
 export function cityCoords(city, lat, lng) {
@@ -673,6 +720,13 @@ function isoDate(d) {
 // Resolve the passport's home base from the profile: an explicit lat/lng if the
 // typed city was geocoded against the bundled table, otherwise null.
 export function resolveHome(profile = {}) {
+  // Preferred: a chosen home country (like a real passport's nationality).
+  const country = (profile.homeCountry || '').trim();
+  if (country) {
+    const c = countryOrigin(country);
+    return { country, city: country, lat: c?.lat ?? null, lng: c?.lng ?? null };
+  }
+  // Back-compat: an older typed home city.
   const city = (profile.homeCity || '').trim();
   if (!city) return null;
   const coords = cityCoords(city, profile.homeLat, profile.homeLng);

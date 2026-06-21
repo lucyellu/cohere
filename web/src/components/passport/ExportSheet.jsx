@@ -32,7 +32,7 @@ const ExportSheet = forwardRef(function ExportSheet(
           <div className="cohear-export__meta">
             <span><b>No.</b> {passportNo}</span>
             <span><b>Authority</b> COHERE</span>
-            {profile?.homeCity && <span><b>Place of issue</b> {profile.homeCity}</span>}
+            {(profile?.homeCountry || profile?.homeCity) && <span><b>Country of issue</b> {profile.homeCountry || profile.homeCity}</span>}
             <span><b>Member since</b> {memberSince || '—'}</span>
           </div>
         </div>

@@ -19,7 +19,6 @@ import {
   resyncTokens,
   resolveHome,
   travelItinerary,
-  cityCoords,
   snapshotLocal,
   mergeState,
   writeLocalState,
@@ -35,6 +34,7 @@ import EntryStamp from './passport/EntryStamp.jsx';
 import TicketStub from './passport/TicketStub.jsx';
 import ExportSheet from './passport/ExportSheet.jsx';
 import PassportMap from './passport/PassportMap.jsx';
+import PassportPages from './passport/PassportPages.jsx';
 import ArtistTourMap from './passport/ArtistTourMap.jsx';
 import { exportPng, exportPdf } from './passport/passportExport.js';
 
@@ -127,8 +127,8 @@ export default function PassportView({ onOpenCity }) {
   const travel = useMemo(() => travelItinerary(entries, home), [entries, home]);
 
   function setHome(value) {
-    const coords = cityCoords(value);
-    setProfile(writeProfile({ homeCity: value, homeLat: coords?.lat ?? null, homeLng: coords?.lng ?? null }));
+    // Place of issue is now a country (like a real passport), not a typed city.
+    setProfile(writeProfile({ homeCountry: value }));
   }
 
   async function doExport(kind) {
@@ -343,6 +343,8 @@ export default function PassportView({ onOpenCity }) {
           onName={(name) => setProfile(writeProfile({ name }))}
           onAvatar={(avatar) => setProfile(writeProfile({ avatar }))}
           onHome={setHome}
+          photoGender={profile.photoGender}
+          onPhotoGender={(g) => setProfile(writeProfile({ photoGender: g }))}
           identitySeed={session?.user?.email || profile.name || ''}
           memberSince={memberSince}
           stats={stats}
@@ -383,6 +385,17 @@ export default function PassportView({ onOpenCity }) {
           </p>
         </div>
       </section>
+
+      {/* Flip-through passport booklet — visas, stamps and tickets on pages */}
+      <PassportPages
+        profile={profile}
+        identitySeed={session?.user?.email || profile.name || ''}
+        memberSince={memberSince}
+        stats={stats}
+        visas={visas}
+        entries={entries}
+        stubs={stubs}
+      />
 
       {/* Chronological journey map */}
       {entries.length > 0 && <PassportMap entries={entries} home={home} />}
