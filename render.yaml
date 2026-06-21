@@ -23,6 +23,8 @@ services:
       # Do NOT set PORT — Render injects it and the server reads process.env.PORT.
       # Each secret below is sync:false, so Render asks you to paste its value
       # (copy from your local api-gateway/.env). Leave any you don't use blank.
+      - key: GOOGLE_MAPS_KEY
+        sync: false
       - key: MUSIXMATCH_API_KEY
         sync: false
       - key: MUSIXMATCH_PASSWORD
