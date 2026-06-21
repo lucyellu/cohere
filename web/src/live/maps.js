@@ -5,13 +5,38 @@
 let promise = null;
 let callbackId = 0;
 
+// The key can come from a build-time env var (local dev / Netlify env) OR be
+// supplied at runtime by the gateway via loadPublicConfig() — so the deployed
+// frontend works without the key being committed to the repo or set in Netlify.
+let runtimeKey = '';
+export function setMapsKey(key) {
+  if (key && typeof key === 'string') runtimeKey = key;
+}
+function mapsKey() {
+  return import.meta.env.VITE_GOOGLE_MAPS_KEY || runtimeKey || '';
+}
+
+// Fetch non-secret client config (the Maps key) from the gateway once at startup.
+export async function loadPublicConfig() {
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 2500);
+    const r = await fetch('/api/config/public', { signal: ctrl.signal });
+    clearTimeout(t);
+    const j = await r.json();
+    if (j?.googleMapsKey) setMapsKey(j.googleMapsKey);
+  } catch {
+    /* gateway unreachable — maps just fall back to the paper list */
+  }
+}
+
 export function loadGoogleMaps() {
   if (typeof window === 'undefined') return Promise.reject(new Error('no window'));
   if (window.google?.maps) return Promise.resolve(window.google.maps);
   if (promise) return promise;
 
-  const key = import.meta.env.VITE_GOOGLE_MAPS_KEY;
-  if (!key) return Promise.reject(new Error('missing VITE_GOOGLE_MAPS_KEY'));
+  const key = mapsKey();
+  if (!key) return Promise.reject(new Error('missing Google Maps key'));
 
   promise = new Promise((resolve, reject) => {
     const callbackName = `__cohearGoogleMapsReady${++callbackId}`;
@@ -46,5 +71,5 @@ export function loadGoogleMaps() {
 }
 
 export function hasMapsKey() {
-  return Boolean(import.meta.env.VITE_GOOGLE_MAPS_KEY);
+  return Boolean(mapsKey());
 }

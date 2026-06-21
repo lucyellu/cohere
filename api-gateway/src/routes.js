@@ -71,6 +71,14 @@ router.get('/health', (_req, res) => {
   res.json({ ok: true, uptime: process.uptime(), services });
 });
 
+// Public, non-secret client config. The Google Maps JS key is a client-side key
+// (it ships in the browser bundle anyway and is protected by HTTP-referrer
+// restrictions), so the deployed frontend can fetch it from here at runtime
+// instead of needing it baked in at build time. Keeps the key out of the repo.
+router.get('/config/public', (_req, res) => {
+  res.json({ ok: true, googleMapsKey: process.env.GOOGLE_MAPS_KEY || '' });
+});
+
 // --- Toggle a service between mock and live at runtime -------------------
 router.post('/config/mock', express.json(), (req, res) => {
   if (!isAdminRequest(req)) return res.status(403).json({ error: 'admin token required' });
