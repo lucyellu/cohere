@@ -13,12 +13,13 @@
   # VITE_SUPABASE_ANON_KEY) in Netlify → Site settings → Environment variables.
   # Vite inlines VITE_-prefixed vars at build time.
 
-# Proxy API calls to the deployed gateway so the browser stays same-origin.
-# Replace the host below with your gateway URL (Render/Railway/Fly/tunnel).
-# Until then, /api/* requests will 404 and the Live room can't load.
+# Proxy API calls to the gateway so the browser stays same-origin.
+# CURRENT: a temporary Cloudflare quick tunnel to the gateway running on Lucy's
+# machine — only live while that machine + tunnel are up, and the URL changes on
+# restart. For a permanent host, deploy via render.yaml and swap the line below.
 [[redirects]]
   from = "/api/*"
-  to = "https://REPLACE-WITH-YOUR-GATEWAY-HOST/api/:splat"
+  to = "https://shaved-withdrawal-merchandise-toolbox.trycloudflare.com/api/:splat"
   status = 200
   force = true
 

@@ -1,0 +1,73 @@
+# Render Blueprint for the Cohere API gateway (Express).
+# Deploy: render.com -> New -> Blueprint -> pick this repo. Render reads this
+# file, creates the service, and prompts you to paste each secret below.
+#
+# After it deploys you'll get a URL like https://cohere-gateway.onrender.com —
+# put it in netlify.toml's /api/* redirect (replacing the temporary tunnel) and
+# push, then redeploy the Netlify site.
+#
+# Note: the Free plan sleeps after ~15 min idle; the first request then takes
+# ~30-50s to wake. Hit /api/health once to warm it before a demo.
+services:
+  - type: web
+    name: cohere-gateway
+    runtime: node
+    rootDir: api-gateway
+    plan: free
+    region: oregon
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      # Do NOT set PORT — Render injects it and the server reads process.env.PORT.
+      # Each secret below is sync:false, so Render asks you to paste its value
+      # (copy from your local api-gateway/.env). Leave any you don't use blank.
+      - key: MUSIXMATCH_API_KEY
+        sync: false
+      - key: MUSIXMATCH_PASSWORD
+        sync: false
+      - key: JAMBASE_API_KEY
+        sync: false
+      - key: YOUTUBE_API_KEY
+        sync: false
+      - key: SETLISTFM_API_KEY
+        sync: false
+      - key: SONGSTATS_API_KEY
+        sync: false
+      - key: SPOTIFY_CLIENT_ID
+        sync: false
+      - key: SPOTIFY_CLIENT_SECRET
+        sync: false
+      - key: TICKETMASTER_API_KEY
+        sync: false
+      - key: RAPIDAPI_KEY
+        sync: false
+      - key: CYANITE_API_KEY
+        sync: false
+      - key: CYANITE_WEBHOOK_SECRET
+        sync: false
+      - key: LALALAI_API_KEY
+        sync: false
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: HF_TOKEN
+        sync: false
+      - key: CEREBRAS_API_KEY
+        sync: false
+      - key: CEREBRAS_TEXT_MODEL
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_TEXT_MODEL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: PASSPORT_SIGNING_SECRET
+        sync: false
+      - key: USE_MOCK_DATA
+        sync: false
