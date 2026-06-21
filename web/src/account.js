@@ -497,12 +497,41 @@ export function addEntryStamp(input) {
   return stamp;
 }
 
-// Default behaviour: just seeing a room's page stamps the passport — it issues
-// the country visa (once) and adds a dated entry stamp for the city. Silent on a
-// prior "I was never here" (only an explicit claimStamp re-enables that show).
+// A souvenir (visa / entry stamp / ticket stub) should only mint once you could
+// actually be "in the crowd": the show is live, already happened, or starts very
+// soon. Opening an upcoming show hours or days early must NOT stamp it — you
+// weren't there yet. You can "arrive" up to STAMP_LEAD_MS before the start.
+const STAMP_LEAD_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+function stampStartMs(c) {
+  const raw = c.startDate || c.date || '';
+  if (!raw) return null;
+  // Date-only → assume an 8pm show; datetimes parse as-is.
+  const t = Date.parse(raw.length <= 10 ? `${raw}T20:00:00` : raw);
+  return Number.isNaN(t) ? null : t;
+}
+
+// Has this show started (or is it about to / already past)? Replays always count.
+export function isStampable(concert, now = Date.now()) {
+  if (!concert) return false;
+  if (concert.when === 'past' || concert.mode === 'replay' || concert.source === 'replay') return true;
+  const start = stampStartMs(concert);
+  if (start == null) return true; // unknown start time → don't block (back-compat)
+  return now >= start - STAMP_LEAD_MS;
+}
+
+// Default behaviour: seeing a room's page stamps the passport — it issues the
+// country visa (once) and a dated entry stamp + ticket stub for the city. But
+// only once the show is actually on; opening it too early just records the view.
+// Silent on a prior "I was never here" (only an explicit claimStamp re-enables).
 export function autoStampOnView(input) {
   const concert = normalizeConcert(input);
   if (!concert.id || isOptedOut(concert.id)) return null;
+  if (!isStampable(concert)) {
+    // Too early — log that you looked, but hand out no souvenir yet.
+    recordConcertAction(input, 'viewed', { source: 'view' });
+    return { visa: null, entry: null, stub: null, pending: true };
+  }
   recordConcertAction(input, concert.when === 'past' ? 'opened_replay' : 'joined_live', { source: 'view' });
   const visa = issueVisa(concert);
   const entry = addEntryStamp(concert);
@@ -589,6 +618,7 @@ export function autoStampHistory() {
   let stamped = 0;
   for (const item of readHistory()) {
     if (!item.id || isOptedOut(item.id)) continue;
+    if (!isStampable(item)) continue; // not started yet → stays "visited", no souvenir
     issueVisa(item);
     addEntryStamp(item);
     issueTicketStub(item);
