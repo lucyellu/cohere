@@ -5,7 +5,7 @@ export const SETTINGS_KEY = 'cohear_settings_v1';
 export const DEFAULT_SETTINGS = {
   timezone: DETECTED_TIME_ZONE,
   currency: 'USD',
-  themeAccent: '#e0662f',
+  themeAccent: '#2f86d6',
   // Flips the monochrome ramp's light/dark poles — the "paper" (light) skin.
   themeInverted: false,
   // How long an ended concert stays visible in Discover (hours). 0 = hide the
@@ -45,6 +45,26 @@ export const CURRENCIES = [
   { code: 'AUD', label: 'AUD - Australian dollar' },
   { code: 'JPY', label: 'JPY - Japanese yen' },
 ];
+
+// One-time migration: the original default accent was a terracotta orange. Flip
+// anyone still sitting on that exact default over to the new blue default once,
+// without disturbing a colour the user later picked on purpose.
+const OLD_DEFAULT_ACCENT = '#e0662f';
+const ACCENT_MIGRATION_KEY = 'cohere_accent_blue_v1';
+function migrateDefaultAccent() {
+  try {
+    if (localStorage.getItem(ACCENT_MIGRATION_KEY)) return;
+    const parsed = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');
+    if (parsed && typeof parsed === 'object' && String(parsed.themeAccent).toLowerCase() === OLD_DEFAULT_ACCENT) {
+      parsed.themeAccent = DEFAULT_SETTINGS.themeAccent;
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(parsed));
+    }
+    localStorage.setItem(ACCENT_MIGRATION_KEY, '1');
+  } catch {
+    /* storage unavailable — nothing to migrate */
+  }
+}
+migrateDefaultAccent();
 
 export function readSettings() {
   try {

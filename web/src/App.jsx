@@ -31,7 +31,7 @@ export default function App() {
   const [settings, setSettings] = useState(() => readSettings());
 
   useEffect(() => {
-    applyTheme(settings.themeAccent || '#e0662f', Boolean(settings.themeInverted));
+    applyTheme(settings.themeAccent || '#2f86d6', Boolean(settings.themeInverted));
   }, [settings.themeAccent, settings.themeInverted]);
 
   function openCity(city, country) {

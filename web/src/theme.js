@@ -70,7 +70,7 @@ export function isValidHex(hex) {
 // Paint the entire palette onto :root. `seed` is the vivid accent; everything
 // else is derived from its hue. `invert` produces the light skin.
 export function applyTheme(seed, invert = false) {
-  if (!isValidHex(seed)) seed = '#e0662f';
+  if (!isValidHex(seed)) seed = '#2f86d6';
   const root = document.documentElement;
   const set = (k, v) => root.style.setProperty(k, v);
   const [r, g, b] = hexRgb(seed);

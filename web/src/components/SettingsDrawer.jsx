@@ -252,7 +252,7 @@ export default function SettingsDrawer({ open, settings, onChange, onClose }) {
 // ramp that paints the whole UI. Pick a preset, shuffle a random hue, scrub the
 // shade strip, or use the native picker; the Dark/Light toggle flips the ramp.
 function ThemeSection({ settings, update }) {
-  const seed = settings.themeAccent || '#e0662f';
+  const seed = settings.themeAccent || '#2f86d6';
   const inverted = Boolean(settings.themeInverted);
   const shades = monoShades(seed, 12);
   const activeShade = nearestShadeIndex(shades, seed);
