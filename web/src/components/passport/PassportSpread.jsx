@@ -9,6 +9,7 @@ const PER_PAGE = 6;
 // The passport as an open two-page book spread (like a real passport): the
 // identity/photo page on the left, and the collected visas, entry stamps and
 // ticket stubs laid out as stamps on the right — paged through like a booklet.
+// Stats and distance are rendered OUTSIDE the passport by the parent.
 export default function PassportSpread({
   profile,
   onName,
@@ -18,9 +19,6 @@ export default function PassportSpread({
   onPhotoGender,
   identitySeed,
   memberSince,
-  stats,
-  travel,
-  home,
   visas = [],
   entries = [],
   stubs = [],
@@ -32,7 +30,6 @@ export default function PassportSpread({
   const passportNo = 'CO' + String(hashString(seed) % 9000000 + 1000000);
   const initials = display.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
   const tint = hashString(`${seed}:tint`) % 360;
-  const homeLocated = Boolean(home && home.lat != null);
 
   const fileRef = useRef(null);
   const [busy, setBusy] = useState('');
@@ -68,7 +65,7 @@ export default function PassportSpread({
   return (
     <div className="cohear-spread">
       {/* LEFT PAGE — identity */}
-      <div className="cohear-spread__page cohear-passport-page left">
+      <div className="cohear-spread__page cohear-passport-page left" style={{ display: 'flex', flexDirection: 'column' }}>
         <div className="flex items-center justify-between border-b border-black/15 pb-1.5">
           <span className="text-[11px] font-black uppercase tracking-[0.28em]">Passport</span>
           <span className="text-[9px] font-bold uppercase tracking-[0.14em] opacity-70">Cohere · Citizen of Live Music</span>
@@ -147,32 +144,24 @@ export default function PassportSpread({
           </div>
         </div>
 
-        {/* Distance travelled */}
-        <div className="cohear-book__miles mt-3">
-          <span className="cohear-book__globe" aria-hidden="true">🌍</span>
-          <div className="min-w-0">
-            <div className="text-[9px] font-black uppercase tracking-[0.2em] opacity-70">Distance travelled</div>
-            <div className="font-mono text-2xl font-black leading-none tabular-nums">
-              {fmtNum(Math.round(travel?.miles || 0))} <span className="text-sm font-bold">mi</span>
+        {/* Endorsements / annotations area — fills remaining space like a real passport */}
+        <div className="mt-auto pt-3 space-y-2">
+          <div className="border-t border-black/10 pt-2">
+            <div className="text-[8px] font-semibold uppercase tracking-[0.16em] opacity-45">Endorsements</div>
+            <div className="mt-1 text-[9px] leading-relaxed opacity-55 font-mono">
+              This passport is the property of Cohere. It is not transferable.
+              The bearer is a citizen of live music and is entitled to free
+              passage through all concert venues worldwide.
             </div>
-            <div className="font-mono text-[11px] font-semibold opacity-70">{fmtNum(Math.round(travel?.km || 0))} km · {travel?.stops || 0} stops</div>
           </div>
-          {!homeLocated && (travel?.stops || 0) > 0 && (
-            <span className="ml-auto max-w-[120px] text-right text-[9px] leading-tight opacity-60">Pick a country to count the trip out &amp; back</span>
-          )}
-        </div>
-
-        {/* Stat chips */}
-        <div className="mt-2.5 grid grid-cols-5 gap-2">
-          <Stat label="Countries" value={stats.countries} />
-          <Stat label="Cities" value={stats.cities} />
-          <Stat label="Entries" value={stats.visits} />
-          <Stat label="Artists" value={stats.artists} />
-          <Stat label="Tickets" value={stats.stubs} />
+          <div className="border-t border-black/10 pt-2">
+            <div className="text-[8px] font-semibold uppercase tracking-[0.16em] opacity-45">Observations / Remarques</div>
+            <div className="mt-1 text-[9px] leading-relaxed opacity-40 font-mono">—</div>
+          </div>
         </div>
 
         {/* Machine-readable zone */}
-        <pre className="mt-2.5 whitespace-pre-wrap break-all border-t border-black/15 pt-2 font-mono text-[10px] leading-tight tracking-[0.04em] opacity-80">{mrz(display, passportNo, stats)}</pre>
+        <pre className="mt-auto whitespace-pre-wrap break-all border-t border-black/15 pt-2 font-mono text-[10px] leading-tight tracking-[0.04em] opacity-80">{mrz(display, passportNo)}</pre>
       </div>
 
       {/* RIGHT PAGE — stamps / pages */}
@@ -350,25 +339,17 @@ function KV({ label, value, mono }) {
   );
 }
 
-function Stat({ label, value }) {
-  return (
-    <div className="rounded border border-black/10 bg-black/[0.03] px-1 py-1 text-center">
-      <div className="font-mono text-base font-black leading-none tabular-nums">{value}</div>
-      <div className="mt-0.5 text-[7px] font-semibold uppercase tracking-[0.06em] opacity-55">{label}</div>
-    </div>
-  );
-}
+
 
 function fmtNum(n) {
   return Number(n || 0).toLocaleString('en-US');
 }
 
-function mrz(name, passportNo, stats) {
+function mrz(name, passportNo) {
   const surname = name.split(/\s+/).slice(-1)[0] || 'TRAVELLER';
   const given = name.split(/\s+/).slice(0, -1).join('<') || name.replace(/\s+/g, '<');
   const pad = (s, n) => (s.toUpperCase().replace(/[^A-Z<]/g, '<') + '<'.repeat(n)).slice(0, n);
   const line1 = `P<COH${pad(surname, 10)}<<${pad(given, 26)}`.slice(0, 44).padEnd(44, '<');
-  const code = `${passportNo}<COH<${stats.countries}C${stats.cities}T${stats.visits}E${stats.stubs}S`;
-  const line2 = pad(code.replace(/[^A-Z0-9<]/g, '<'), 44);
+  const line2 = pad(`${passportNo}<COH`.replace(/[^A-Z0-9<]/g, '<'), 44);
   return `${line1}\n${line2}`;
 }

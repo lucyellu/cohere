@@ -335,24 +335,57 @@ export default function PassportView({ onOpenCity }) {
         )}
       </div>
 
-      {/* Passport — open book spread: identity (left) + stamp pages (right) */}
-      <PassportSpread
-        profile={profile}
-        onName={(name) => setProfile(writeProfile({ name }))}
-        onAvatar={(avatar) => setProfile(writeProfile({ avatar }))}
-        onHome={setHome}
-        photoGender={profile.photoGender}
-        onPhotoGender={(g) => setProfile(writeProfile({ photoGender: g }))}
-        identitySeed={session?.user?.email || profile.name || ''}
-        memberSince={memberSince}
-        stats={stats}
-        travel={travel}
-        home={home}
-        visas={visas}
-        entries={entries}
-        stubs={stubs}
-        onOpenCity={onOpenCity}
-      />
+      {/* Passport + stats sidebar layout */}
+      <div className="cohear-passport-layout">
+        {/* Passport — open book spread: identity (left) + stamp pages (right) */}
+        <PassportSpread
+          profile={profile}
+          onName={(name) => setProfile(writeProfile({ name }))}
+          onAvatar={(avatar) => setProfile(writeProfile({ avatar }))}
+          onHome={setHome}
+          photoGender={profile.photoGender}
+          onPhotoGender={(g) => setProfile(writeProfile({ photoGender: g }))}
+          identitySeed={session?.user?.email || profile.name || ''}
+          memberSince={memberSince}
+          visas={visas}
+          entries={entries}
+          stubs={stubs}
+          onOpenCity={onOpenCity}
+        />
+
+        {/* Stats sidebar — moved out of the passport for realism */}
+        <div className="cohear-stats-sidebar">
+          {/* Distance travelled */}
+          <div className="cohear-stat-card">
+            <div className="cohear-stat-card__title">Distance Travelled</div>
+            <div className="cohear-distance-hero">
+              <span className="cohear-distance-hero__globe" aria-hidden="true">🌍</span>
+              <div>
+                <div>
+                  <span className="cohear-distance-hero__value">{fmtStat(Math.round(travel?.miles || 0))}</span>
+                  {' '}<span className="cohear-distance-hero__unit">mi</span>
+                </div>
+                <div className="cohear-distance-hero__sub">
+                  {fmtStat(Math.round(travel?.km || 0))} km · {travel?.stops || 0} stops
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Concert stats */}
+          <div className="cohear-stat-card">
+            <div className="cohear-stat-card__title">Your Stats</div>
+            <div className="cohear-stat-grid">
+              <StatChip label="Countries" value={stats.countries} />
+              <StatChip label="Cities" value={stats.cities} />
+              <StatChip label="Entries" value={stats.visits} />
+              <StatChip label="Artists" value={stats.artists} />
+              <StatChip label="Tickets" value={stats.stubs} />
+              <StatChip label="Member since" value={memberSince ? memberSince.slice(0, 4) : '—'} />
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Compact account strip */}
       <div className="cohear-panel flex flex-wrap items-center justify-between gap-3 px-4 py-2.5">
@@ -560,4 +593,17 @@ function Empty({ children, dark }) {
       <p className="max-w-sm leading-6">{children}</p>
     </div>
   );
+}
+
+function StatChip({ label, value }) {
+  return (
+    <div className="cohear-stat-chip">
+      <div className="cohear-stat-chip__value">{value}</div>
+      <div className="cohear-stat-chip__label">{label}</div>
+    </div>
+  );
+}
+
+function fmtStat(n) {
+  return Number(n || 0).toLocaleString('en-US');
 }
