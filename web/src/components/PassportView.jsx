@@ -28,13 +28,12 @@ import {
 } from '../account.js';
 import { supabase, supabaseEnabled } from '../live/supabase.js';
 import { readArtMap, generateArtFor } from './passport/passportArt.js';
-import PassportBook from './passport/PassportBook.jsx';
+import PassportSpread from './passport/PassportSpread.jsx';
 import VisaCard from './passport/VisaCard.jsx';
 import EntryStamp from './passport/EntryStamp.jsx';
 import TicketStub from './passport/TicketStub.jsx';
 import ExportSheet from './passport/ExportSheet.jsx';
 import PassportMap from './passport/PassportMap.jsx';
-import PassportPages from './passport/PassportPages.jsx';
 import ArtistTourMap from './passport/ArtistTourMap.jsx';
 import { exportPng, exportPdf } from './passport/passportExport.js';
 
@@ -336,66 +335,50 @@ export default function PassportView({ onOpenCity }) {
         )}
       </div>
 
-      {/* Identity + account */}
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <PassportBook
-          profile={profile}
-          onName={(name) => setProfile(writeProfile({ name }))}
-          onAvatar={(avatar) => setProfile(writeProfile({ avatar }))}
-          onHome={setHome}
-          photoGender={profile.photoGender}
-          onPhotoGender={(g) => setProfile(writeProfile({ photoGender: g }))}
-          identitySeed={session?.user?.email || profile.name || ''}
-          memberSince={memberSince}
-          stats={stats}
-          travel={travel}
-          home={home}
-        />
-
-        <div className="cohear-panel p-5">
-          <p className="cohear-label">Account</p>
-          <div className="mt-3">
-            {supabaseEnabled ? (
-              session?.user && !session.user.is_anonymous ? (
-                <div className="space-y-3">
-                  <div className="truncate text-sm font-semibold text-white">{session.user.email}</div>
-                  <div className="flex flex-wrap gap-2">
-                    <button className="cohear-primary" onClick={syncCloud}>Sync now</button>
-                    <button className="cohear-secondary" onClick={signOut}>Sign out</button>
-                  </div>
-                  <p className="text-xs leading-5 text-zinc-500">
-                    {syncMessage || 'Your passport syncs automatically across every device you sign in on.'}
-                  </p>
-                </div>
-              ) : (
-                <form onSubmit={sendMagicLink} className="space-y-3">
-                  <input className="cohear-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email address" />
-                  <button className="cohear-primary w-full justify-center" disabled={!email.trim()}>Email sign-in link</button>
-                  <p className="text-xs leading-5 text-zinc-500">{authMessage || 'Sign in to save your passport and see your stamps on any device.'}</p>
-                </form>
-              )
-            ) : (
-              <p className="text-sm leading-6 text-zinc-500">Local guest passport</p>
-            )}
-          </div>
-          <p className="mt-4 text-xs leading-5 text-zinc-500">
-            Seeing a live room issues a <span className="text-zinc-300">visa</span> for its country and a dated
-            <span className="text-zinc-300"> entry stamp</span> for the city. Listen to a song and you keep the
-            <span className="text-zinc-300"> ticket stub</span>.
-          </p>
-        </div>
-      </section>
-
-      {/* Flip-through passport booklet — visas, stamps and tickets on pages */}
-      <PassportPages
+      {/* Passport — open book spread: identity (left) + stamp pages (right) */}
+      <PassportSpread
         profile={profile}
+        onName={(name) => setProfile(writeProfile({ name }))}
+        onAvatar={(avatar) => setProfile(writeProfile({ avatar }))}
+        onHome={setHome}
+        photoGender={profile.photoGender}
+        onPhotoGender={(g) => setProfile(writeProfile({ photoGender: g }))}
         identitySeed={session?.user?.email || profile.name || ''}
         memberSince={memberSince}
         stats={stats}
+        travel={travel}
+        home={home}
         visas={visas}
         entries={entries}
         stubs={stubs}
+        onOpenCity={onOpenCity}
       />
+
+      {/* Compact account strip */}
+      <div className="cohear-panel flex flex-wrap items-center justify-between gap-3 px-4 py-2.5">
+        {supabaseEnabled ? (
+          session?.user && !session.user.is_anonymous ? (
+            <>
+              <div className="min-w-0 text-xs text-zinc-400">
+                <span className="font-semibold text-white">{session.user.email}</span>
+                <span className="ml-2 text-zinc-500">{syncMessage || 'Synced across your devices'}</span>
+              </div>
+              <div className="flex gap-2">
+                <button className="cohear-secondary min-h-8 px-3 text-xs" onClick={syncCloud}>Sync now</button>
+                <button className="cohear-secondary min-h-8 px-3 text-xs" onClick={signOut}>Sign out</button>
+              </div>
+            </>
+          ) : (
+            <form onSubmit={sendMagicLink} className="flex w-full flex-wrap items-center gap-2">
+              <input className="cohear-input h-9 flex-1" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email to save your passport across devices" />
+              <button className="cohear-primary min-h-9 px-3 text-xs" disabled={!email.trim()}>Email sign-in link</button>
+              {authMessage && <p className="w-full text-xs text-zinc-500">{authMessage}</p>}
+            </form>
+          )
+        ) : (
+          <p className="text-xs text-zinc-500">Local guest passport — stamps are collected automatically as you attend shows.</p>
+        )}
+      </div>
 
       {/* Chronological journey map */}
       {entries.length > 0 && <PassportMap entries={entries} home={home} />}
