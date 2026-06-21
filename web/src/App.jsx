@@ -1,17 +1,21 @@
-import { useEffect, useState } from 'react';
-import LiveLanding from './live/LiveLanding.jsx';
-import LiveRoom from './live/LiveRoom.jsx';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { PlayerProvider } from './live/player.jsx';
 import BottomPlayer from './live/BottomPlayer.jsx';
 import { resolveEvent } from './live/liveApi.js';
 import ConcertsView from './components/ConcertsView.jsx';
 import SettingsDrawer from './components/SettingsDrawer.jsx';
-import PassportView from './components/PassportView.jsx';
-import CityView from './components/CityView.jsx';
 import AccountButton from './components/AccountButton.jsx';
 import { readSettings, writeSettings } from './settings.js';
 import { recordConcertAction, autoStampOnView } from './account.js';
 import { applyTheme } from './theme.js';
+
+// Non-landing views are split into their own chunks so the Discover view (what
+// loads first) ships far less JavaScript on the first visit. They fetch on
+// demand the moment you navigate to them.
+const LiveLanding = lazy(() => import('./live/LiveLanding.jsx'));
+const LiveRoom = lazy(() => import('./live/LiveRoom.jsx'));
+const PassportView = lazy(() => import('./components/PassportView.jsx'));
+const CityView = lazy(() => import('./components/CityView.jsx'));
 
 const NAV = [
   { id: 'discover', label: 'Discover' },
@@ -114,31 +118,41 @@ export default function App() {
           <main className="mt-5 flex-1">
             {view === 'discover' && <ConcertsView onSyncLive={syncLive} settings={settings} onSettingsChange={updateSettings} />}
 
-            {view === 'passport' && <PassportView onOpenCity={openCity} />}
+            <Suspense fallback={<ViewLoading />}>
+              {view === 'passport' && <PassportView onOpenCity={openCity} />}
 
-            {view === 'city' && cityTarget && (
-              <CityView
-                city={cityTarget.city}
-                country={cityTarget.country}
-                onBack={() => setView('passport')}
-                onSyncLive={syncLive}
-              />
-            )}
+              {view === 'city' && cityTarget && (
+                <CityView
+                  city={cityTarget.city}
+                  country={cityTarget.country}
+                  onBack={() => setView('passport')}
+                  onSyncLive={syncLive}
+                />
+              )}
 
-            {view === 'live' &&
-              (liveEvent ? (
-                <LiveRoom event={liveEvent} onBack={() => setLiveEvent(null)} />
-              ) : (
-                <section className="cohear-panel p-5">
-                  <LiveLanding onJoin={joinLandingEvent} />
-                </section>
-              ))}
+              {view === 'live' &&
+                (liveEvent ? (
+                  <LiveRoom event={liveEvent} onBack={() => setLiveEvent(null)} />
+                ) : (
+                  <section className="cohear-panel p-5">
+                    <LiveLanding onJoin={joinLandingEvent} />
+                  </section>
+                ))}
+            </Suspense>
           </main>
         </div>
         <BottomPlayer />
         <SettingsDrawer open={settingsOpen} settings={settings} onChange={updateSettings} onClose={() => setSettingsOpen(false)} />
       </div>
     </PlayerProvider>
+  );
+}
+
+function ViewLoading() {
+  return (
+    <section className="cohear-panel grid min-h-64 place-items-center p-8 text-sm text-zinc-500">
+      Loading…
+    </section>
   );
 }
 
