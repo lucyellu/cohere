@@ -1478,3 +1478,170 @@ button:disabled { cursor: not-allowed; }
     overflow: visible;
   }
 }
+
+/* =========================================================================
+   CHAT & VOICE  — live room text + WebRTC voice chat
+   ========================================================================= */
+
+.cohear-chat {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.cohear-chat--disabled {
+  display: grid;
+  place-items: center;
+  min-height: 200px;
+}
+
+/* ---- Voice bar (top) ---- */
+.cohear-chat__voice-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.02);
+}
+.cohear-chat__voice-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.cohear-chat__voice-btn:hover { background: rgba(255, 255, 255, 0.12); }
+.cohear-chat__voice-btn--active {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+}
+.cohear-chat__voice-btn--active:hover { background: rgba(239, 68, 68, 0.25); }
+.cohear-chat__voice-btn--muted {
+  background: rgba(251, 191, 36, 0.12);
+  border-color: rgba(251, 191, 36, 0.3);
+  color: #fde68a;
+}
+.cohear-chat__voice-peers {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+  margin-left: 4px;
+}
+.cohear-chat__voice-error {
+  font-size: 11px;
+  color: #fca5a5;
+}
+
+/* ---- Message list ---- */
+.cohear-chat__messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 120px;
+  scroll-behavior: smooth;
+}
+.cohear-chat__empty {
+  text-align: center;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.35);
+  margin: auto 0;
+  padding: 24px 12px;
+  line-height: 1.6;
+}
+.cohear-chat__empty code {
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+/* ---- Chat bubble ---- */
+.cohear-chat__msg {
+  display: flex;
+  flex-direction: column;
+  max-width: 82%;
+  padding: 6px 10px;
+  border-radius: 12px 12px 12px 4px;
+  background: rgba(255, 255, 255, 0.07);
+  animation: cohear-chat-in 0.2s ease-out;
+}
+.cohear-chat__msg--me {
+  align-self: flex-end;
+  background: rgba(99, 102, 241, 0.22);
+  border-radius: 12px 12px 4px 12px;
+}
+.cohear-chat__author {
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 1px;
+}
+.cohear-chat__text {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.45;
+  word-break: break-word;
+}
+.cohear-chat__time {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.3);
+  align-self: flex-end;
+  margin-top: 2px;
+}
+
+@keyframes cohear-chat-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ---- Input form ---- */
+.cohear-chat__form {
+  display: flex;
+  gap: 6px;
+  padding: 8px 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(0, 0, 0, 0.15);
+}
+.cohear-chat__input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 7px 12px;
+  color: #fff;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.cohear-chat__input::placeholder { color: rgba(255, 255, 255, 0.3); }
+.cohear-chat__input:focus { border-color: rgba(99, 102, 241, 0.5); }
+.cohear-chat__send {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(99, 102, 241, 0.45);
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.cohear-chat__send:hover:not(:disabled) { background: rgba(99, 102, 241, 0.65); }
+.cohear-chat__send:disabled { opacity: 0.35; cursor: default; }

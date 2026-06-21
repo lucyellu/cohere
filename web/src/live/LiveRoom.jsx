@@ -10,6 +10,7 @@ import NowPlaying from './NowPlaying.jsx';
 import SetlistTimeline from './SetlistTimeline.jsx';
 import FanWall from './FanWall.jsx';
 import Lyrics from './Lyrics.jsx';
+import ChatPanel from './ChatPanel.jsx';
 
 // The shared room. One synchronized clock drives the map, now-playing, timeline,
 // fan wall and lyrics. The timeline is a PREDICTION (start time + real track
@@ -97,7 +98,7 @@ export default function LiveRoom({ event: initial, onBack }) {
   function resetPanels() {
     localStorage.removeItem('cohear_live_panel_order');
     sizeStore.clear();
-    setPanelOrder(['video', 'lyrics', 'setlist', 'map', 'social']);
+    setPanelOrder(['video', 'lyrics', 'setlist', 'map', 'social', 'chat']);
     setResetNonce((n) => n + 1); // re-applies default size to every panel
   }
 
@@ -208,13 +209,25 @@ export default function LiveRoom({ event: initial, onBack }) {
             if (fresh) setEvent((prev) => ({ ...prev, ...fresh }));
           }} compact />
         </RoomPanel>
+
+        <RoomPanel
+          id="chat"
+          title="Chat & Voice"
+          subtitle="Text and voice chat with others in the room"
+          order={panelIndex.chat}
+          onMove={movePanel}
+          sizeStore={sizeStore}
+          resetNonce={resetNonce}
+        >
+          <ChatPanel eventId={event.id} />
+        </RoomPanel>
       </div>
     </div>
   );
 }
 
 function readPanelOrder() {
-  const fallback = ['video', 'lyrics', 'setlist', 'map', 'social'];
+  const fallback = ['video', 'lyrics', 'setlist', 'map', 'social', 'chat'];
   try {
     const parsed = JSON.parse(localStorage.getItem('cohear_live_panel_order') || 'null');
     if (Array.isArray(parsed) && fallback.every((id) => parsed.includes(id))) {
@@ -271,6 +284,7 @@ const PANEL_DEFAULT_SIZE = {
   setlist: { w: 430, h: 560 },
   map: { w: 430, h: 560 },
   social: { w: 470, h: 560 },
+  chat: { w: 380, h: 560 },
 };
 
 function createSizeStore() {
