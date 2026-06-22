@@ -60,20 +60,8 @@ export default function FanWall({ event, np, clips, onClipsChanged, compact = fa
 
   // TikTok / Instagram / X feed (RapidAPI), fetched in parallel + cached.
   useEffect(() => {
-    let cancelled = false;
-    if (socialCache.current[socialQ]) {
-      setSocial({ items: socialCache.current[socialQ], loading: false });
-      return;
-    }
-    setSocial((d) => ({ ...d, loading: true }));
-    socialSearch({ q: socialQ, artist: event.artist }).then((items) => {
-      if (cancelled) return;
-      socialCache.current[socialQ] = items;
-      setSocial({ items, loading: false });
-    });
-    return () => {
-      cancelled = true;
-    };
+    // PAUSED: social search disabled per user request
+    setSocial({ items: [], loading: false });
   }, [socialQ, event.artist, refreshKey]);
 
   // Unified list: YouTube auto items + crowd-submitted clips, normalized.
@@ -182,8 +170,8 @@ export default function FanWall({ event, np, clips, onClipsChanged, compact = fa
       <PasteBar event={event} np={np} onClipsChanged={onClipsChanged} />
 
       {/* Unified embedded grid */}
-      {(yt.loading || social.loading) && !items.length ? (
-        <p className="py-6 text-center text-sm text-zinc-500">Pulling footage from YouTube, TikTok, Instagram &amp; X…</p>
+      {(yt.loading) && !items.length ? (
+        <p className="py-6 text-center text-sm text-zinc-500">Pulling footage from YouTube…</p>
       ) : !items.length ? (
         <p className="py-6 text-center text-sm text-zinc-500">
           No {platform === 'all' ? '' : platform + ' '}footage found yet for this {scopeSong ? 'song' : 'show'}.
