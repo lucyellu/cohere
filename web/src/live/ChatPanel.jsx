@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useChat } from './chatChannel.js';
 import { useVoice } from './voiceChannel.js';
-import { guestId } from './liveApi.js';
+import { guestId, guestName } from './liveApi.js';
+import WaveformTile from './WaveformTile.jsx';
+
+const MAX_VOICE_PARTICIPANTS = 6;
 
 // Combined chat + voice panel for a live room.
 export default function ChatPanel({ eventId }) {
@@ -10,6 +13,7 @@ export default function ChatPanel({ eventId }) {
   const [draft, setDraft] = useState('');
   const listRef = useRef(null);
   const myUid = guestId();
+  const myName = guestName() || 'You';
 
   // Auto-scroll to latest message.
   useEffect(() => {
@@ -35,9 +39,40 @@ export default function ChatPanel({ eventId }) {
     );
   }
 
+  // Build participant list for the voice grid (self first, then peers)
+  const totalParticipants = voice.joined ? 1 + voice.peers.length : 0;
+  const gridClass = gridLayoutClass(totalParticipants);
+
   return (
     <div className="cohear-chat">
-      {/* Voice bar */}
+      {/* ── Voice Call Grid ── */}
+      {voice.joined && (
+        <div className="cohear-voice-section">
+          <div className={`cohear-voice-grid ${gridClass}`}>
+            {/* Self tile */}
+            <WaveformTile
+              stream={voice.localStream}
+              name={myName}
+              isSelf={true}
+              muted={voice.muted}
+              colorIdx={0}
+            />
+            {/* Peer tiles */}
+            {voice.peers.map((peer, i) => (
+              <WaveformTile
+                key={peer.uid}
+                stream={peer.stream}
+                name={peer.name}
+                isSelf={false}
+                muted={false}
+                colorIdx={i + 1}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Voice controls bar ── */}
       <div className="cohear-chat__voice-bar">
         {voice.joined ? (
           <>
@@ -55,6 +90,9 @@ export default function ChatPanel({ eventId }) {
             >
               {voice.muted ? '🔇 Muted' : '🔊 On'}
             </button>
+            <span className="cohear-chat__voice-count">
+              {totalParticipants}/{MAX_VOICE_PARTICIPANTS}
+            </span>
             {voice.peers.length > 0 && (
               <span className="cohear-chat__voice-peers">
                 {voice.peers.map((p) => p.name).join(', ')}
@@ -75,7 +113,7 @@ export default function ChatPanel({ eventId }) {
         )}
       </div>
 
-      {/* Message list */}
+      {/* ── Message list ── */}
       <div className="cohear-chat__messages" ref={listRef}>
         {messages.length === 0 ? (
           <p className="cohear-chat__empty">
@@ -98,7 +136,7 @@ export default function ChatPanel({ eventId }) {
         )}
       </div>
 
-      {/* Input */}
+      {/* ── Input ── */}
       <form className="cohear-chat__form" onSubmit={handleSend}>
         <input
           className="cohear-chat__input"
@@ -124,4 +162,12 @@ export default function ChatPanel({ eventId }) {
 function fmtTime(ts) {
   const d = new Date(ts);
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+/** Returns the CSS modifier class for the voice grid based on participant count. */
+function gridLayoutClass(count) {
+  if (count <= 1) return 'cohear-voice-grid--1';
+  if (count === 2) return 'cohear-voice-grid--2';
+  if (count <= 4) return 'cohear-voice-grid--4';
+  return 'cohear-voice-grid--6';
 }

@@ -9,9 +9,9 @@
 
 [build.environment]
   NODE_VERSION = "20"
-  # Set VITE_GOOGLE_MAPS_KEY (and optionally VITE_SUPABASE_URL /
-  # VITE_SUPABASE_ANON_KEY) in Netlify → Site settings → Environment variables.
-  # Vite inlines VITE_-prefixed vars at build time.
+  VITE_GOOGLE_MAPS_KEY = "AIzaSyAQdm7UCr8aMXilvvKj4eh0l2bs56lc-50"
+  VITE_SUPABASE_URL = "https://bzbxtnivfzeqgoajsyhc.supabase.co"
+  VITE_SUPABASE_ANON_KEY = "sb_publishable_DfOQMiEWdIpyu03N90jQUg_t4eops9r"
 
 # Proxy API calls to the gateway so the browser stays same-origin.
 # CURRENT: a temporary Cloudflare quick tunnel to the gateway running on Lucy's
@@ -19,7 +19,7 @@
 # restart. For a permanent host, deploy via render.yaml and swap the line below.
 [[redirects]]
   from = "/api/*"
-  to = "https://shaved-withdrawal-merchandise-toolbox.trycloudflare.com/api/:splat"
+  to = "https://cohere-gateway.onrender.com/api/:splat"
   status = 200
   force = true
 

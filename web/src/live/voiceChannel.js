@@ -17,13 +17,17 @@ const ICE_SERVERS = [
   { urls: 'stun:stun1.l.google.com:19302' },
 ];
 
+/** Maximum number of participants in a voice call (including self). */
+const MAX_VOICE_PARTICIPANTS = 6;
+
 /**
  * useVoice(eventId) — WebRTC voice chat for a live room.
  *
  * Returns:
  *   joined       – boolean, whether we're in the voice channel
  *   muted        – boolean, mic mute state
- *   peers        – array of { uid, name } for everyone in voice
+ *   peers        – array of { uid, name, stream } for everyone in voice
+ *   localStream  – the local MediaStream (mic), or null
  *   join()       – request mic and join voice
  *   leave()      – disconnect from voice
  *   toggleMute() – toggle local mic
@@ -35,10 +39,11 @@ export function useVoice(eventId) {
   const [muted, setMuted] = useState(false);
   const [peers, setPeers] = useState([]);
   const [error, setError] = useState(null);
+  const [localStream, setLocalStream] = useState(null);
 
   const channelRef = useRef(null);
   const streamRef = useRef(null);
-  const connectionsRef = useRef({}); // uid → { pc, name }
+  const connectionsRef = useRef({}); // uid → { pc, name, stream }
   const audioContainerRef = useRef(null);
   const myUid = guestId();
 
@@ -56,6 +61,7 @@ export function useVoice(eventId) {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     }
+    setLocalStream(null);
 
     // Remove audio elements
     if (audioContainerRef.current) {
@@ -110,19 +116,36 @@ export function useVoice(eventId) {
     audioContainerRef.current.appendChild(audio);
   }
 
-  function createPeerConnection(remoteUid, remoteName, channel, localStream) {
+  function createPeerConnection(remoteUid, remoteName, channel, localStreamArg) {
     if (connectionsRef.current[remoteUid]) return connectionsRef.current[remoteUid].pc;
+
+    // Enforce participant cap (5 remote peers + self = 6 total)
+    const currentPeerCount = Object.keys(connectionsRef.current).length;
+    if (currentPeerCount >= MAX_VOICE_PARTICIPANTS - 1) {
+      console.warn(`[voice] Room full (${MAX_VOICE_PARTICIPANTS} max). Rejecting peer ${remoteUid}`);
+      setError(`Voice call is full (${MAX_VOICE_PARTICIPANTS} max).`);
+      return null;
+    }
 
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
 
     // Add our local audio tracks
-    if (localStream) {
-      localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
+    if (localStreamArg) {
+      localStreamArg.getTracks().forEach((track) => pc.addTrack(track, localStreamArg));
     }
 
-    // Handle remote audio
+    // Handle remote audio — store the stream for waveform visualization AND play it
     pc.ontrack = (e) => {
-      if (e.streams[0]) addRemoteStream(remoteUid, e.streams[0]);
+      if (e.streams[0]) {
+        const remoteStream = e.streams[0];
+        addRemoteStream(remoteUid, remoteStream);
+
+        // Store the stream on the connection entry for waveform access
+        if (connectionsRef.current[remoteUid]) {
+          connectionsRef.current[remoteUid].stream = remoteStream;
+          syncPeerList();
+        }
+      }
     };
 
     // ICE candidates → send to the specific peer
@@ -142,7 +165,7 @@ export function useVoice(eventId) {
       }
     };
 
-    connectionsRef.current[remoteUid] = { pc, name: remoteName };
+    connectionsRef.current[remoteUid] = { pc, name: remoteName, stream: null };
     syncPeerList();
     return pc;
   }
@@ -162,7 +185,7 @@ export function useVoice(eventId) {
 
   function syncPeerList() {
     setPeers(
-      Object.entries(connectionsRef.current).map(([uid, { name }]) => ({ uid, name })),
+      Object.entries(connectionsRef.current).map(([uid, { name, stream }]) => ({ uid, name, stream })),
     );
   }
 
@@ -182,6 +205,7 @@ export function useVoice(eventId) {
       return;
     }
     streamRef.current = stream;
+    setLocalStream(stream);
 
     // 2) Set up Supabase signaling channel
     const channel = supabase.channel(`voice:${eventId}`);
@@ -193,6 +217,7 @@ export function useVoice(eventId) {
       .on('broadcast', { event: 'voice:join' }, async ({ payload }) => {
         if (payload.uid === myUid) return;
         const pc = createPeerConnection(payload.uid, payload.name, channel, streamRef.current);
+        if (!pc) return; // room full
         try {
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
@@ -209,6 +234,7 @@ export function useVoice(eventId) {
       .on('broadcast', { event: 'voice:offer' }, async ({ payload }) => {
         if (payload.to !== myUid) return;
         const pc = createPeerConnection(payload.from, payload.fromName, channel, streamRef.current);
+        if (!pc) return; // room full
         try {
           await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
           const answer = await pc.createAnswer();
@@ -276,5 +302,9 @@ export function useVoice(eventId) {
     }
   }, []);
 
-  return { joined, muted, peers, join, leave, toggleMute, supported: supabaseEnabled, error };
+  return {
+    joined, muted, peers, localStream,
+    join, leave, toggleMute,
+    supported: supabaseEnabled, error,
+  };
 }

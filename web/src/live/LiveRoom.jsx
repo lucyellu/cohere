@@ -98,7 +98,7 @@ export default function LiveRoom({ event: initial, onBack }) {
   function resetPanels() {
     localStorage.removeItem('cohear_live_panel_order');
     sizeStore.clear();
-    setPanelOrder(['video', 'lyrics', 'setlist', 'map', 'social', 'chat']);
+    setPanelOrder(['chat', 'video', 'lyrics', 'setlist', 'map', 'social']);
     setResetNonce((n) => n + 1); // re-applies default size to every panel
   }
 
@@ -227,7 +227,7 @@ export default function LiveRoom({ event: initial, onBack }) {
 }
 
 function readPanelOrder() {
-  const fallback = ['video', 'lyrics', 'setlist', 'map', 'social', 'chat'];
+  const fallback = ['chat', 'video', 'lyrics', 'setlist', 'map', 'social'];
   try {
     const parsed = JSON.parse(localStorage.getItem('cohear_live_panel_order') || 'null');
     if (Array.isArray(parsed) && fallback.every((id) => parsed.includes(id))) {
