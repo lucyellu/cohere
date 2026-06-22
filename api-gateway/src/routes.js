@@ -353,6 +353,11 @@ router.get('/concerts', async (req, res) => {
       else if (windowKey === 'week') dateTo = addDaysIso(today, 7);
       else dateTo = addDaysIso(today, 60); // 'upcoming'
     }
+  } else {
+    // Artist search: limit to next 60 days so the timeline isn't completely overwhelming
+    const today = new Date().toISOString().slice(0, 10);
+    dateFrom = today;
+    dateTo = addDaysIso(today, 60);
   }
 
   // Upcoming (JamBase) — artist-filtered, or the whole window when browsing.
@@ -382,7 +387,7 @@ router.get('/concerts', async (req, res) => {
   } else {
     // Real-time lookup for a specific artist
     try {
-      const jb = await fetchJambaseEvents({ artist, source, dateFrom, dateTo, perPage: browse ? 80 : 40 });
+      const jb = await fetchJambaseEvents({ artist, source, dateFrom, dateTo, perPage: 25 });
       collected.push(...normJambase(jb.events));
       sources.jambase = jb.mode;
     } catch (e) {
@@ -839,10 +844,49 @@ function cleanSnippet(value) {
 // --- YouTube: crowd-sourced concert video search -------------------------
 router.get('/youtube/search', async (req, res) => {
   const q = req.query.q || 'coldplay live';
-  const result = await resolve('youtube', () => {
-    const key = process.env.YOUTUBE_API_KEY;
+  const userKey = String(req.get('x-cohear-youtube-key') || '').trim();
+  
+  // 1. Check Supabase cache
+  if (SB_URL && SB_KEY) {
+    try {
+      const cacheRes = await sbFetch(`youtube_cache?query=eq.${encodeURIComponent(q)}&select=response`);
+      if (cacheRes.ok) {
+        const cached = await cacheRes.json();
+        if (cached && cached.length > 0) {
+          return res.status(200).json(cached[0].response);
+        }
+      }
+    } catch (e) {
+      console.warn('YouTube Supabase cache read failed:', e.message);
+    }
+  }
+
+  // 2. Fetch live if cache miss
+  let result = await resolve('youtube', () => {
+    const key = userKey || process.env.YOUTUBE_API_KEY;
     return `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=6&q=${encodeURIComponent(q)}&key=${key}`;
   });
+  
+  if (!result.ok) {
+    result = await serveMock('youtube');
+  } else if (SB_URL && SB_KEY) {
+    // 3. Save to Supabase cache
+    try {
+      await fetch(`${SB_URL}/rest/v1/youtube_cache`, {
+        method: 'POST',
+        headers: {
+          apikey: SB_KEY,
+          Authorization: `Bearer ${SB_KEY}`,
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates',
+        },
+        body: JSON.stringify({ query: q, response: result }),
+      });
+    } catch (e) {
+      console.warn('YouTube Supabase cache write failed:', e.message);
+    }
+  }
+  
   res.status(result.ok ? 200 : 502).json(result);
 });
 
@@ -1683,7 +1727,9 @@ router.get('/live/youtube', async (req, res) => {
   if (isMock('youtube')) {
     return res.json(await serveMock('youtube'));
   }
-  const key = process.env.YOUTUBE_API_KEY;
+  
+  const userKey = String(req.get('x-cohear-youtube-key') || '').trim();
+  const key = userKey || process.env.YOUTUBE_API_KEY;
   const base = (extra) =>
     `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=12` +
     `&q=${encodeURIComponent(q)}&order=date${extra}&key=${key}`;
@@ -1728,7 +1774,11 @@ router.get('/live/youtube', async (req, res) => {
     live: Boolean(i._live),
   }));
 
-  res.json({ ok: !error, items, error });
+  if (error) {
+    record('youtube', { status: 502, latencyMs: 0, bytes: 0, mode: 'live', error });
+    return res.json(await serveMock('youtube'));
+  }
+  res.json({ ok: true, items });
 });
 
 // Multi-platform fan footage. Two providers, picked per platform:

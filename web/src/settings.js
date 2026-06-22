@@ -16,6 +16,7 @@ export const DEFAULT_SETTINGS = {
     seatgeek: '',
     gemini: '',
     googleCse: '',
+    youtubeData: '',
   },
   affiliateIds: {
     ticketmaster: '',

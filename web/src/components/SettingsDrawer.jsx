@@ -32,6 +32,13 @@ const API_KEYS = [
     note: 'Optional fallback for web ticket-price estimates from top search result snippets.',
   },
   {
+    id: 'youtubeData',
+    label: 'YouTube Data API v3',
+    status: 'Wired',
+    placeholder: 'Google Cloud API Key',
+    note: 'Used to search for videos. Add your own key to bypass the global daily quota limit!',
+  },
+  {
     id: 'gemini',
     label: 'Gemini',
     status: 'Wired',

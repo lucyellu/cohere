@@ -392,6 +392,11 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
         setHideEnded={setHideEnded}
         loading={loading}
         onArtistSearch={() => loadArtist(query)}
+        onClearSearch={() => {
+          setQuery('');
+          setArtist('');
+          loadBrowse(windowKey);
+        }}
         onRefresh={refreshConcerts}
         onResetLayout={resetDiscoverLayout}
       />
@@ -547,20 +552,32 @@ function DiscoverHeader({ artist, browse, biggest, loading, stats, spotify, user
 function ControlSurface(props) {
   const {
     browse, query, setQuery, location, setLocation, userZone, setUserZone, windowKey, setWindowKey,
-    mode, setMode, sortKey, pickSort, dir, setDir, when, setWhen, hideEnded, setHideEnded, loading, onArtistSearch, onRefresh, onResetLayout,
+    mode, setMode, sortKey, pickSort, dir, setDir, when, setWhen, hideEnded, setHideEnded, loading, onArtistSearch, onClearSearch, onRefresh, onResetLayout,
   } = props;
 
   return (
     <section className="cohear-panel p-3">
       <div className="grid gap-3 lg:grid-cols-[minmax(260px,1.1fr)_minmax(160px,.55fr)_minmax(180px,.55fr)_auto]">
-        <label className="cohear-field">
+        <label className="cohear-field relative flex-1">
           <SearchIcon />
           <input
+            className="w-full pr-8"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && query.trim() && onArtistSearch()}
             placeholder="Artist, city, venue"
           />
+          {(!browse || query) && (
+            <button
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-zinc-500 hover:text-zinc-300"
+              onClick={onClearSearch}
+              title="Clear search and return to Discover"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            </button>
+          )}
         </label>
         <label className="cohear-field">
           <MapPinIcon />

@@ -199,7 +199,10 @@ export function useVoice(eventId) {
     // 1) Get mic permission
     let stream;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        video: false,
+      });
     } catch (err) {
       setError('Microphone access denied. Please allow mic access and try again.');
       return;

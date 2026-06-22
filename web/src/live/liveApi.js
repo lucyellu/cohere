@@ -89,7 +89,9 @@ export async function liveYoutube(q, { live = false, since, hours } = {}) {
   if (live) p.set('live', '1');
   if (since) p.set('since', since);
   if (hours) p.set('hours', String(hours));
-  const r = await fetch(`/api/live/youtube?${p.toString()}`).then((x) => x.json()).catch(() => null);
+  const ytKey = readApiKey('youtubeData');
+  const headers = ytKey ? { 'x-cohear-youtube-key': ytKey } : {};
+  const r = await fetch(`/api/live/youtube?${p.toString()}`, { headers }).then((x) => x.json()).catch(() => null);
   return r || { items: [], error: 'api' };
 }
 
@@ -134,7 +136,9 @@ export async function youtubeTop(query) {
       /* fall through */
     }
   }
-  const r = await fetch(`/api/youtube/search?q=${encodeURIComponent(query)}`).then((x) => x.json()).catch(() => null);
+  const ytKey = readApiKey('youtubeData');
+  const headers = ytKey ? { 'x-cohear-youtube-key': ytKey } : {};
+  const r = await fetch(`/api/youtube/search?q=${encodeURIComponent(query)}`, { headers }).then((x) => x.json()).catch(() => null);
   const item = (r?.data?.items || []).find((i) => i?.id?.videoId);
   if (!item) return null;
   const out = { videoId: item.id.videoId, title: item.snippet?.title || query, channel: item.snippet?.channelTitle || '' };
