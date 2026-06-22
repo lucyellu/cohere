@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { fetchConcerts, getCachedConcerts, filterWhen, spotifyArtist, ticketmasterMatch, ticketWebEstimate, C_SORTS, defaultDir } from '../concerts.js';
+import { fetchConcerts, getCachedConcerts, filterWhen, spotifyArtist, ticketmasterMatch, seatgeekMatch, ticketWebEstimate, C_SORTS, defaultDir } from '../concerts.js';
 import { fmtCapacity, fmtDate } from '../tour.js';
 import { loadGoogleMaps, hasMapsKey } from '../live/maps.js';
 import { GOOGLE_PAPER_MAP } from '../live/mapStyle.js';
@@ -828,8 +828,10 @@ function SortHeader({ id, label, sortKey, dir, onSort, align = 'left' }) {
 function ConcertInspector({ concert, saved, calendared, sources, userZone, currency, now, onSave, onAddCalendar, onEnterShow, onSyncLive }) {
   const [syncing, setSyncing] = useState(false);
   const [ticket, setTicket] = useState(null);
+  const [sgTicket, setSgTicket] = useState(null);
   const [webTicket, setWebTicket] = useState(null);
   const [ticketLoading, setTicketLoading] = useState(false);
+  const [sgTicketLoading, setSgTicketLoading] = useState(false);
   const [webTicketLoading, setWebTicketLoading] = useState(false);
 
   useEffect(() => {
@@ -844,6 +846,8 @@ function ConcertInspector({ concert, saved, calendared, sources, userZone, curre
       };
     }
     setTicketLoading(true);
+    setSgTicketLoading(true);
+    
     ticketmasterMatch(concert)
       .then((res) => {
         if (alive) setTicket(res);
@@ -863,6 +867,15 @@ function ConcertInspector({ concert, saved, calendared, sources, userZone, curre
       .finally(() => {
         if (alive) setTicketLoading(false);
       });
+
+    seatgeekMatch(concert)
+      .then((res) => {
+        if (alive) setSgTicket(res);
+      })
+      .finally(() => {
+        if (alive) setSgTicketLoading(false);
+      });
+
     return () => {
       alive = false;
     };
@@ -880,8 +893,9 @@ function ConcertInspector({ concert, saved, calendared, sources, userZone, curre
   }
 
   const ticketInfo = ticket?.ok ? ticket.ticket : null;
+  const sgTicketInfo = sgTicket?.ok ? sgTicket.ticket : null;
   const webEstimate = webTicket?.ok ? webTicket.estimate : null;
-  const priceLoading = ticketLoading || webTicketLoading;
+  const priceLoading = ticketLoading || webTicketLoading || sgTicketLoading;
 
   return (
     <aside className="cohear-panel sticky top-5 self-start overflow-hidden">
@@ -951,7 +965,7 @@ function ConcertInspector({ concert, saved, calendared, sources, userZone, curre
 
         <MiniMap concert={concert} />
 
-        <TicketCard ticket={ticketInfo} webEstimate={webEstimate} loading={priceLoading} concert={concert} currency={currency} />
+        <TicketCard ticket={ticketInfo} sgTicket={sgTicketInfo} webEstimate={webEstimate} loading={priceLoading} concert={concert} currency={currency} />
 
         <div className="grid gap-2">
           <div className="grid grid-cols-2 gap-2">
@@ -1397,58 +1411,80 @@ function MiniMap({ concert }) {
   );
 }
 
-function TicketCard({ ticket, webEstimate, loading, concert, currency }) {
+function TicketCard({ ticket, sgTicket, webEstimate, loading, concert, currency }) {
   if (concert.when === 'past') return null;
   if (loading) {
     return (
       <div className="rounded-lg border border-white/10 bg-black/20 p-3 text-sm text-zinc-400">
-        Checking Ticketmaster and web sources for ticket prices...
+        Checking ticket sources...
       </div>
     );
   }
-  if (!ticket && !webEstimate) {
+  if (!ticket && !sgTicket && !webEstimate) {
     return (
       <div className="rounded-lg border border-white/10 bg-black/20 p-3">
         <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-600">Tickets</div>
         <div className="mt-1 text-sm font-semibold text-white">{estimatedTicketLabel(concert)}</div>
         <p className="mt-1 text-xs leading-5 text-zinc-500">
-          Estimated single-ticket value. Add Ticketmaster and Google Search keys in Settings for live ranges, buy links, and web estimates.
+          Estimated single-ticket value. Add Ticketmaster, SeatGeek, and Google Search keys in Settings for live ranges and buy links.
         </p>
       </div>
     );
   }
+  
   const shown = hasTicketPrice(ticket) ? ticket : webEstimate;
+  
   return (
-    <div className="rounded-lg border border-emerald-300/20 bg-emerald-300/[0.06] p-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-200/70">Tickets</div>
-          <div className="mt-1 text-sm font-semibold text-white">{ticketRangeLabel(shown, currency)}</div>
-          <div className="mt-1 truncate text-xs text-emerald-100/65">
-            {ticket?.venue || concert.venue} {ticket?.date ? `- ${fmtDate(ticket.date)}` : ''}
-          </div>
-          {webEstimate && !hasTicketPrice(ticket) && (
-            <div className="mt-2 text-xs leading-5 text-emerald-100/70">
-              Web estimate from {webEstimate.sourceCount || 0} source{webEstimate.sourceCount === 1 ? '' : 's'}.
-              {webEstimate.confidence ? ` Confidence: ${webEstimate.confidence.replace('_', ' ')}.` : ''}
+    <div className="grid gap-3">
+      {(shown || ticket?.url) && (
+        <div className="rounded-lg border border-emerald-300/20 bg-emerald-300/[0.06] p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-200/70">Ticketmaster (Official)</div>
+              <div className="mt-1 text-sm font-semibold text-white">{ticketRangeLabel(shown, currency)}</div>
+              <div className="mt-1 truncate text-xs text-emerald-100/65">
+                {ticket?.venue || concert.venue} {ticket?.date ? `- ${fmtDate(ticket.date)}` : ''}
+              </div>
+              {webEstimate && !hasTicketPrice(ticket) && (
+                <div className="mt-2 text-xs leading-5 text-emerald-100/70">
+                  Web estimate from {webEstimate.sourceCount || 0} source{webEstimate.sourceCount === 1 ? '' : 's'}.
+                  {webEstimate.confidence ? ` Confidence: ${webEstimate.confidence.replace('_', ' ')}.` : ''}
+                </div>
+              )}
             </div>
-          )}
+            {ticket?.url && (
+              <a className="cohear-primary min-h-9 shrink-0 px-3 text-xs" href={ticket.url} target="_blank" rel="noreferrer">
+                Buy
+              </a>
+            )}
+          </div>
+          {webEstimate?.results?.length ? (
+            <div className="mt-3 grid gap-1 border-t border-emerald-300/10 pt-3">
+              {webEstimate.results.slice(0, 3).map((result) => (
+                <a key={result.link || result.title} className="truncate text-xs text-emerald-100/70 hover:text-white" href={result.link} target="_blank" rel="noreferrer">
+                  {result.title || result.link}
+                </a>
+              ))}
+            </div>
+          ) : null}
         </div>
-        {ticket?.url && (
-          <a className="cohear-primary min-h-9 shrink-0 px-3 text-xs" href={ticket.url} target="_blank" rel="noreferrer">
-            Buy
-          </a>
-        )}
-      </div>
-      {webEstimate?.results?.length ? (
-        <div className="mt-3 grid gap-1 border-t border-emerald-300/10 pt-3">
-          {webEstimate.results.slice(0, 3).map((result) => (
-            <a key={result.link || result.title} className="truncate text-xs text-emerald-100/70 hover:text-white" href={result.link} target="_blank" rel="noreferrer">
-              {result.title || result.link}
-            </a>
-          ))}
+      )}
+      
+      {sgTicket && (
+        <div className="rounded-lg border border-purple-300/20 bg-purple-300/[0.06] p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-purple-200/70">SeatGeek (Resale)</div>
+              <div className="mt-1 text-sm font-semibold text-white">{ticketRangeLabel(sgTicket, currency)}</div>
+            </div>
+            {sgTicket.url && (
+              <a className="cohear-secondary min-h-9 shrink-0 px-3 text-xs border-purple-300/20 text-purple-200 hover:bg-purple-300/10 hover:border-purple-300/40" href={sgTicket.url} target="_blank" rel="noreferrer">
+                Buy
+              </a>
+            )}
+          </div>
         </div>
-      ) : null}
+      )}
     </div>
   );
 }

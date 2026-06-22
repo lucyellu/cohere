@@ -18,6 +18,13 @@ const API_KEYS = [
     note: 'Used for selected-concert price ranges and buy-ticket links.',
   },
   {
+    id: 'seatgeek',
+    label: 'SeatGeek API',
+    status: 'Wired',
+    placeholder: 'SeatGeek Client ID',
+    note: 'Used alongside Ticketmaster to show comparative resale ticket prices.',
+  },
+  {
     id: 'googleCse',
     label: 'Google Programmable Search',
     status: 'Wired',

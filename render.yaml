@@ -43,6 +43,10 @@ services:
         sync: false
       - key: TICKETMASTER_API_KEY
         sync: false
+      - key: SEATGEEK_CLIENT_ID
+        sync: false
+      - key: SEATGEEK_CLIENT_SECRET
+        sync: false
       - key: RAPIDAPI_KEY
         sync: false
       - key: LALALAI_API_KEY

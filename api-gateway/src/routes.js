@@ -13,6 +13,21 @@ import * as live from './live.js';
 import * as rapid from './rapid.js';
 import * as passport from './passport.js';
 
+const SB_URL = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
+const SB_KEY = process.env.SUPABASE_SECRET_KEY || '';
+
+function sbFetch(path, opts = {}) {
+  return fetch(`${SB_URL}/rest/v1/${path}`, {
+    ...opts,
+    headers: {
+      apikey: SB_KEY,
+      Authorization: `Bearer ${SB_KEY}`,
+      'Content-Type': 'application/json',
+      ...(opts.headers || {}),
+    },
+  });
+}
+
 const router = express.Router();
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -341,22 +356,37 @@ router.get('/concerts', async (req, res) => {
   }
 
   // Upcoming (JamBase) — artist-filtered, or the whole window when browsing.
-  try {
-    const jb = await fetchJambaseEvents({ artist, source, dateFrom, dateTo, perPage: browse ? 80 : 40 });
-    collected.push(...normJambase(jb.events));
-    sources.jambase = jb.mode;
-  } catch (e) {
-    sources.jambase = 'error';
-  }
-
-  // Some major residencies do not surface reliably in JamBase's broad browse
-  // page even though artist-specific lookup finds them. Fill those into browse.
-  if (browse && windowKey !== 'past' && source !== 'mock') {
-    const fills = await Promise.allSettled(
-      FEATURED_DISCOVERY_ARTISTS.map((name) => fetchJambaseEvents({ artist: name, source, dateFrom, dateTo, perPage: 20 }))
-    );
-    for (const f of fills) {
-      if (f.status === 'fulfilled' && f.value.mode === 'live') collected.push(...normJambase(f.value.events));
+  if (browse && windowKey !== 'past' && source !== 'mock' && SB_URL && SB_KEY) {
+    // Read pre-sorted top global concerts from the daily cache
+    try {
+      const res = await sbFetch(`jambase_global_cache?date=gte.${dateFrom}&date=lte.${dateTo}&order=capacity.desc&limit=100`);
+      if (!res.ok) throw new Error('Cache fetch failed');
+      
+      const cached = await res.json();
+      if (cached.length === 0) throw new Error('Cache empty, falling back to realtime');
+      
+      const jbEvents = cached.map((c) => c.jambase_payload);
+      collected.push(...normJambase(jbEvents));
+      sources.jambase = 'live'; // Effectively live via cache
+    } catch (e) {
+      console.error('Supabase cache error:', e.message);
+      // Fallback to real-time if cache isn't ready
+      try {
+        const jb = await fetchJambaseEvents({ artist, source, dateFrom, dateTo, perPage: browse ? 100 : 40 });
+        collected.push(...normJambase(jb.events));
+        sources.jambase = jb.mode;
+      } catch (err) {
+        sources.jambase = 'error';
+      }
+    }
+  } else {
+    // Real-time lookup for a specific artist
+    try {
+      const jb = await fetchJambaseEvents({ artist, source, dateFrom, dateTo, perPage: browse ? 80 : 40 });
+      collected.push(...normJambase(jb.events));
+      sources.jambase = jb.mode;
+    } catch (e) {
+      sources.jambase = 'error';
     }
   }
 
@@ -386,8 +416,8 @@ router.get('/concerts', async (req, res) => {
   const merged = mergeConcerts(collected).filter((c) => !(browse && windowKey === 'past') || c.when === 'past');
   const concerts = browse
     ? (windowKey === 'past'
-        ? merged.sort((a, b) => b.date.localeCompare(a.date))
-        : merged.sort((a, b) => (b.popularity ?? -1) - (a.popularity ?? -1)))
+      ? merged.sort((a, b) => b.date.localeCompare(a.date))
+      : merged.sort((a, b) => (b.popularity ?? -1) - (a.popularity ?? -1)))
     : merged.sort((a, b) => b.date.localeCompare(a.date));
   res.json({ ok: true, artist, browse, window: browse ? windowKey : null, concerts, sources });
 });
@@ -552,6 +582,66 @@ function ticketmasterCountryCode(country) {
   if (/^[a-z]{2}$/.test(c)) return c.toUpperCase();
   return '';
 }
+
+// --- SeatGeek Discovery: resale ticket price range + buy link --------
+const SG_BASE = 'https://api.seatgeek.com/2';
+
+router.get('/seatgeek/match', async (req, res) => {
+  const artist = String(req.query.artist || '').trim();
+  const city = String(req.query.city || '').trim();
+  const date = String(req.query.date || '').slice(0, 10);
+  
+  const userKey = String(req.get('x-cohear-seatgeek-key') || '').trim();
+  const key = userKey || process.env.SEATGEEK_CLIENT_ID || '';
+  
+  if (!key) {
+    record('seatgeek', { status: 200, latencyMs: 0, bytes: 0, mode: 'mock', error: 'no key' });
+    return res.json({ ok: false, mode: 'nokey', error: 'seatgeek client_id required' });
+  }
+  if (!artist) {
+    return res.status(400).json({ ok: false, error: 'artist required' });
+  }
+
+  const q = [artist, city].filter(Boolean).join(' ');
+  const params = new URLSearchParams({
+    client_id: key,
+    q: q,
+    per_page: '10'
+  });
+  if (date) {
+    params.set('datetime_local.gte', `${date}T00:00:00`);
+    params.set('datetime_local.lte', `${date}T23:59:59`);
+  }
+
+  try {
+    const start = Date.now();
+    const result = await fetch(`${SG_BASE}/events?${params.toString()}`);
+    record('seatgeek', { status: result.status, latencyMs: Date.now() - start, bytes: 0, mode: 'live' });
+    
+    if (!result.ok) return res.status(502).json({ ok: false, mode: 'live', error: `seatgeek failed (HTTP ${result.status})` });
+    
+    const data = await result.json();
+    const events = data.events || [];
+    if (!events.length) return res.json({ ok: true, mode: 'live', ticket: null });
+
+    // SeatGeek sorts by relevance when using 'q', so the first is usually the best match
+    const best = events[0];
+    
+    const ticket = {
+      source: 'seatgeek',
+      eventId: best.id,
+      url: best.url,
+      priceMin: best.stats?.lowest_price ?? null,
+      priceMax: best.stats?.highest_price ?? null,
+      currency: 'USD',
+      priceSource: 'seatgeek_resale'
+    };
+
+    res.json({ ok: true, mode: 'live', ticket });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
 
 // --- Web ticket estimate: top search snippets -> conservative price range -
 router.get('/tickets/web-estimate', async (req, res) => {

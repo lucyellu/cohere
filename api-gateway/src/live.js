@@ -151,7 +151,7 @@ function enrichDurations(ev) {
       ev.durations = live;
       ev.timeline = buildTimeline(ev.songs, ev.startUTC, live);
     })
-    .catch(() => {});
+    .catch(() => { });
 }
 
 // ---- Timeline -----------------------------------------------------------
@@ -461,7 +461,7 @@ function slug(s) {
 export function getEvent(id) {
   const ev = events.get(id);
   if (!ev) return null;
-  refreshLiveSetlist(ev).catch(() => {}); // non-blocking: swaps in tonight's real setlist when logged
+  refreshLiveSetlist(ev).catch(() => { }); // non-blocking: swaps in tonight's real setlist when logged
   return snapshot(ev);
 }
 

@@ -83,17 +83,13 @@ export async function fetchConcerts(artist, source = 'live', window = 'week', { 
 }
 
 export async function ticketmasterMatch(concert) {
-  if (!concert) return null;
-  const p = new URLSearchParams();
-  for (const [key, value] of [
-    ['artist', concert.artist],
-    ['venue', concert.venue],
-    ['city', concert.city],
-    ['country', concert.country],
-    ['date', concert.date],
-  ]) {
-    if (value) p.set(key, value);
-  }
+  if (!concert?.artist) return null;
+  const p = new URLSearchParams({ artist: concert.artist });
+  if (concert.venue) p.set('venue', concert.venue);
+  if (concert.city) p.set('city', concert.city);
+  if (concert.country) p.set('country', concert.country);
+  if (concert.date) p.set('date', concert.date);
+
   const settings = readLocalSettings();
   const key = readApiKey('ticketmaster');
   const affiliate = settings?.affiliateIds?.ticketmaster || '';
@@ -102,7 +98,21 @@ export async function ticketmasterMatch(concert) {
     ...(affiliate ? { 'x-cohear-ticketmaster-affiliate': affiliate } : {}),
   };
   return fetch(`/api/ticketmaster/match?${p.toString()}`, { headers })
-    .then((x) => x.json())
+    .then((r) => r.json())
+    .catch(() => null);
+}
+
+export async function seatgeekMatch(concert) {
+  if (!concert?.artist) return null;
+  const p = new URLSearchParams({ artist: concert.artist });
+  if (concert.city) p.set('city', concert.city);
+  if (concert.date) p.set('date', concert.date);
+
+  const key = readApiKey('seatgeek');
+  const headers = key ? { 'x-cohear-seatgeek-key': key } : {};
+  
+  return fetch(`/api/seatgeek/match?${p.toString()}`, { headers })
+    .then((r) => r.json())
     .catch(() => null);
 }
 

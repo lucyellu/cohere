@@ -13,6 +13,7 @@ export const DEFAULT_SETTINGS = {
   endedGraceHours: 2,
   apiKeys: {
     ticketmaster: '',
+    seatgeek: '',
     gemini: '',
     googleCse: '',
   },
