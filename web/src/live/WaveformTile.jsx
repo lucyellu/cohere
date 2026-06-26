@@ -20,7 +20,7 @@ const PALETTE = [
  *   muted    – true when mic is muted
  *   colorIdx – index into the PALETTE array
  */
-export default function WaveformTile({ stream, name, isSelf, muted, colorIdx = 0 }) {
+export default function WaveformTile({ stream, name, transcript, isSelf, muted, colorIdx = 0, showWaveforms = true, showSubtitles = true }) {
   const canvasRef = useRef(null);
   const animRef = useRef(0);
   const ctxRef = useRef(null);
@@ -56,6 +56,12 @@ export default function WaveformTile({ stream, name, isSelf, muted, colorIdx = 0
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
       ctxRef.current = ctx;
+
+      if (!showWaveforms) {
+        // Clear it once and don't render further, but keep loop active if it toggles
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        return;
+      }
 
       // Match canvas internal resolution to display size
       const rect = canvas.getBoundingClientRect();
@@ -111,7 +117,7 @@ export default function WaveformTile({ stream, name, isSelf, muted, colorIdx = 0
       analyser.disconnect();
       audioCtx.close().catch(() => {});
     };
-  }, [stream, colorIdx]);
+  }, [stream, colorIdx, showWaveforms]);
 
   return (
     <div className={`cohear-voice-tile ${isSelf ? 'cohear-voice-tile--self' : ''}`}>
@@ -131,6 +137,14 @@ export default function WaveformTile({ stream, name, isSelf, muted, colorIdx = 0
         <span className="cohear-voice-tile__name">{name}</span>
         {isSelf && <span className="cohear-voice-tile__you-badge">You</span>}
       </div>
+      {/* Live Subtitles */}
+      {showSubtitles && transcript && (
+        <div className="absolute inset-x-0 bottom-6 z-20 px-2 text-center drop-shadow-md">
+          <span className="inline-block rounded bg-black/60 px-2 py-1 text-[11px] leading-tight text-white/90 backdrop-blur-sm">
+            {transcript}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

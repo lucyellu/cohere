@@ -18,11 +18,13 @@ const LiveLanding = lazy(() => import('./live/LiveLanding.jsx'));
 const LiveRoom = lazy(() => import('./live/LiveRoom.jsx'));
 const PassportView = lazy(() => import('./components/PassportView.jsx'));
 const CityView = lazy(() => import('./components/CityView.jsx'));
+const TranscriptsView = lazy(() => import('./components/TranscriptsView.jsx'));
 
 const NAV = [
   { id: 'discover', label: 'Discover' },
   { id: 'live', label: 'Live Rooms' },
   { id: 'passport', label: 'Passport' },
+  { id: 'transcripts', label: 'Past Chats' },
 ];
 
 export default function App() {
@@ -161,6 +163,8 @@ export default function App() {
                   onSyncLive={syncLive}
                 />
               )}
+
+              {view === 'transcripts' && <TranscriptsView onOpenRoom={joinLandingEvent} />}
 
               {view === 'live' &&
                 (liveEvent ? (

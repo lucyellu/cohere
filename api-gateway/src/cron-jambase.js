@@ -14,6 +14,12 @@ if (!JB_KEY) {
   process.exit(1);
 }
 
+// Stop fetching data after June 28, 2026 to avoid trial limit charges/issues.
+if (new Date() > new Date('2026-06-28T23:59:59Z')) {
+  console.log('Trial safety: cron job disabled after 3 days to avoid API limit usage.');
+  process.exit(0);
+}
+
 const today = new Date().toISOString().slice(0, 10);
 const JB_BASE = 'https://api.data.jambase.com/v3';
 
@@ -41,7 +47,7 @@ async function run() {
   console.log(`Starting JamBase sync for events >= ${today}...`);
   let page = 1;
   let totalFetched = 0;
-  const maxPages = 200; // 200 pages * 100 = 20,000 events (approx 1-2 months of global live music)
+  const maxPages = 15; // 15 pages * 100 = 1,500 events (drastically reduces API calls)
   const allEvents = [];
 
   while (page <= maxPages) {
@@ -97,14 +103,13 @@ async function run() {
     };
   });
 
-  // Only keep events that actually have a known capacity so we can rank them properly
-  // Sort descending to find the biggest stadiums
+  // Only require an artist. Sort descending to find the biggest stadiums, but keep smaller ones
   const ranked = parsed
-    .filter(e => e.capacity > 0 && e.artist)
+    .filter(e => e.artist)
     .sort((a, b) => b.capacity - a.capacity);
 
-  // Take the absolute top 300 biggest concerts in the world
-  const topConcerts = ranked.slice(0, 300);
+  // Take up to 1500 concerts
+  const topConcerts = ranked.slice(0, 1500);
   console.log(`Filtered to the top ${topConcerts.length} massive concerts.`);
 
   if (topConcerts.length === 0) {

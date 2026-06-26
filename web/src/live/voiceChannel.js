@@ -40,10 +40,13 @@ export function useVoice(eventId) {
   const [peers, setPeers] = useState([]);
   const [error, setError] = useState(null);
   const [localStream, setLocalStream] = useState(null);
+  const [localTranscript, setLocalTranscript] = useState('');
+  const [transcriptHistory, setTranscriptHistory] = useState([]);
 
   const channelRef = useRef(null);
   const streamRef = useRef(null);
-  const connectionsRef = useRef({}); // uid → { pc, name, stream }
+  const speechRef = useRef(null);
+  const connectionsRef = useRef({}); // uid → { pc, name, stream, transcript }
   const audioContainerRef = useRef(null);
   const myUid = guestId();
 
@@ -56,12 +59,18 @@ export function useVoice(eventId) {
     connectionsRef.current = {};
     setPeers([]);
 
-    // Stop local mic stream
+    // Stop local mic stream and transcription
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     }
+    if (speechRef.current) {
+      try { speechRef.current.stop(); } catch {}
+      speechRef.current = null;
+    }
     setLocalStream(null);
+    setLocalTranscript('');
+    setTranscriptHistory([]);
 
     // Remove audio elements
     if (audioContainerRef.current) {
@@ -183,11 +192,11 @@ export function useVoice(eventId) {
     syncPeerList();
   }
 
-  function syncPeerList() {
+  const syncPeerList = useCallback(() => {
     setPeers(
-      Object.entries(connectionsRef.current).map(([uid, { name, stream }]) => ({ uid, name, stream })),
+      Object.entries(connectionsRef.current).map(([uid, { name, stream, transcript }]) => ({ uid, name, stream, transcript })),
     );
-  }
+  }, []);
 
   const join = useCallback(async () => {
     if (!supabase || !eventId) {
@@ -210,7 +219,52 @@ export function useVoice(eventId) {
     streamRef.current = stream;
     setLocalStream(stream);
 
-    // 2) Set up Supabase signaling channel
+    // 2) Set up SpeechRecognition for live subtitles
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.onresult = (event) => {
+        let transcript = '';
+        let isFinal = false;
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          transcript += event.results[i][0].transcript;
+          if (event.results[i].isFinal) isFinal = true;
+        }
+        setLocalTranscript(transcript);
+        if (channelRef.current) {
+          channelRef.current.send({
+            type: 'broadcast',
+            event: 'voice:transcript',
+            payload: { 
+              uid: myUid, 
+              name: myName,
+              text: transcript, 
+              isFinal, 
+              ts: Date.now() 
+            },
+          });
+        }
+        // Locally add to history just like we received it
+        handleIncomingTranscript({ uid: myUid, name: myName, text: transcript, isFinal, ts: Date.now() });
+      };
+      recognition.onerror = () => {};
+      recognition.onend = () => {
+        // restart if still joined
+        if (streamRef.current) {
+          try { recognition.start(); } catch {}
+        }
+      };
+      try {
+        recognition.start();
+        speechRef.current = recognition;
+      } catch (err) {
+        console.warn('SpeechRecognition start error', err);
+      }
+    }
+
+    // 3) Set up Supabase signaling channel
     const channel = supabase.channel(`voice:${eventId}`);
     channelRef.current = channel;
     const myName = guestName() || 'Guest';
@@ -279,6 +333,16 @@ export function useVoice(eventId) {
       .on('broadcast', { event: 'voice:leave' }, ({ payload }) => {
         if (payload.uid !== myUid) removePeer(payload.uid);
       })
+      // Received a transcript chunk
+      .on('broadcast', { event: 'voice:transcript' }, ({ payload }) => {
+        if (payload.uid === myUid) return;
+        const entry = connectionsRef.current[payload.uid];
+        if (entry) {
+          entry.transcript = payload.text;
+          syncPeerList();
+        }
+        handleIncomingTranscript(payload);
+      })
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           // Announce ourselves
@@ -291,7 +355,31 @@ export function useVoice(eventId) {
       });
 
     setJoined(true);
-  }, [eventId, myUid, cleanup]);
+  }, [eventId, myUid, cleanup, syncPeerList]);
+
+  // Helper to append/update the transcript history array
+  const handleIncomingTranscript = useCallback((payload) => {
+    setTranscriptHistory((prev) => {
+      const next = [...prev];
+      // Find the last open (not final) message from this user
+      const idx = next.findLastIndex((msg) => msg.uid === payload.uid && !msg.isFinal);
+      if (idx !== -1) {
+        next[idx] = { ...next[idx], text: payload.text, isFinal: payload.isFinal, ts: payload.ts };
+      } else {
+        next.push({
+          id: Math.random().toString(36).slice(2),
+          uid: payload.uid,
+          name: payload.name || 'Guest',
+          text: payload.text,
+          isFinal: payload.isFinal,
+          ts: payload.ts,
+        });
+      }
+      // Optional: keep array from growing infinitely if room runs for 12 hours
+      if (next.length > 500) return next.slice(-500);
+      return next;
+    });
+  }, []);
 
   const leave = useCallback(() => {
     cleanup();
@@ -306,8 +394,16 @@ export function useVoice(eventId) {
   }, []);
 
   return {
-    joined, muted, peers, localStream,
-    join, leave, toggleMute,
-    supported: supabaseEnabled, error,
+    joined,
+    muted,
+    peers,
+    localStream,
+    localTranscript,
+    transcriptHistory,
+    join,
+    leave,
+    toggleMute,
+    supported: supabaseEnabled,
+    error,
   };
 }

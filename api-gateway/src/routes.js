@@ -364,7 +364,7 @@ router.get('/concerts', async (req, res) => {
   if (browse && windowKey !== 'past' && source !== 'mock' && SB_URL && SB_KEY) {
     // Read pre-sorted top global concerts from the daily cache
     try {
-      const res = await sbFetch(`jambase_global_cache?date=gte.${dateFrom}&date=lte.${dateTo}&order=capacity.desc&limit=100`);
+      const res = await sbFetch(`jambase_global_cache?date=gte.${dateFrom}&date=lte.${dateTo}&order=capacity.desc`);
       if (!res.ok) throw new Error('Cache fetch failed');
       
       const cached = await res.json();

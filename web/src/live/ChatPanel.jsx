@@ -7,10 +7,13 @@ import WaveformTile from './WaveformTile.jsx';
 const MAX_VOICE_PARTICIPANTS = 6;
 
 // Combined chat + voice panel for a live room.
-export default function ChatPanel({ eventId }) {
+export default function ChatPanel({ eventId, voiceProp }) {
   const { messages, send, supported: chatSupported } = useChat(eventId);
-  const voice = useVoice(eventId);
+  const myVoice = useVoice(eventId);
+  const voice = voiceProp || myVoice;
   const [draft, setDraft] = useState('');
+  const [showWaveforms, setShowWaveforms] = useState(true);
+  const [showSubtitles, setShowSubtitles] = useState(true);
   const listRef = useRef(null);
   const myUid = guestId();
   const myName = guestName() || 'You';
@@ -53,9 +56,12 @@ export default function ChatPanel({ eventId }) {
             <WaveformTile
               stream={voice.localStream}
               name={myName}
+              transcript={voice.localTranscript}
               isSelf={true}
               muted={voice.muted}
               colorIdx={0}
+              showWaveforms={showWaveforms}
+              showSubtitles={showSubtitles}
             />
             {/* Peer tiles */}
             {voice.peers.map((peer, i) => (
@@ -63,9 +69,12 @@ export default function ChatPanel({ eventId }) {
                 key={peer.uid}
                 stream={peer.stream}
                 name={peer.name}
+                transcript={peer.transcript}
                 isSelf={false}
                 muted={false}
                 colorIdx={i + 1}
+                showWaveforms={showWaveforms}
+                showSubtitles={showSubtitles}
               />
             ))}
           </div>
@@ -98,6 +107,22 @@ export default function ChatPanel({ eventId }) {
                 {voice.peers.map((p) => p.name).join(', ')}
               </span>
             )}
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px' }}>
+              <button
+                className={`cohear-chat__voice-btn ${!showWaveforms ? 'cohear-chat__voice-btn--muted' : ''}`}
+                onClick={() => setShowWaveforms((v) => !v)}
+                title="Toggle visualizer"
+              >
+                {showWaveforms ? '〰️ Waves' : '〰️ Off'}
+              </button>
+              <button
+                className={`cohear-chat__voice-btn ${!showSubtitles ? 'cohear-chat__voice-btn--muted' : ''}`}
+                onClick={() => setShowSubtitles((v) => !v)}
+                title="Toggle live subtitles"
+              >
+                {showSubtitles ? '💬 Subs' : '💬 Off'}
+              </button>
+            </div>
           </>
         ) : (
           <button

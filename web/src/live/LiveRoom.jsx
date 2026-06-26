@@ -11,6 +11,8 @@ import SetlistTimeline from './SetlistTimeline.jsx';
 import FanWall from './FanWall.jsx';
 import Lyrics from './Lyrics.jsx';
 import ChatPanel from './ChatPanel.jsx';
+import TranscriptPanel from './TranscriptPanel.jsx';
+import { useVoice } from './voiceChannel.js';
 
 // The shared room. One synchronized clock drives the map, now-playing, timeline,
 // fan wall and lyrics. The timeline is a PREDICTION (start time + real track
@@ -24,6 +26,7 @@ export default function LiveRoom({ event: initial, onBack }) {
   const [panelOrder, setPanelOrder] = useState(() => readPanelOrder());
   const [resetNonce, setResetNonce] = useState(0);
   const { count: presenceCount } = usePresence(event.id);
+  const voice = useVoice(event.id);
   const player = usePlayer();
   const sizeStore = useMemo(() => createSizeStore(), []);
 
@@ -219,7 +222,19 @@ export default function LiveRoom({ event: initial, onBack }) {
           sizeStore={sizeStore}
           resetNonce={resetNonce}
         >
-          <ChatPanel eventId={event.id} />
+          <ChatPanel eventId={event.id} voiceProp={voice} />
+        </RoomPanel>
+
+        <RoomPanel
+          id="transcription"
+          title="Transcription"
+          subtitle="Live group chat of the voice channel"
+          order={panelIndex.transcription || 99}
+          onMove={movePanel}
+          sizeStore={sizeStore}
+          resetNonce={resetNonce}
+        >
+          <TranscriptPanel eventId={event.id} voice={voice} />
         </RoomPanel>
       </div>
     </div>
@@ -227,7 +242,7 @@ export default function LiveRoom({ event: initial, onBack }) {
 }
 
 function readPanelOrder() {
-  const fallback = ['chat', 'video', 'lyrics', 'setlist', 'map', 'social'];
+  const fallback = ['chat', 'transcription', 'video', 'lyrics', 'setlist', 'map', 'social'];
   try {
     const parsed = JSON.parse(localStorage.getItem('cohear_live_panel_order') || 'null');
     if (Array.isArray(parsed) && fallback.every((id) => parsed.includes(id))) {

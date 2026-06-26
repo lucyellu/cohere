@@ -14,10 +14,10 @@ function cacheKey(artist, source, window) {
 
 function readCached(key) {
   const mem = memoryCache.get(key);
-  if (mem && Date.now() - mem.ts < CACHE_TTL_MS) return mem.value;
+  if (mem && Date.now() - mem.ts < CACHE_TTL_MS && !mem.value?.fallback) return mem.value;
   try {
     const parsed = JSON.parse(localStorage.getItem(key) || 'null');
-    if (parsed && Date.now() - parsed.ts < CACHE_TTL_MS) {
+    if (parsed && Date.now() - parsed.ts < CACHE_TTL_MS && !parsed.value?.fallback) {
       memoryCache.set(key, parsed);
       return parsed.value;
     }

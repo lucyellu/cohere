@@ -108,6 +108,7 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
   const [saved, setSaved] = useState(() => new Set(JSON.parse(localStorage.getItem('cohear_saved_shows') || '[]')));
   const [calendared, setCalendared] = useState(() => new Set(readCalendar().map((e) => e.id)));
   const [fallbackUserZone, setFallbackUserZone] = useState(() => settings?.timezone || localStorage.getItem(USER_ZONE_KEY) || DETECTED_TIME_ZONE);
+  const [page, setPage] = useState(1);
   const [now, setNow] = useState(() => Date.now());
   const [inspectorWidth, setInspectorWidth] = useState(() => readInspectorWidth());
   const [me, setMe] = useState(() => personalStats());
@@ -301,10 +302,17 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
     return sortVisibleConcerts(filtered, sortKey, dir, userZone, now);
   }, [artist, browse, concerts, dir, hideEnded, location, now, query, settings?.endedGraceHours, sortKey, userZone, when]);
 
+  // Reset pagination when filters or sort change
+  useEffect(() => {
+    setPage(1);
+  }, [visible]);
+
   useEffect(() => {
     if (!visible.length) return;
     if (!visible.some((c) => c.id === selectedId)) setSelectedId(visible[0].id);
   }, [selectedId, visible]);
+
+  const paginatedVisible = useMemo(() => visible.slice(0, page * 100), [visible, page]);
 
   const selected = useMemo(() => visible.find((c) => c.id === selectedId) || visible[0] || null, [selectedId, visible]);
   const biggest = visible[0] || null;
@@ -413,20 +421,32 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
         <div className="cohear-resizable-layout" style={{ '--cohear-inspector-width': `${inspectorWidth}px` }}>
           <main className="min-w-0">
             {mode === 'list' && (
-              <ConcertTable
-                rows={visible}
-                selectedId={selected?.id}
-                onSelect={setSelectedId}
-                saved={saved}
-                calendared={calendared}
-                onAddCalendar={addCalendar}
-                userZone={userZone}
-                now={now}
-                sortKey={sortKey}
-                dir={dir}
-                onSort={pickSort}
-                onSyncLive={onSyncLive}
-              />
+              <div className="flex flex-col h-full">
+                <ConcertTable
+                  rows={paginatedVisible}
+                  selectedId={selected?.id}
+                  onSelect={setSelectedId}
+                  saved={saved}
+                  calendared={calendared}
+                  onAddCalendar={addCalendar}
+                  userZone={userZone}
+                  now={now}
+                  sortKey={sortKey}
+                  dir={dir}
+                  onSort={pickSort}
+                  onSyncLive={onSyncLive}
+                />
+                {visible.length > page * 100 && (
+                  <div className="flex justify-center p-4 border-t border-white/10 shrink-0">
+                    <button 
+                      className="cohear-secondary px-6 py-2" 
+                      onClick={() => setPage(p => p + 1)}
+                    >
+                      Load More (Showing {page * 100} of {visible.length})
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
             {mode === 'map' && <ConcertMap rows={visible} selectedId={selected?.id} onSelect={setSelectedId} />}
             {mode === 'calendar' && <ConcertCalendar rows={visible} selectedId={selected?.id} onSelect={setSelectedId} calendared={calendared} />}
