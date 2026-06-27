@@ -100,3 +100,49 @@ create policy "passport stamps update own"
   on public.passport_stamps for update
   using ((select auth.uid()) = user_id)
   with check ((select auth.uid()) = user_id);
+
+-- Voice transcripts
+create table if not exists public.voice_transcripts (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  event_id text not null,
+  transcript jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+alter table public.voice_transcripts enable row level security;
+
+create policy "voice transcripts read own"
+  on public.voice_transcripts for select
+  using ((select auth.uid()) = user_id);
+
+create policy "voice transcripts insert own"
+  on public.voice_transcripts for insert
+  with check ((select auth.uid()) = user_id);
+
+create policy "voice transcripts update own"
+  on public.voice_transcripts for update
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
+
+-- YouTube API Caching
+create table if not exists public.youtube_cache (
+  query text primary key,
+  response jsonb not null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.youtube_cache enable row level security;
+
+create policy "youtube cache read all"
+  on public.youtube_cache for select
+  using (true);
+
+create policy "youtube cache insert all"
+  on public.youtube_cache for insert
+  with check (true);
+
+create policy "youtube cache update all"
+  on public.youtube_cache for update
+  using (true)
+  with check (true);

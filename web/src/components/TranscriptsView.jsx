@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '../live/supabase.js';
+import { db } from '../firebase.js';
+import { collection, query, orderBy, getDocs } from 'firebase/firestore';
 
 function fmtDate(iso) {
   return new Intl.DateTimeFormat('en-US', {
@@ -27,17 +28,17 @@ export default function TranscriptsView() {
 
   useEffect(() => {
     async function load() {
-      if (!supabase) {
+      if (!db) {
         setLoading(false);
         return;
       }
-      const { data, error } = await supabase
-        .from('voice_transcripts')
-        .select('*')
-        .order('created_at', { ascending: false });
-        
-      if (!error && data) {
+      try {
+        const q = query(collection(db, 'voice_transcripts'), orderBy('created_at', 'desc'));
+        const snapshot = await getDocs(q);
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setTranscripts(data);
+      } catch (error) {
+        console.error("Error fetching transcripts:", error);
       }
       setLoading(false);
     }

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { supabase } from './supabase.js';
+import { db } from '../firebase.js';
+import { collection, addDoc } from 'firebase/firestore';
 
 function fmtTime(ts) {
   if (!ts) return '';
@@ -24,14 +25,14 @@ export default function TranscriptPanel({ eventId, voice }) {
   }, [history.length]);
 
   async function handleSave() {
-    if (!history.length || !supabase) return;
+    if (!history.length || !db) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from('voice_transcripts').insert({
+      await addDoc(collection(db, 'voice_transcripts'), {
         event_id: eventId,
         transcript: history,
+        created_at: new Date().toISOString()
       });
-      if (error) throw error;
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (e) {

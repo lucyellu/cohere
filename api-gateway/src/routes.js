@@ -12,6 +12,8 @@ import { synthesize } from './pipeline.js';
 import * as live from './live.js';
 import * as rapid from './rapid.js';
 import * as passport from './passport.js';
+import { db } from './firebase.js';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 const SB_URL = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
 const SB_KEY = process.env.SUPABASE_SECRET_KEY || '';
@@ -846,18 +848,19 @@ router.get('/youtube/search', async (req, res) => {
   const q = req.query.q || 'coldplay live';
   const userKey = String(req.get('x-cohear-youtube-key') || '').trim();
   
-  // 1. Check Supabase cache
-  if (SB_URL && SB_KEY) {
+  // 1. Check Firebase cache
+  if (db) {
     try {
-      const cacheRes = await sbFetch(`youtube_cache?query=eq.${encodeURIComponent(q)}&select=response`);
-      if (cacheRes.ok) {
-        const cached = await cacheRes.json();
-        if (cached && cached.length > 0) {
-          return res.status(200).json(cached[0].response);
+      const cacheRef = doc(db, 'youtube_cache', encodeURIComponent(q));
+      const cacheSnap = await getDoc(cacheRef);
+      if (cacheSnap.exists()) {
+        const cached = cacheSnap.data();
+        if (cached && cached.response) {
+          return res.status(200).json(cached.response);
         }
       }
     } catch (e) {
-      console.warn('YouTube Supabase cache read failed:', e.message);
+      console.warn('YouTube Firebase cache read failed:', e.message);
     }
   }
 
@@ -869,21 +872,17 @@ router.get('/youtube/search', async (req, res) => {
   
   if (!result.ok) {
     result = await serveMock('youtube');
-  } else if (SB_URL && SB_KEY) {
-    // 3. Save to Supabase cache
+  } else if (db) {
+    // 3. Save to Firebase cache
     try {
-      await fetch(`${SB_URL}/rest/v1/youtube_cache`, {
-        method: 'POST',
-        headers: {
-          apikey: SB_KEY,
-          Authorization: `Bearer ${SB_KEY}`,
-          'Content-Type': 'application/json',
-          Prefer: 'resolution=merge-duplicates',
-        },
-        body: JSON.stringify({ query: q, response: result }),
+      const cacheRef = doc(db, 'youtube_cache', encodeURIComponent(q));
+      await setDoc(cacheRef, { 
+        query: q, 
+        response: result,
+        created_at: new Date().toISOString()
       });
     } catch (e) {
-      console.warn('YouTube Supabase cache write failed:', e.message);
+      console.warn('YouTube Firebase cache write failed:', e.message);
     }
   }
   

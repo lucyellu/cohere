@@ -3,7 +3,7 @@
   "pageInfo": { "totalResults": 3, "resultsPerPage": 3 },
   "items": [
     {
-      "id": { "kind": "youtube#video", "videoId": "mock_yellow_front" },
+      "id": { "kind": "youtube#video", "videoId": "yKNxeF4KMsY" },
       "snippet": {
         "title": "Coldplay - Yellow (LIVE Vancouver BC Place 2026) FRONT ROW 4K",
         "channelTitle": "FanCam Vancouver",
@@ -12,7 +12,7 @@
       }
     },
     {
-      "id": { "kind": "youtube#video", "videoId": "mock_yellow_pit" },
+      "id": { "kind": "youtube#video", "videoId": "k4V3Mo61fJM" },
       "snippet": {
         "title": "Yellow live Coldplay Vancouver — pit view full song",
         "channelTitle": "concertclips",
@@ -21,7 +21,7 @@
       }
     },
     {
-      "id": { "kind": "youtube#video", "videoId": "mock_fixyou_balcony" },
+      "id": { "kind": "youtube#video", "videoId": "7qH4qyi1-Ys" },
       "snippet": {
         "title": "Coldplay Fix You (whole crowd singing) BC Place balcony",
         "channelTitle": "livemusicarchive",
