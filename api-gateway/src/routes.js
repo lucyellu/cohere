@@ -313,15 +313,43 @@ function mergeConcerts(list) {
       source: prev.source === c.source ? prev.source : 'merged',
     });
   }
+  const nowMs = Date.now();
   const todayIso = new Date().toISOString().slice(0, 10);
-  return [...byKey.values()].map((c) => ({
-    ...c,
-    when: c.date >= todayIso ? 'upcoming' : 'past',
-    // Popularity proxy: real venue capacity when known (bigger room = more
-    // demand), else setlist richness. True per-show popularity isn't exposed by
-    // any free API, so the UI labels this a heuristic.
-    popularity: c.capacity != null ? c.capacity : (c.songCount ? c.songCount * 2500 : 0),
-  }));
+  return [...byKey.values()].map((c) => {
+    // Determine upcoming/past using the actual start time when available,
+    // not just the UTC calendar date (which misclassifies evening shows in
+    // western timezones once UTC rolls past midnight).
+    let when = c.date >= todayIso ? 'upcoming' : 'past';
+    if (when === 'past' && c.startDate) {
+      // Parse the startDate — if it's a bare local time (no Z/offset), we
+      // can't know the venue's offset server-side, so we add a generous buffer
+      // (12h for worst-case UTC-12) to avoid prematurely marking shows as past.
+      const raw = c.startDate;
+      let startMs;
+      let bufferMs = 4 * 3600_000; // default: show duration (~4h)
+      if (/[zZ]|[+-]\d{2}:?\d{2}$/.test(raw)) {
+        startMs = new Date(raw).getTime();
+      } else if (raw.includes('T')) {
+        // Naive local time — could be in any timezone. Treat as UTC but add
+        // 12h buffer so a 8 PM Pacific show (which is 8 PM "UTC" here, already
+        // past) still gets classified as upcoming.
+        startMs = new Date(raw + 'Z').getTime();
+        bufferMs = 12 * 3600_000;
+      }
+      // If the show hasn't ended yet (start + buffer), it's still upcoming
+      if (startMs && !Number.isNaN(startMs) && startMs + bufferMs > nowMs) {
+        when = 'upcoming';
+      }
+    }
+    return {
+      ...c,
+      when,
+      // Popularity proxy: real venue capacity when known (bigger room = more
+      // demand), else setlist richness. True per-show popularity isn't exposed by
+      // any free API, so the UI labels this a heuristic.
+      popularity: c.capacity != null ? c.capacity : (c.songCount ? c.songCount * 2500 : 0),
+    };
+  });
 }
 
 async function fetchRecentSetlistsByArtist(artist) {
