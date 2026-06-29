@@ -68,7 +68,7 @@ export default function WaveformTile({ stream, name, transcript, isSelf, muted, 
       const dpr = window.devicePixelRatio || 1;
       const w = Math.round(rect.width * dpr);
       const h = Math.round(rect.height * dpr);
-      if (canvas.width !== w || canvas.height !== h) {
+      if (Math.abs(canvas.width - w) > 1 || Math.abs(canvas.height - h) > 1) {
         canvas.width = w;
         canvas.height = h;
       }

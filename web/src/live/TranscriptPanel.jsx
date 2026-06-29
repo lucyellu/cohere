@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { db } from '../firebase.js';
-import { collection, addDoc } from 'firebase/firestore';
+import { supabase } from './supabase.js';
 
 function fmtTime(ts) {
   if (!ts) return '';
@@ -13,10 +12,21 @@ function fmtTime(ts) {
 
 export default function TranscriptPanel({ eventId, voice }) {
   const listRef = useRef(null);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [incognito, setIncognito] = useState(false);
 
   const history = voice.transcriptHistory || [];
+  const historyRef = useRef(history);
+  const joinedRef = useRef(voice.joined);
+  const savedRef = useRef(false);
+  const incognitoRef = useRef(incognito);
+
+  useEffect(() => {
+    historyRef.current = history;
+  }, [history]);
+
+  useEffect(() => {
+    incognitoRef.current = incognito;
+  }, [incognito]);
 
   // Auto-scroll to latest message.
   useEffect(() => {
@@ -24,24 +34,33 @@ export default function TranscriptPanel({ eventId, voice }) {
     if (el) el.scrollTop = el.scrollHeight;
   }, [history.length]);
 
-  async function handleSave() {
-    if (!history.length || !db) return;
-    setSaving(true);
-    try {
-      await addDoc(collection(db, 'voice_transcripts'), {
+  // Auto-save when leaving the voice chat or unmounting
+  useEffect(() => {
+    return () => {
+      if (joinedRef.current && historyRef.current.length > 0 && !savedRef.current && supabase && !incognitoRef.current) {
+        supabase.from('voice_transcripts').insert({
+          event_id: eventId,
+          transcript: historyRef.current
+        }).catch(e => console.error('Auto-save failed:', e));
+        savedRef.current = true;
+      }
+    };
+  }, [eventId]);
+
+  // Handle case where we leave the voice chat without unmounting
+  useEffect(() => {
+    if (!voice.joined && joinedRef.current && historyRef.current.length > 0 && !savedRef.current && supabase && !incognitoRef.current) {
+      supabase.from('voice_transcripts').insert({
         event_id: eventId,
-        transcript: history,
-        created_at: new Date().toISOString()
-      });
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
-    } catch (e) {
-      console.error('Failed to save transcript:', e.message);
-      alert('Failed to save transcript: ' + e.message);
-    } finally {
-      setSaving(false);
+        transcript: historyRef.current
+      }).catch(e => console.error('Auto-save failed:', e));
+      savedRef.current = true;
     }
-  }
+    // Update joined state tracker
+    joinedRef.current = voice.joined;
+  }, [voice.joined, eventId]);
+
+
 
   if (!voice.joined) {
     return (
@@ -60,11 +79,11 @@ export default function TranscriptPanel({ eventId, voice }) {
           Live Group Transcription
         </span>
         <button
-          onClick={handleSave}
-          disabled={saving || !history.length}
-          className="rounded bg-fuchsia-500/20 px-2.5 py-1 text-[11px] font-semibold text-fuchsia-300 hover:bg-fuchsia-500/30 disabled:opacity-50"
+          onClick={() => setIncognito(!incognito)}
+          className={`rounded px-2.5 py-1 text-[11px] font-semibold ${incognito ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30' : 'bg-white/10 text-zinc-300 hover:bg-white/20'}`}
+          title="When incognito is on, this chat will not be saved."
         >
-          {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Transcript'}
+          {incognito ? '🕵️ Incognito (On)' : 'Incognito (Off)'}
         </button>
       </div>
       

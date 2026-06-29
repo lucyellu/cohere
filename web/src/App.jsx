@@ -45,7 +45,10 @@ export default function App() {
   // Open a shared room link (?room=…) on first load so friends land in the room.
   useEffect(() => {
     const code = currentRoomCode();
-    if (!code) return;
+    if (!code) {
+      setRoomLoading(false);
+      return;
+    }
     let alive = true;
     setView('live');
     (async () => {
@@ -65,8 +68,9 @@ export default function App() {
 
   // Keep the address bar pointed at the open room so the URL stays shareable.
   useEffect(() => {
+    if (roomLoading) return;
     syncRoomUrl(view === 'live' && liveEvent ? liveEvent : null);
-  }, [view, liveEvent]);
+  }, [view, liveEvent, roomLoading]);
 
   function openCity(city, country) {
     if (!city) return;
@@ -171,7 +175,7 @@ export default function App() {
                   <LiveRoom event={liveEvent} onBack={() => { setLiveEvent(null); setRoomLoading(false); }} />
                 ) : roomLoading ? (
                   <section className="cohear-panel grid min-h-64 place-items-center p-8 text-sm text-zinc-500">
-                    Joining your crew's room…
+                    Joining room…
                   </section>
                 ) : (
                   <section className="cohear-panel p-5">

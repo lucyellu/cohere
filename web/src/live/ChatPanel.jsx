@@ -185,7 +185,9 @@ export default function ChatPanel({ eventId, voiceProp }) {
 }
 
 function fmtTime(ts) {
+  if (!ts) return '';
   const d = new Date(ts);
+  if (isNaN(d)) return '';
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 

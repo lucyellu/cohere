@@ -281,7 +281,7 @@ function InviteButton({ event }) {
       className="cohear-primary min-h-8 shrink-0 px-3 text-xs"
       title="Copy a link that drops your friends into this exact room"
     >
-      {copied ? '✓ Link copied' : '🎟 Invite crew'}
+      {copied ? '✓ Link copied' : '🎟 Invite'}
     </button>
   );
 }

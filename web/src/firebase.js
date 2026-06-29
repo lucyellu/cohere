@@ -1,5 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
+import { getAuth, signInAnonymously } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDkSNbvqfCkx9F7t8lj-Ut1LpeW5DNysX4",
@@ -13,3 +14,9 @@ const firebaseConfig = {
 
 export const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
+export const auth = getAuth(app);
+
+// Authenticate anonymously so we have permission to write to Firestore
+signInAnonymously(auth).catch((error) => {
+  console.error("Firebase Anonymous Auth Error:", error.message);
+});

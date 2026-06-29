@@ -107,7 +107,8 @@ create table if not exists public.voice_transcripts (
   user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
   event_id text not null,
   transcript jsonb not null default '[]'::jsonb,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  deleted_at timestamptz
 );
 
 alter table public.voice_transcripts enable row level security;

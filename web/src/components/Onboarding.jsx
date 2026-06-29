@@ -79,8 +79,8 @@ export default function Onboarding({ onClose }) {
     {
       id: 'crew',
       art: '🎟',
-      title: 'Bring your crew',
-      body: 'Open a show in Discover → Join → tap "Invite crew" to send a link that drops your friends into the same room. Every show you attend stamps your passport.',
+      title: 'Bring your friends',
+      body: 'Open a show in Discover → Join → tap "Invite" to send a link that drops your friends into the same room. Every show you attend stamps your passport.',
     },
   ];
 
