@@ -351,7 +351,7 @@ router.get('/concerts', async (req, res) => {
       dateTo = addDaysIso(today, -1);
     } else {
       dateFrom = today;
-      if (windowKey === 'tonight') dateTo = today;
+      if (windowKey === 'tonight') { dateFrom = addDaysIso(today, -1); dateTo = today; }
       else if (windowKey === 'week') dateTo = addDaysIso(today, 7);
       else dateTo = addDaysIso(today, 60); // 'upcoming'
     }

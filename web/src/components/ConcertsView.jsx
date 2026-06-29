@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fetchConcerts, getCachedConcerts, filterWhen, spotifyArtist, ticketmasterMatch, seatgeekMatch, ticketWebEstimate, C_SORTS, defaultDir } from '../concerts.js';
+import { readStubs, readHistory } from '../account.js';
 import { fmtCapacity, fmtDate } from '../tour.js';
 import { loadGoogleMaps, hasMapsKey } from '../live/maps.js';
 import { GOOGLE_PAPER_MAP } from '../live/mapStyle.js';
@@ -53,16 +54,17 @@ function readDiscoverState() {
     concerts: getCachedConcerts('', 'live', 'tonight')?.concerts || [],
     sources: getCachedConcerts('', 'live', 'tonight')?.sources || {},
     mode: 'list',
-    sortKey: 'date',
-    dir: 'desc',
+    sortKey: 'soon',
+    dir: 'asc',
     when: 'all',
-    hideEnded: true,
+    hideEnded: false,
+    showMyArtists: false,
     selectedId: null,
   };
   try {
     const parsed = JSON.parse(sessionStorage.getItem(DISCOVER_STATE_KEY) || 'null');
     if (!parsed || !Array.isArray(parsed.concerts)) return fallback;
-    return { ...fallback, ...parsed, hideEnded: parsed.hideEnded ?? true };
+    return { ...fallback, ...parsed, hideEnded: parsed.hideEnded ?? false };
   } catch {
     return fallback;
   }
@@ -112,7 +114,20 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
   const [now, setNow] = useState(() => Date.now());
   const [inspectorWidth, setInspectorWidth] = useState(() => readInspectorWidth());
   const [me, setMe] = useState(() => personalStats());
+  const [showMyArtists, setShowMyArtists] = useState(Boolean(initialState.showMyArtists));
   const resizeRef = useRef(null);
+
+  // Build a set of artist names the user has attended (stubs + history)
+  const myArtistNames = useMemo(() => {
+    const names = new Set();
+    for (const s of readStubs()) {
+      if (s.artist) names.add(s.artist.toLowerCase());
+    }
+    for (const h of readHistory()) {
+      if (h.status === 'attended' && h.artist) names.add(h.artist.toLowerCase());
+    }
+    return names;
+  }, [me]); // re-derive when personal stats change (stamps added/removed)
 
   // Personal passport stats for the header — backfill any missing stubs once,
   // then keep the numbers live as you stamp shows.
@@ -137,8 +152,8 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
       setConcerts(cached.concerts);
       setSources(cached.sources || {});
       if (reset) {
-        setSortKey('date');
-        setDir('desc');
+        setSortKey('soon');
+        setDir('asc');
         setWhen('all');
       }
       setSelectedId(cached.concerts[0]?.id || null);
@@ -153,8 +168,8 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
       setConcerts(out.concerts);
       setSources(out.sources);
       if (reset) {
-        setSortKey('date');
-        setDir('desc');
+        setSortKey('soon');
+        setDir('asc');
         setWhen('all');
       }
       setSelectedId(out.concerts[0]?.id || null);
@@ -172,8 +187,8 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
       setConcerts(cached.concerts);
       setSources(cached.sources || {});
       if (reset) {
-        setSortKey('date');
-        setDir('desc');
+        setSortKey('soon');
+        setDir('asc');
         setWhen('all');
       }
       setSelectedId(cached.concerts[0]?.id || null);
@@ -187,8 +202,8 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
       setConcerts(out.concerts);
       setSources(out.sources);
       if (reset) {
-        setSortKey('date');
-        setDir('desc');
+        setSortKey('soon');
+        setDir('asc');
         setWhen('all');
       }
       setSelectedId(out.concerts[0]?.id || null);
@@ -203,8 +218,8 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
   }, []);
 
   useEffect(() => {
-    writeDiscoverState({ query, artist, location, windowKey, concerts, sources, mode, sortKey, dir, when, hideEnded, selectedId });
-  }, [artist, concerts, dir, hideEnded, location, mode, query, selectedId, sortKey, sources, when, windowKey]);
+    writeDiscoverState({ query, artist, location, windowKey, concerts, sources, mode, sortKey, dir, when, hideEnded, showMyArtists, selectedId });
+  }, [artist, concerts, dir, hideEnded, location, mode, query, selectedId, showMyArtists, sortKey, sources, when, windowKey]);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30_000);
@@ -268,10 +283,11 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
   const resetDiscoverLayout = useCallback(() => {
     setInspectorWidth(DEFAULT_INSPECTOR_WIDTH);
     setMode('list');
-    setSortKey('date');
-    setDir('desc');
+    setSortKey('soon');
+    setDir('asc');
     setWhen('all');
-    setHideEnded(true);
+    setHideEnded(false);
+    setShowMyArtists(false);
     try {
       localStorage.removeItem(DISCOVER_LAYOUT_KEY);
     } catch {
@@ -299,8 +315,19 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
       const locationText = [c.city, c.region, c.country, c.venue].filter(Boolean).join(' ').toLowerCase();
       return (!search || haystack.includes(search)) && (!loc || locationText.includes(loc));
     });
-    return sortVisibleConcerts(filtered, sortKey, dir, userZone, now);
-  }, [artist, browse, concerts, dir, hideEnded, location, now, query, settings?.endedGraceHours, sortKey, userZone, when]);
+    const sorted = sortVisibleConcerts(filtered, sortKey, dir, userZone, now);
+    // When "My Artists" is on, boost concerts by attended artists to the top
+    if (showMyArtists && myArtistNames.size > 0) {
+      const mine = [];
+      const rest = [];
+      for (const c of sorted) {
+        if (c.artist && myArtistNames.has(c.artist.toLowerCase())) mine.push(c);
+        else rest.push(c);
+      }
+      return [...mine, ...rest];
+    }
+    return sorted;
+  }, [artist, browse, concerts, dir, hideEnded, location, myArtistNames, now, query, settings?.endedGraceHours, showMyArtists, sortKey, userZone, when]);
 
   // Reset pagination when filters or sort change
   useEffect(() => {
@@ -398,6 +425,9 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
         setWhen={setWhen}
         hideEnded={hideEnded}
         setHideEnded={setHideEnded}
+        showMyArtists={showMyArtists}
+        setShowMyArtists={setShowMyArtists}
+        hasMyArtists={myArtistNames.size > 0}
         loading={loading}
         onArtistSearch={() => loadArtist(query)}
         onClearSearch={() => {
@@ -572,7 +602,9 @@ function DiscoverHeader({ artist, browse, biggest, loading, stats, spotify, user
 function ControlSurface(props) {
   const {
     browse, query, setQuery, location, setLocation, userZone, setUserZone, windowKey, setWindowKey,
-    mode, setMode, sortKey, pickSort, dir, setDir, when, setWhen, hideEnded, setHideEnded, loading, onArtistSearch, onClearSearch, onRefresh, onResetLayout,
+    mode, setMode, sortKey, pickSort, dir, setDir, when, setWhen, hideEnded, setHideEnded,
+    showMyArtists, setShowMyArtists, hasMyArtists,
+    loading, onArtistSearch, onClearSearch, onRefresh, onResetLayout,
   } = props;
 
   return (
@@ -633,6 +665,16 @@ function ControlSurface(props) {
         >
           {hideEnded ? 'Ended hidden' : 'Show ended'}
         </button>
+
+        {hasMyArtists && (
+          <button
+            className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${showMyArtists ? 'border-amber-300/40 bg-amber-300/[0.12] text-amber-100' : 'border-white/10 bg-black/20 text-zinc-400 hover:text-zinc-100'}`}
+            onClick={() => setShowMyArtists((v) => !v)}
+            title="Boost concerts by artists you've attended to the top"
+          >
+            {showMyArtists ? '★ My Artists' : '☆ My Artists'}
+          </button>
+        )}
 
         <label className="ml-auto flex items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs font-medium text-zinc-400">
           Sort
