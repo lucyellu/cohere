@@ -101,7 +101,7 @@ export default function LiveRoom({ event: initial, onBack }) {
   function resetPanels() {
     localStorage.removeItem('cohear_live_panel_order');
     sizeStore.clear();
-    setPanelOrder(['chat', 'video', 'lyrics', 'setlist', 'map', 'social']);
+    setPanelOrder(['chat', 'transcription', 'video', 'lyrics', 'setlist', 'map', 'social']);
     setResetNonce((n) => n + 1); // re-applies default size to every panel
   }
 
@@ -245,11 +245,17 @@ function readPanelOrder() {
   const fallback = ['chat', 'transcription', 'video', 'lyrics', 'setlist', 'map', 'social'];
   try {
     const parsed = JSON.parse(localStorage.getItem('cohear_live_panel_order') || 'null');
-    if (Array.isArray(parsed) && fallback.every((id) => parsed.includes(id))) {
-      return fallback
-        .map((id) => ({ id, index: parsed.indexOf(id) }))
-        .sort((a, b) => a.index - b.index)
-        .map((item) => item.id);
+    if (Array.isArray(parsed) && parsed.includes('chat')) {
+      // If transcription is missing from a saved layout, insert it after chat
+      if (!parsed.includes('transcription')) {
+        const chatIdx = parsed.indexOf('chat');
+        parsed.splice(chatIdx + 1, 0, 'transcription');
+      }
+      // Ensure all fallback items exist
+      for (const f of fallback) {
+        if (!parsed.includes(f)) parsed.push(f);
+      }
+      return parsed;
     }
   } catch {
     /* ignore bad saved layout */

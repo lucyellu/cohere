@@ -28,7 +28,6 @@ function fmtTime(ts) {
 export default function TranscriptsView() {
   const [transcripts, setTranscripts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [expanded, setExpanded] = useState({});
   const [showTrash, setShowTrash] = useState(false);
 
   useEffect(() => {
@@ -57,9 +56,7 @@ export default function TranscriptsView() {
     load();
   }, [showTrash]);
 
-  function toggle(id) {
-    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
-  }
+
 
   async function moveToTrash(id) {
     if (!supabase) return;
@@ -134,12 +131,6 @@ export default function TranscriptsView() {
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  <button 
-                    onClick={() => toggle(t.id)} 
-                    className="rounded-lg bg-white/5 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:bg-white/10"
-                  >
-                    {expanded[t.id] ? 'Hide Chat' : 'Read Chat'}
-                  </button>
                   {showTrash ? (
                     <>
                       <button onClick={() => restore(t.id)} className="rounded-lg bg-emerald-500/20 px-3 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/30">
@@ -156,23 +147,6 @@ export default function TranscriptsView() {
                   )}
                 </div>
               </div>
-              
-              {expanded[t.id] && (
-                <div className="cohear-chat mt-2 max-h-[400px] overflow-y-auto rounded-xl bg-black/40">
-                  <div className="cohear-chat__messages border-none">
-                    {(Array.isArray(t.transcript) ? t.transcript : []).map((msg, i) => (
-                      <div key={i} className="cohear-chat__msg">
-                        <span className="cohear-chat__author">{msg.name}</span>
-                        <span className={`cohear-chat__text text-zinc-300 ${!msg.isFinal ? 'opacity-60 italic' : ''}`}>{msg.text}</span>
-                        <span className="cohear-chat__time">{fmtTime(msg.ts)}</span>
-                      </div>
-                    ))}
-                    {(!Array.isArray(t.transcript) || t.transcript.length === 0) && (
-                      <p className="cohear-chat__empty">This transcript was empty.</p>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
           ))}
         </div>
