@@ -1,12 +1,10 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '../live/supabase.js';
 import ControlRoom from './ControlRoom.jsx';
 import { CURRENCIES, TIME_ZONES, ENDED_GRACE_OPTIONS } from '../settings.js';
 import { SEED_SWATCHES, monoShades, randomSeed } from '../theme.js';
 
 const TABS = [
   { id: 'preferences', label: 'Preferences' },
-  { id: 'transcripts', label: 'Past Chats' },
   { id: 'apis', label: 'API keys' },
   { id: 'dev', label: 'Dev status' },
 ];
@@ -117,67 +115,6 @@ export default function SettingsDrawer({ open, settings, onChange, onClose }) {
     window.dispatchEvent(new Event('cohear:reset-layout'));
   }
 
-  // --- Transcripts State ---
-  const [transcripts, setTranscripts] = useState([]);
-  const [loadingTranscripts, setLoadingTranscripts] = useState(false);
-  const [showTrash, setShowTrash] = useState(false);
-
-  useEffect(() => {
-    if (tab !== 'transcripts' || !supabase) return;
-    setLoadingTranscripts(true);
-    let alive = true;
-    async function load() {
-      try {
-        let query = supabase.from('voice_transcripts').select('*').order('created_at', { ascending: false });
-        if (showTrash) query = query.not('deleted_at', 'is', null);
-        else query = query.is('deleted_at', null);
-
-        const { data, error } = await query;
-        if (error) throw error;
-        if (alive) setTranscripts(data || []);
-      } catch (error) {
-        console.error("Error fetching transcripts:", error);
-      }
-      if (alive) setLoadingTranscripts(false);
-    }
-    load();
-    return () => { alive = false; };
-  }, [tab, showTrash]);
-
-  async function moveToTrash(id) {
-    if (!supabase) return;
-    try {
-      const { error } = await supabase.from('voice_transcripts').update({ deleted_at: new Date().toISOString() }).eq('id', id);
-      if (error) throw error;
-      setTranscripts(prev => prev.filter(t => t.id !== id));
-    } catch (e) {
-      alert("Failed to move to trash: " + e.message);
-    }
-  }
-
-  async function restore(id) {
-    if (!supabase) return;
-    try {
-      const { error } = await supabase.from('voice_transcripts').update({ deleted_at: null }).eq('id', id);
-      if (error) throw error;
-      setTranscripts(prev => prev.filter(t => t.id !== id));
-    } catch (e) {
-      alert("Failed to restore: " + e.message);
-    }
-  }
-
-  async function permanentlyDelete(id) {
-    if (!supabase || !confirm("Are you sure you want to permanently delete this chat?")) return;
-    try {
-      const { error } = await supabase.from('voice_transcripts').delete().eq('id', id);
-      if (error) throw error;
-      setTranscripts(prev => prev.filter(t => t.id !== id));
-    } catch (e) {
-      alert("Failed to delete: " + e.message);
-    }
-  }
-  // -------------------------
-
   return (
     <div className="fixed inset-0 z-50">
       <button className="absolute inset-0 cursor-default bg-black/62 backdrop-blur-sm" onClick={onClose} aria-label="Close settings" />
@@ -262,76 +199,6 @@ export default function SettingsDrawer({ open, settings, onChange, onClose }) {
                   Reset Discover layout
                 </button>
               </section>
-            </div>
-          )}
-
-          {tab === 'transcripts' && (
-            <div className="grid gap-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-white">{showTrash ? 'Trash' : 'Voice Chat History'}</h3>
-                  <p className="mt-1 text-sm leading-6 text-zinc-500">
-                    A record of past voice rooms you participated in.
-                  </p>
-                </div>
-                <button 
-                  onClick={() => setShowTrash(!showTrash)}
-                  className="rounded-lg bg-white/5 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:bg-white/10"
-                >
-                  {showTrash ? 'View Active' : 'View Trash'}
-                </button>
-              </div>
-
-              {!supabase ? (
-                <section className="cohear-panel p-8 text-center text-sm text-zinc-500">
-                  Saving transcripts requires Supabase. Please check your setup.
-                </section>
-              ) : loadingTranscripts ? (
-                <section className="cohear-panel p-8 text-center text-sm text-zinc-500">Loading...</section>
-              ) : transcripts.length === 0 ? (
-                <section className="cohear-panel p-8 text-center text-sm text-zinc-500">
-                  {showTrash ? "Trash is empty." : "No past voice chats saved yet."}
-                </section>
-              ) : (
-                <div className="grid gap-3">
-                  {transcripts.map((t) => {
-                    const attendees = Array.from(new Set((Array.isArray(t.transcript) ? t.transcript : []).map(m => m.name).filter(Boolean)));
-                    let dateStr = '';
-                    try {
-                      const d = new Date(showTrash ? t.deleted_at : t.created_at);
-                      if (!isNaN(d)) dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                    } catch (e) {}
-
-                    return (
-                      <div key={t.id} className="cohear-panel flex flex-col gap-2 p-4">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="min-w-0">
-                            <h4 className="truncate text-sm font-semibold text-white">Room: {t.event_id}</h4>
-                            <div className="mt-1 text-xs text-zinc-500">
-                              {showTrash ? 'Deleted on ' : 'Saved on '} {dateStr}
-                            </div>
-                            {attendees.length > 0 && (
-                              <div className="mt-2 text-xs font-medium text-zinc-400">
-                                Attendees: <span className="text-zinc-300">{attendees.join(', ')}</span>
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex shrink-0 gap-2">
-                            {showTrash ? (
-                              <>
-                                <button onClick={() => restore(t.id)} className="rounded bg-emerald-500/20 px-2.5 py-1 text-[11px] font-medium text-emerald-300 hover:bg-emerald-500/30">Restore</button>
-                                <button onClick={() => permanentlyDelete(t.id)} className="rounded bg-red-500/20 px-2.5 py-1 text-[11px] font-medium text-red-300 hover:bg-red-500/30">Delete</button>
-                              </>
-                            ) : (
-                              <button onClick={() => moveToTrash(t.id)} className="rounded bg-white/5 px-2.5 py-1 text-[11px] font-medium text-zinc-400 hover:bg-red-500/20 hover:text-red-300">Trash</button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
             </div>
           )}
 
