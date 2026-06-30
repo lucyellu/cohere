@@ -168,7 +168,11 @@ export default function App() {
                 />
               )}
 
-              {view === 'transcripts' && <TranscriptsView onOpenRoom={joinLandingEvent} />}
+              {view === 'transcripts' && (
+                <ErrorBoundary onBack={() => setView('discover')}>
+                  <TranscriptsView onOpenRoom={joinLandingEvent} />
+                </ErrorBoundary>
+              )}
 
               {view === 'live' &&
                 (liveEvent ? (
@@ -199,6 +203,30 @@ function ViewLoading() {
       Loading…
     </section>
   );
+}
+
+import React from 'react';
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <section className="cohear-panel m-5 p-8 text-center">
+          <p className="mb-4 text-zinc-500">Something went wrong loading this view.</p>
+          <button className="cohear-primary px-4 py-2" onClick={this.props.onBack}>
+            Go Back
+          </button>
+        </section>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 function GearIcon() {
