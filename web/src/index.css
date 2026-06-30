@@ -210,7 +210,10 @@
 html, body, #root { height: 100%; }
 body {
   margin: 0;
-  background: var(--paper-2);
+  background-color: var(--paper-2);
+  background-image:
+    radial-gradient(circle at 25% 30%, rgba(255,255,255,0.04) 0, transparent 40%),
+    radial-gradient(circle at 75% 70%, rgba(0,0,0,0.05) 0, transparent 50%);
   color: var(--ink);
   font-family: var(--ff-sans);
   font-size: 14px;

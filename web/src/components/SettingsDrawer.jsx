@@ -267,7 +267,7 @@ export default function SettingsDrawer({ open, settings, onChange, onClose }) {
 
           {tab === 'transcripts' && (
             <div className="grid gap-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-semibold text-white">{showTrash ? 'Trash' : 'Voice Chat History'}</h3>
                   <p className="mt-1 text-sm leading-6 text-zinc-500">
@@ -304,8 +304,8 @@ export default function SettingsDrawer({ open, settings, onChange, onClose }) {
 
                     return (
                       <div key={t.id} className="cohear-panel flex flex-col gap-2 p-4">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="min-w-0">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="min-w-0 w-full">
                             <h4 className="truncate text-sm font-semibold text-white">Room: {t.event_id}</h4>
                             <div className="mt-1 text-xs text-zinc-500">
                               {showTrash ? 'Deleted on ' : 'Saved on '} {dateStr}
@@ -316,7 +316,7 @@ export default function SettingsDrawer({ open, settings, onChange, onClose }) {
                               </div>
                             )}
                           </div>
-                          <div className="flex shrink-0 gap-2">
+                          <div className="flex shrink-0 gap-2 mt-2 sm:mt-0 w-full sm:w-auto justify-end">
                             {showTrash ? (
                               <>
                                 <button onClick={() => restore(t.id)} className="rounded bg-emerald-500/20 px-2.5 py-1 text-[11px] font-medium text-emerald-300 hover:bg-emerald-500/30">Restore</button>
@@ -453,20 +453,6 @@ function ThemeSection({ settings, update }) {
         </label>
       </div>
 
-      <div>
-        <div className="cohear-label mb-2">Shade ramp</div>
-        <div className="flex h-9 overflow-hidden rounded-lg border border-white/10">
-          {shades.map((hex, i) => (
-            <button
-              key={hex + i}
-              onClick={() => update({ themeAccent: hex })}
-              title={hex}
-              className={`h-full flex-1 transition-transform hover:scale-y-110 ${i === activeShade ? 'ring-2 ring-inset ring-white' : ''}`}
-              style={{ background: hex }}
-            />
-          ))}
-        </div>
-      </div>
     </section>
   );
 }
