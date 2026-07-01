@@ -14,9 +14,9 @@ if (!JB_KEY) {
   process.exit(1);
 }
 
-// Stop fetching data after June 28, 2026 to avoid trial limit charges/issues.
-if (new Date() > new Date('2026-06-28T23:59:59Z')) {
-  console.log('Trial safety: cron job disabled after 3 days to avoid API limit usage.');
+// Trial safety: stop syncing after July 15, 2026 (14-day trial period with new API key)
+if (new Date() > new Date('2026-07-15T23:59:59Z')) {
+  console.log('Trial safety: cron job disabled after 14-day trial period.');
   process.exit(0);
 }
 
