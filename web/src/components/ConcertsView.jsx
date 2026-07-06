@@ -517,6 +517,7 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
             setMinCapacity={setMinCapacity}
             timeLimitHrs={timeLimitHrs}
             setTimeLimitHrs={setTimeLimitHrs}
+            visibleCount={visible.length}
           />
         </div>
       )}
@@ -917,7 +918,7 @@ function SortHeader({ id, label, sortKey, dir, onSort, align = 'left' }) {
   );
 }
 
-function ConcertInspector({ concert, saved, calendared, sources, userZone, currency, now, onSave, onAddCalendar, onEnterShow, onSyncLive, minCapacity, setMinCapacity, timeLimitHrs, setTimeLimitHrs }) {
+function ConcertInspector({ concert, saved, calendared, sources, userZone, currency, now, onSave, onAddCalendar, onEnterShow, onSyncLive, minCapacity, setMinCapacity, timeLimitHrs, setTimeLimitHrs, visibleCount }) {
   const [syncing, setSyncing] = useState(false);
   const [ticket, setTicket] = useState(null);
   const [sgTicket, setSgTicket] = useState(null);
@@ -979,6 +980,10 @@ function ConcertInspector({ concert, saved, calendared, sources, userZone, curre
         <div className="border-b border-white/10 p-5">
           <h3 className="text-lg font-semibold text-white">Filter Concerts</h3>
           <p className="mt-1 text-xs text-zinc-500">Refine the current list of concerts. Select a concert from the list to view its details here.</p>
+        </div>
+        <div className="border-b border-white/10 bg-black/20 p-3 text-center">
+          <span className="text-sm font-semibold text-cyan-300">{visibleCount}</span>
+          <span className="ml-2 text-xs text-zinc-400">concerts match your filters</span>
         </div>
         <div className="space-y-6 p-5">
           <div>
