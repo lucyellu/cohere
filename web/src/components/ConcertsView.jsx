@@ -51,13 +51,11 @@ function readDiscoverState() {
     artist: '',
     location: '',
     windowKey: 'tonight',
-    concerts: getCachedConcerts('', 'live', 'tonight')?.concerts || [],
-    sources: getCachedConcerts('', 'live', 'tonight')?.sources || {},
     mode: 'list',
     sortKey: 'soon',
     dir: 'asc',
     when: 'all',
-    hideEnded: false,
+    hideEnded: true,
     showMyArtists: false,
     selectedId: null,
     minCapacity: 0,
@@ -65,8 +63,8 @@ function readDiscoverState() {
   };
   try {
     const parsed = JSON.parse(sessionStorage.getItem(DISCOVER_STATE_KEY) || 'null');
-    if (!parsed || !Array.isArray(parsed.concerts)) return fallback;
-    return { ...fallback, ...parsed, hideEnded: parsed.hideEnded ?? false };
+    if (!parsed) return fallback;
+    return { ...fallback, ...parsed, hideEnded: parsed.hideEnded ?? true };
   } catch {
     return fallback;
   }
@@ -99,8 +97,8 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
   const [artist, setArtist] = useState(initialState.artist);
   const [location, setLocation] = useState(initialState.location);
   const [windowKey, setWindowKey] = useState(initialState.windowKey);
-  const [concerts, setConcerts] = useState(initialState.concerts);
-  const [sources, setSources] = useState(initialState.sources);
+  const [concerts, setConcerts] = useState(() => getCachedConcerts(initialState.artist, 'live', initialState.windowKey)?.concerts || []);
+  const [sources, setSources] = useState(() => getCachedConcerts(initialState.artist, 'live', initialState.windowKey)?.sources || {});
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState(initialState.mode);
   const [sortKey, setSortKey] = useState(initialState.sortKey);
@@ -222,8 +220,8 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
   }, []);
 
   useEffect(() => {
-    writeDiscoverState({ query, artist, location, windowKey, concerts, sources, mode, sortKey, dir, when, hideEnded, showMyArtists, selectedId, minCapacity, timeLimitHrs });
-  }, [artist, concerts, dir, hideEnded, location, mode, query, selectedId, showMyArtists, sortKey, sources, when, windowKey, minCapacity, timeLimitHrs]);
+    writeDiscoverState({ query, artist, location, windowKey, mode, sortKey, dir, when, hideEnded, showMyArtists, selectedId, minCapacity, timeLimitHrs });
+  }, [artist, dir, hideEnded, location, mode, query, selectedId, showMyArtists, sortKey, when, windowKey, minCapacity, timeLimitHrs]);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30_000);
@@ -1702,22 +1700,25 @@ function TimeStack({ concert, userZone, now }) {
 function sortVisibleConcerts(list, key, dir, userZone, now = Date.now()) {
   const sort = C_SORTS[key] || C_SORTS.date;
   const direction = (dir || sort.dir) === 'asc' ? 1 : -1;
-  return [...list].sort((a, b) => {
-    const av = key === 'soon' ? timeProximityValue(a, now) : key === 'date' ? userLocalSortValue(a, userZone) : sort.get(a);
-    const bv = key === 'soon' ? timeProximityValue(b, now) : key === 'date' ? userLocalSortValue(b, userZone) : sort.get(b);
-    const aMissing = av == null || av === '';
-    const bMissing = bv == null || bv === '';
-    if (aMissing && !bMissing) return 1;
-    if (!aMissing && bMissing) return -1;
-    if (av < bv) return -1 * direction;
-    if (av > bv) return 1 * direction;
 
-    const tieA = `${showStartMs(a) || ''}|${a.artist || ''}|${a.venue || ''}`.toLowerCase();
-    const tieB = `${showStartMs(b) || ''}|${b.artist || ''}|${b.venue || ''}`.toLowerCase();
-    if (tieA < tieB) return -1;
-    if (tieA > tieB) return 1;
+  // Pre-calculate expensive sort values (Schwartzian transform)
+  const mapped = list.map((c) => {
+    const val = key === 'soon' ? timeProximityValue(c, now) : key === 'date' ? userLocalSortValue(c, userZone) : sort.get(c);
+    const tie = `${showStartMs(c) || ''}|${c.artist || ''}|${c.venue || ''}`.toLowerCase();
+    return { c, val, tie, missing: val == null || val === '' };
+  });
+
+  mapped.sort((a, b) => {
+    if (a.missing && !b.missing) return 1;
+    if (!a.missing && b.missing) return -1;
+    if (a.val < b.val) return -1 * direction;
+    if (a.val > b.val) return 1 * direction;
+    if (a.tie < b.tie) return -1;
+    if (a.tie > b.tie) return 1;
     return 0;
   });
+
+  return mapped.map((m) => m.c);
 }
 
 // Closeness-to-now ranking for the default "Happening soon" sort. Ascending, so
