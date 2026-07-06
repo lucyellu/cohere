@@ -38,8 +38,8 @@ export default function App() {
   const [onboarding, setOnboarding] = useState(() => shouldOnboard() && !currentRoomCode());
 
   useEffect(() => {
-    applyTheme(settings.themeAccent || '#2f86d6', Boolean(settings.themeInverted));
-  }, [settings.themeAccent, settings.themeInverted]);
+    applyTheme(settings.themeAccent || '#71717a');
+  }, [settings.themeAccent]);
 
   // Open a shared room link (?room=…) on first load so friends land in the room.
   useEffect(() => {

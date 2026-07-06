@@ -6,8 +6,6 @@ export const DEFAULT_SETTINGS = {
   timezone: DETECTED_TIME_ZONE,
   currency: 'USD',
   themeAccent: '#71717a',
-  // Flips the monochrome ramp's light/dark poles — the "paper" (light) skin.
-  themeInverted: true,
   // How long an ended concert stays visible in Discover (hours). 0 = hide the
   // moment it ends; up to 8 = linger so you can still join to collect the stamp.
   endedGraceHours: 2,

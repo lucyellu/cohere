@@ -274,8 +274,7 @@ export default function SettingsDrawer({ open, settings, onChange, onClose }) {
 // shade strip, or use the native picker; the Dark/Light toggle flips the ramp.
 function ThemeSection({ settings, update }) {
   const seed = settings.themeAccent || '#2f86d6';
-  const inverted = Boolean(settings.themeInverted);
-  const shades = monoShades(seed, 12);
+  const shades = monoShades(seed, 3);
   const activeShade = nearestShadeIndex(shades, seed);
 
   return (
@@ -285,14 +284,6 @@ function ThemeSection({ settings, update }) {
         <p className="mt-1 text-sm leading-6 text-zinc-500">
           One seed colour drives the entire palette — the whole app is built from varying shades of it. Only concert start and end times stay green and red.
         </p>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="cohear-label">Skin</span>
-        <div className="cohear-tabs">
-          <button className={!inverted ? 'active' : ''} onClick={() => update({ themeInverted: false })}>Dark</button>
-          <button className={inverted ? 'active' : ''} onClick={() => update({ themeInverted: true })}>Light</button>
-        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">

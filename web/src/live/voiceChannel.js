@@ -122,6 +122,7 @@ export function useVoice(eventId) {
     audio.autoplay = true;
     audio.setAttribute('data-uid', uid);
     audio.srcObject = stream;
+    audio.volume = 0.5; // Reduce loop gain to mitigate same-room acoustic feedback
     audioContainerRef.current.appendChild(audio);
   }
 
