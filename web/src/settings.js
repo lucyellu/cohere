@@ -5,9 +5,9 @@ export const SETTINGS_KEY = 'cohear_settings_v1';
 export const DEFAULT_SETTINGS = {
   timezone: DETECTED_TIME_ZONE,
   currency: 'USD',
-  themeAccent: '#2f86d6',
+  themeAccent: '#71717a',
   // Flips the monochrome ramp's light/dark poles — the "paper" (light) skin.
-  themeInverted: false,
+  themeInverted: true,
   // How long an ended concert stays visible in Discover (hours). 0 = hide the
   // moment it ends; up to 8 = linger so you can still join to collect the stamp.
   endedGraceHours: 2,
@@ -17,6 +17,7 @@ export const DEFAULT_SETTINGS = {
     gemini: '',
     googleCse: '',
     youtubeData: '',
+    deepseek: '',
   },
   affiliateIds: {
     ticketmaster: '',
@@ -58,7 +59,7 @@ function migrateDefaultAccent() {
     if (localStorage.getItem(ACCENT_MIGRATION_KEY)) return;
     const parsed = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');
     if (parsed && typeof parsed === 'object' && String(parsed.themeAccent).toLowerCase() === OLD_DEFAULT_ACCENT) {
-      parsed.themeAccent = DEFAULT_SETTINGS.themeAccent;
+      parsed.themeAccent = '#2f86d6';
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(parsed));
     }
     localStorage.setItem(ACCENT_MIGRATION_KEY, '1');
@@ -67,6 +68,24 @@ function migrateDefaultAccent() {
   }
 }
 migrateDefaultAccent();
+
+// Second migration: user requested the default color scheme be gray.
+const OLD_BLUE_ACCENT = '#2f86d6';
+const GRAY_MIGRATION_KEY = 'cohere_accent_gray_v2';
+function migrateDefaultAccentGray() {
+  try {
+    if (localStorage.getItem(GRAY_MIGRATION_KEY)) return;
+    const parsed = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');
+    if (parsed && typeof parsed === 'object' && String(parsed.themeAccent).toLowerCase() === OLD_BLUE_ACCENT) {
+      parsed.themeAccent = DEFAULT_SETTINGS.themeAccent;
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(parsed));
+    }
+    localStorage.setItem(GRAY_MIGRATION_KEY, '1');
+  } catch {
+    /* storage unavailable */
+  }
+}
+migrateDefaultAccentGray();
 
 export function readSettings() {
   try {

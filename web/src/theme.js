@@ -154,6 +154,14 @@ export function applyTheme(seed, invert = false) {
     set(`--color-${fam}-500`, seed);
     set(`--color-${fam}-600`, accentDim);
   }
+
+  let metaThemeColor = document.querySelector('meta[name="theme-color"]');
+  if (!metaThemeColor) {
+    metaThemeColor = document.createElement('meta');
+    metaThemeColor.name = 'theme-color';
+    document.head.appendChild(metaThemeColor);
+  }
+  metaThemeColor.content = paper2;
 }
 
 // ── Colour maths ─────────────────────────────────────────────────────────────

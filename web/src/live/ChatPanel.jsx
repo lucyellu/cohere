@@ -3,6 +3,7 @@ import { useChat } from './chatChannel.js';
 import { useVoice } from './voiceChannel.js';
 import { guestId, guestName } from './liveApi.js';
 import WaveformTile from './WaveformTile.jsx';
+import SunoLibrary from './SunoLibrary.jsx';
 
 const MAX_VOICE_PARTICIPANTS = 6;
 
@@ -14,6 +15,7 @@ export default function ChatPanel({ eventId, voiceProp }) {
   const [draft, setDraft] = useState('');
   const [showWaveforms, setShowWaveforms] = useState(true);
   const [showSubtitles, setShowSubtitles] = useState(true);
+  const [showDJ, setShowDJ] = useState(false);
   const listRef = useRef(null);
   const myUid = guestId();
   const myName = guestName() || 'You';

@@ -6,6 +6,7 @@ import { eventFromRoomCode, syncRoomUrl, currentRoomCode } from './live/roomShar
 import ConcertsView from './components/ConcertsView.jsx';
 import SettingsDrawer from './components/SettingsDrawer.jsx';
 import AccountButton from './components/AccountButton.jsx';
+import ChatbotWidget from './components/ChatbotWidget.jsx';
 import { readSettings, writeSettings } from './settings.js';
 import { recordConcertAction, autoStampOnView } from './account.js';
 import { applyTheme } from './theme.js';
@@ -121,16 +122,26 @@ export default function App() {
           <div className="cohear-mesh-blob" style={{ width: 460, height: 460, bottom: -60, left: '42%', opacity: 0.1, animationDuration: '22s', animationDelay: '-10s' }} />
         </div>
         <div className="mx-auto flex min-h-screen w-full max-w-[1480px] flex-col px-4 py-5 pb-28 sm:px-6 lg:px-8">
-          <header className="cohear-topbar">
-            <button className="flex min-w-0 items-center gap-3 text-left" onClick={() => setView('discover')} aria-label="Open Discover">
-              <img src="/cohere-logo.png" alt="Cohere" className="h-10 w-10 shrink-0 rounded-lg" />
-              <span className="min-w-0">
-                <span className="block text-lg font-semibold tracking-tight text-white">Cohere</span>
-                <span className="block truncate text-xs text-zinc-500">Find the biggest concerts happening now.</span>
-              </span>
-            </button>
+          <header className="cohear-topbar flex-wrap justify-between gap-y-3">
+            <div className="flex items-center gap-3 w-full lg:w-auto lg:flex-none justify-between">
+              <button className="flex min-w-0 items-center gap-3 text-left" onClick={() => setView('discover')} aria-label="Open Discover">
+                <img src="/cohere-logo.png" alt="Cohere" className="h-10 w-10 shrink-0 rounded-lg" />
+                <span className="min-w-0">
+                  <span className="block text-lg font-semibold tracking-tight text-white">Cohere</span>
+                  <span className="block truncate text-xs text-zinc-500">Find the biggest concerts happening now.</span>
+                </span>
+              </button>
 
-            <nav className="cohear-nav" aria-label="Primary navigation">
+              {/* Mobile actions (hidden on desktop) */}
+              <div className="flex items-center gap-2 lg:hidden shrink-0">
+                <AccountButton />
+                <button className="cohear-icon-button" onClick={() => setSettingsOpen(true)} aria-label="Open settings" title="Settings">
+                  <GearIcon />
+                </button>
+              </div>
+            </div>
+
+            <nav className="cohear-nav w-full justify-between lg:w-auto lg:justify-start overflow-x-auto" aria-label="Primary navigation">
               {NAV.map((item) => (
                 <button key={item.id} onClick={() => setView(item.id)} className={view === item.id ? 'active' : ''}>
                   {item.label}
@@ -138,52 +149,54 @@ export default function App() {
               ))}
             </nav>
 
+            {/* Desktop actions */}
             <div className="hidden items-center gap-2 lg:flex">
               <button className="cohear-primary" onClick={() => setView('discover')}>
                 Browse concerts
               </button>
+              <AccountButton />
+              <button className="cohear-icon-button" onClick={() => setSettingsOpen(true)} aria-label="Open settings" title="Settings">
+                <GearIcon />
+              </button>
             </div>
-
-            <AccountButton />
-
-            <button className="cohear-icon-button" onClick={() => setSettingsOpen(true)} aria-label="Open settings" title="Settings">
-              <GearIcon />
-            </button>
           </header>
 
           <main className="mt-5 flex-1">
             {view === 'discover' && <ConcertsView onSyncLive={syncLive} settings={settings} onSettingsChange={updateSettings} />}
 
-            <Suspense fallback={<ViewLoading />}>
-              {view === 'passport' && <PassportView onOpenCity={openCity} />}
+            <ErrorBoundary onBack={() => { setLiveEvent(null); setRoomLoading(false); setView('discover'); }}>
+              <Suspense fallback={<ViewLoading />}>
+                {view === 'passport' && <PassportView onOpenCity={openCity} />}
 
-              {view === 'city' && cityTarget && (
-                <CityView
-                  city={cityTarget.city}
-                  country={cityTarget.country}
-                  onBack={() => setView('passport')}
-                  onSyncLive={syncLive}
-                />
-              )}
+                {view === 'city' && cityTarget && (
+                  <CityView
+                    city={cityTarget.city}
+                    country={cityTarget.country}
+                    onBack={() => setView('passport')}
+                    onSyncLive={syncLive}
+                  />
+                )}
 
-              {view === 'live' &&
-                (liveEvent ? (
-                  <LiveRoom event={liveEvent} onBack={() => { setLiveEvent(null); setRoomLoading(false); }} />
-                ) : roomLoading ? (
-                  <section className="cohear-panel grid min-h-64 place-items-center p-8 text-sm text-zinc-500">
-                    Joining room…
-                  </section>
-                ) : (
-                  <section className="cohear-panel p-5">
-                    <LiveLanding onJoin={joinLandingEvent} />
-                  </section>
-                ))}
-            </Suspense>
+                {view === 'live' &&
+                  (liveEvent ? (
+                    <LiveRoom event={liveEvent} onBack={() => { setLiveEvent(null); setRoomLoading(false); }} />
+                  ) : roomLoading ? (
+                    <section className="cohear-panel grid min-h-64 place-items-center p-8 text-sm text-zinc-500">
+                      Joining room…
+                    </section>
+                  ) : (
+                    <section className="cohear-panel p-5">
+                      <LiveLanding onJoin={joinLandingEvent} />
+                    </section>
+                  ))}
+              </Suspense>
+            </ErrorBoundary>
           </main>
         </div>
         <BottomPlayer />
         <SettingsDrawer open={settingsOpen} settings={settings} onChange={updateSettings} onClose={() => setSettingsOpen(false)} />
         {onboarding && <Onboarding onClose={() => setOnboarding(false)} />}
+        <ChatbotWidget settings={settings} />
       </div>
     </PlayerProvider>
   );

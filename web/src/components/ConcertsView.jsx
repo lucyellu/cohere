@@ -58,8 +58,8 @@ function readDiscoverState() {
     hideEnded: true,
     showMyArtists: false,
     selectedId: null,
-    minCapacity: 0,
-    timeLimitHrs: 0,
+    minCapacity: 5000,
+    timeLimitHrs: 24,
   };
   try {
     const parsed = JSON.parse(sessionStorage.getItem(DISCOVER_STATE_KEY) || 'null');
@@ -106,8 +106,8 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
   const [when, setWhen] = useState(initialState.when);
   const [hideEnded, setHideEnded] = useState(Boolean(initialState.hideEnded));
   const [selectedId, setSelectedId] = useState(initialState.selectedId);
-  const [minCapacity, setMinCapacity] = useState(initialState.minCapacity || 0);
-  const [timeLimitHrs, setTimeLimitHrs] = useState(initialState.timeLimitHrs || 0);
+  const [minCapacity, setMinCapacity] = useState(initialState.minCapacity ?? 5000);
+  const [timeLimitHrs, setTimeLimitHrs] = useState(initialState.timeLimitHrs ?? 24);
   const [spotify, setSpotify] = useState(null);
   const [saved, setSaved] = useState(() => new Set(JSON.parse(localStorage.getItem('cohear_saved_shows') || '[]')));
   const [calendared, setCalendared] = useState(() => new Set(readCalendar().map((e) => e.id)));
@@ -991,6 +991,8 @@ function ConcertInspector({ concert, saved, calendared, sources, userZone, curre
             <div className="mt-3 grid gap-2">
               {[
                 { id: 0, label: 'All Capacities' },
+                { id: 1000, label: '1,000+ Seats' },
+                { id: 5000, label: '5,000+ Seats' },
                 { id: 10000, label: '10,000+ Seats (Arenas)' },
                 { id: 20000, label: '20,000+ Seats' },
                 { id: 50000, label: '50,000+ Seats (Stadiums)' },

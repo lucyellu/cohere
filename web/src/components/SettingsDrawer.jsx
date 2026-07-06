@@ -46,6 +46,13 @@ const API_KEYS = [
     note: 'Used as your own image-generation key in the AI scene flow.',
   },
   {
+    id: 'deepseek',
+    label: 'DeepSeek',
+    status: 'Wired',
+    placeholder: 'DeepSeek API key',
+    note: 'Used for the AI concert search chatbot. Get your key at https://platform.deepseek.com/',
+  },
+  {
     id: 'youtube',
     label: 'YouTube',
     status: 'Gateway only',

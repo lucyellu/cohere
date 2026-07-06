@@ -61,29 +61,61 @@ export default function LiveLanding({ onJoin }) {
     else setErr(`Could not build a room for ${concert.artist}. Try another result or open it from Discover.`);
   }
 
+  const [customArtist, setCustomArtist] = useState('');
+  const [customVenue, setCustomVenue] = useState('My House');
+
+  async function joinCustom() {
+    if (!customArtist.trim()) return;
+    setBusyId('custom');
+    setErr(null);
+    const customConcert = {
+      artist: customArtist,
+      venue: customVenue || 'Unknown',
+      city: 'Local',
+      country: 'Host',
+      when: 'live'
+    };
+    await join(customConcert);
+  }
+
   return (
     <div className="space-y-5">
-      <section className="grid gap-4 xl:grid-cols-[1.1fr_.9fr]">
-        <SpotlightCard
-          title="Best concert tonight"
-          eyebrow={tonightBest && tonight.some((c) => c.id === tonightBest.id) ? 'Tonight' : 'Soon'}
-          concert={tonightBest}
-          loading={loading}
-          action="Join live"
-          busy={busyId === tonightBest?.id}
-          onFocus={setSpotlightId}
-          onJoin={join}
-        />
-        <SpotlightCard
-          title="Best recent replay"
-          eyebrow="Just happened"
-          concert={recentBest}
-          loading={loading}
-          action="Replay room"
-          busy={busyId === recentBest?.id}
-          onFocus={setSpotlightId}
-          onJoin={join}
-        />
+      <section className="grid gap-4">
+        <div className="cohear-panel p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="cohear-label text-[var(--lcd-glow)]">Custom Room</p>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight">Start your own session</h2>
+            </div>
+          </div>
+          <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-end">
+            <div className="flex-1">
+              <label className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-400">Artist / DJ Name</label>
+              <input
+                value={customArtist}
+                onChange={(e) => setCustomArtist(e.target.value)}
+                placeholder="e.g. DJ User"
+                className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 text-sm text-white outline-none"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-400">Venue</label>
+              <input
+                value={customVenue}
+                onChange={(e) => setCustomVenue(e.target.value)}
+                placeholder="e.g. My House"
+                className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 text-sm text-white outline-none"
+              />
+            </div>
+            <button 
+              className="mt-4 sm:mt-0 cohear-primary"
+              disabled={busyId === 'custom' || !customArtist.trim()} 
+              onClick={joinCustom}
+            >
+              {busyId === 'custom' ? 'Creating...' : 'Start Room'}
+            </button>
+          </div>
+        </div>
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[.85fr_1.15fr]">
@@ -135,37 +167,7 @@ export default function LiveLanding({ onJoin }) {
   );
 }
 
-function SpotlightCard({ title, eyebrow, concert, loading, action, busy, onFocus, onJoin }) {
-  if (loading) {
-    return <div className="min-h-64 rounded-xl border border-white/10 bg-white/[0.03] p-5 text-sm text-zinc-500">Loading live-room picks...</div>;
-  }
-  if (!concert) {
-    return <div className="min-h-64 rounded-xl border border-white/10 bg-white/[0.03] p-5 text-sm text-zinc-500">No eligible concert found.</div>;
-  }
-  return (
-    <article className="rounded-xl border border-white/10 bg-[linear-gradient(135deg,rgba(34,211,238,.08),rgba(251,191,36,.06),rgba(255,255,255,.025))] p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-200">{eyebrow}</p>
-          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">{title}</h2>
-        </div>
-        <span className="rounded-md border border-amber-200/20 bg-amber-200/10 px-2 py-1 text-xs font-semibold text-amber-100">{fmtCapacity(concert.capacity)}</span>
-      </div>
-      <button className="mt-6 block w-full text-left" onClick={() => onFocus(concert.id)}>
-        <h3 className="line-clamp-2 text-3xl font-semibold text-white">{concert.artist}</h3>
-        <p className="mt-2 text-sm text-zinc-300">{concert.venue}</p>
-        <p className="text-sm text-zinc-500">{[concert.city, concert.country].filter(Boolean).join(', ')}</p>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <Metric label="Concert city" value={formatVenueTime(concert)} />
-          <Metric label="Your time" value={formatUserTime(concert)} />
-        </div>
-      </button>
-      <button className="cohear-primary mt-5 w-full justify-center" disabled={busy} onClick={() => onJoin(concert)}>
-        {busy ? 'Opening...' : action}
-      </button>
-    </article>
-  );
-}
+
 
 function Metric({ label, value }) {
   return (

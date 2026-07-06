@@ -2,47 +2,7 @@
   "message": {
     "header": { "status_code": 200, "execute_time": 0.012, "available": 3 },
     "body": {
-      "track_list": [
-        {
-          "track": {
-            "track_id": 92837465,
-            "track_name": "Yellow",
-            "artist_name": "Coldplay",
-            "album_name": "Parachutes",
-            "has_lyrics": 1,
-            "has_subtitles": 1,
-            "explicit": 0,
-            "num_favourite": 184230,
-            "track_share_url": "https://www.musixmatch.com/lyrics/Coldplay/Yellow"
-          }
-        },
-        {
-          "track": {
-            "track_id": 92837466,
-            "track_name": "Fix You",
-            "artist_name": "Coldplay",
-            "album_name": "X&Y",
-            "has_lyrics": 1,
-            "has_subtitles": 1,
-            "explicit": 0,
-            "num_favourite": 221045,
-            "track_share_url": "https://www.musixmatch.com/lyrics/Coldplay/Fix-You"
-          }
-        },
-        {
-          "track": {
-            "track_id": 92837467,
-            "track_name": "Viva la Vida",
-            "artist_name": "Coldplay",
-            "album_name": "Viva la Vida or Death and All His Friends",
-            "has_lyrics": 1,
-            "has_subtitles": 1,
-            "explicit": 0,
-            "num_favourite": 305112,
-            "track_share_url": "https://www.musixmatch.com/lyrics/Coldplay/Viva-la-Vida"
-          }
-        }
-      ]
+      "track_list": []
     }
   },
   "_mock": true

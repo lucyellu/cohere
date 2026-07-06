@@ -262,6 +262,17 @@ export function useVoice(eventId) {
       } catch (err) {
         console.warn('SpeechRecognition start error', err);
       }
+    } else {
+      // Provide a fallback message if subtitles are unsupported by the browser (e.g. Firefox)
+      setTimeout(() => {
+        handleIncomingTranscript({
+          uid: 'system',
+          name: 'System',
+          text: 'Live subtitles are not supported on your current browser. Please use Chrome, Edge, or Safari for this feature.',
+          isFinal: true,
+          ts: Date.now()
+        });
+      }, 500);
     }
 
     // 3) Set up Supabase signaling channel
