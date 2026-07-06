@@ -60,6 +60,8 @@ function readDiscoverState() {
     hideEnded: false,
     showMyArtists: false,
     selectedId: null,
+    minCapacity: 0,
+    timeLimitHrs: 0,
   };
   try {
     const parsed = JSON.parse(sessionStorage.getItem(DISCOVER_STATE_KEY) || 'null');
@@ -106,6 +108,8 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
   const [when, setWhen] = useState(initialState.when);
   const [hideEnded, setHideEnded] = useState(Boolean(initialState.hideEnded));
   const [selectedId, setSelectedId] = useState(initialState.selectedId);
+  const [minCapacity, setMinCapacity] = useState(initialState.minCapacity || 0);
+  const [timeLimitHrs, setTimeLimitHrs] = useState(initialState.timeLimitHrs || 0);
   const [spotify, setSpotify] = useState(null);
   const [saved, setSaved] = useState(() => new Set(JSON.parse(localStorage.getItem('cohear_saved_shows') || '[]')));
   const [calendared, setCalendared] = useState(() => new Set(readCalendar().map((e) => e.id)));
@@ -218,8 +222,8 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
   }, []);
 
   useEffect(() => {
-    writeDiscoverState({ query, artist, location, windowKey, concerts, sources, mode, sortKey, dir, when, hideEnded, showMyArtists, selectedId });
-  }, [artist, concerts, dir, hideEnded, location, mode, query, selectedId, showMyArtists, sortKey, sources, when, windowKey]);
+    writeDiscoverState({ query, artist, location, windowKey, concerts, sources, mode, sortKey, dir, when, hideEnded, showMyArtists, selectedId, minCapacity, timeLimitHrs });
+  }, [artist, concerts, dir, hideEnded, location, mode, query, selectedId, showMyArtists, sortKey, sources, when, windowKey, minCapacity, timeLimitHrs]);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30_000);
@@ -288,6 +292,8 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
     setWhen('all');
     setHideEnded(false);
     setShowMyArtists(false);
+    setMinCapacity(0);
+    setTimeLimitHrs(0);
     try {
       localStorage.removeItem(DISCOVER_LAYOUT_KEY);
     } catch {
@@ -308,6 +314,11 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
     const graceMs = (settings?.endedGraceHours ?? 2) * 3600_000;
     const base = browse ? concerts : filterWhen(concerts, when);
     const filtered = base.filter((c) => {
+      if (minCapacity > 0 && (c.capacity == null || c.capacity < minCapacity)) return false;
+      if (timeLimitHrs > 0) {
+        const start = showStartMs(c);
+        if (!start || start - now > timeLimitHrs * 3600_000) return false;
+      }
       const st = showState(c, now);
       // Hide a show only once it's ended AND past the configured grace window.
       if (hideEnded && st.ended && st.end && now - st.end > graceMs) return false;
@@ -327,7 +338,7 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
       return [...mine, ...rest];
     }
     return sorted;
-  }, [artist, browse, concerts, dir, hideEnded, location, myArtistNames, now, query, settings?.endedGraceHours, showMyArtists, sortKey, userZone, when]);
+  }, [artist, browse, concerts, dir, hideEnded, location, myArtistNames, now, query, settings?.endedGraceHours, showMyArtists, sortKey, userZone, when, minCapacity, timeLimitHrs]);
 
   // Reset pagination when filters or sort change
   useEffect(() => {
@@ -336,12 +347,12 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
 
   useEffect(() => {
     if (!visible.length) return;
-    if (!visible.some((c) => c.id === selectedId)) setSelectedId(visible[0].id);
+    if (selectedId && !visible.some((c) => c.id === selectedId)) setSelectedId(null);
   }, [selectedId, visible]);
 
   const paginatedVisible = useMemo(() => visible.slice(0, page * 100), [visible, page]);
 
-  const selected = useMemo(() => visible.find((c) => c.id === selectedId) || visible[0] || null, [selectedId, visible]);
+  const selected = useMemo(() => visible.find((c) => c.id === selectedId) || null, [selectedId, visible]);
   const biggest = visible[0] || null;
   const stats = useMemo(() => {
     const upcoming = concerts.filter((c) => c.when === 'upcoming').length;
@@ -504,6 +515,10 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
             onAddCalendar={() => selected && addCalendar(selected)}
             onEnterShow={onEnterShow}
             onSyncLive={onSyncLive}
+            minCapacity={minCapacity}
+            setMinCapacity={setMinCapacity}
+            timeLimitHrs={timeLimitHrs}
+            setTimeLimitHrs={setTimeLimitHrs}
           />
         </div>
       )}
@@ -904,7 +919,7 @@ function SortHeader({ id, label, sortKey, dir, onSort, align = 'left' }) {
   );
 }
 
-function ConcertInspector({ concert, saved, calendared, sources, userZone, currency, now, onSave, onAddCalendar, onEnterShow, onSyncLive }) {
+function ConcertInspector({ concert, saved, calendared, sources, userZone, currency, now, onSave, onAddCalendar, onEnterShow, onSyncLive, minCapacity, setMinCapacity, timeLimitHrs, setTimeLimitHrs }) {
   const [syncing, setSyncing] = useState(false);
   const [ticket, setTicket] = useState(null);
   const [sgTicket, setSgTicket] = useState(null);
@@ -961,7 +976,64 @@ function ConcertInspector({ concert, saved, calendared, sources, userZone, curre
   }, [concert, currency]);
 
   if (!concert) {
-    return <aside className="cohear-panel p-5 text-sm text-zinc-500">Select a concert to inspect it.</aside>;
+    return (
+      <aside className="cohear-panel sticky top-5 self-start overflow-hidden">
+        <div className="border-b border-white/10 p-5">
+          <h3 className="text-lg font-semibold text-white">Filter Concerts</h3>
+          <p className="mt-1 text-xs text-zinc-500">Refine the current list of concerts. Select a concert from the list to view its details here.</p>
+        </div>
+        <div className="space-y-6 p-5">
+          <div>
+            <label className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-400">Minimum Capacity</label>
+            <div className="mt-3 grid gap-2">
+              {[
+                { id: 0, label: 'All Capacities' },
+                { id: 10000, label: '10,000+ Seats (Arenas)' },
+                { id: 20000, label: '20,000+ Seats' },
+                { id: 50000, label: '50,000+ Seats (Stadiums)' },
+              ].map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => setMinCapacity(opt.id)}
+                  className={`flex items-center justify-between rounded-lg border p-3 text-left transition ${
+                    minCapacity === opt.id
+                      ? 'border-amber-300/50 bg-amber-300/[0.1] text-amber-100'
+                      : 'border-white/10 bg-black/20 text-zinc-400 hover:border-white/20 hover:text-zinc-200'
+                  }`}
+                >
+                  <span className="text-sm font-medium">{opt.label}</span>
+                  {minCapacity === opt.id && <span className="h-2 w-2 rounded-full bg-amber-400" />}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-400">Time Window</label>
+            <div className="mt-3 grid gap-2">
+              {[
+                { id: 0, label: 'Any Time' },
+                { id: 24, label: 'Next 24 Hours' },
+                { id: 48, label: 'Next 48 Hours' },
+                { id: 168, label: 'Next 7 Days' },
+              ].map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => setTimeLimitHrs(opt.id)}
+                  className={`flex items-center justify-between rounded-lg border p-3 text-left transition ${
+                    timeLimitHrs === opt.id
+                      ? 'border-cyan-300/50 bg-cyan-300/[0.1] text-cyan-100'
+                      : 'border-white/10 bg-black/20 text-zinc-400 hover:border-white/20 hover:text-zinc-200'
+                  }`}
+                >
+                  <span className="text-sm font-medium">{opt.label}</span>
+                  {timeLimitHrs === opt.id && <span className="h-2 w-2 rounded-full bg-cyan-400" />}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </aside>
+    );
   }
 
   async function sync() {
