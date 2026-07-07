@@ -249,9 +249,29 @@ export function useVoice(eventId) {
         }
         // Locally add to history just like we received it
         handleIncomingTranscript({ uid: myUid, name: myName, text: transcript, isFinal, ts: Date.now() });
+        
+        // Track the latest text so we can mark it final on end
+        if (speechRef.current) {
+          speechRef.current._lastText = transcript;
+          speechRef.current._lastFinal = isFinal;
+        }
       };
       recognition.onerror = () => {};
       recognition.onend = () => {
+        // If the session ended but the last text wasn't marked final, mark it final now.
+        if (speechRef.current && speechRef.current._lastText && !speechRef.current._lastFinal) {
+          const finalPayload = { uid: myUid, name: myName, text: speechRef.current._lastText, isFinal: true, ts: Date.now() };
+          if (channelRef.current) {
+             channelRef.current.send({
+               type: 'broadcast',
+               event: 'voice:transcript',
+               payload: finalPayload
+             });
+          }
+          handleIncomingTranscript(finalPayload);
+          speechRef.current._lastFinal = true;
+        }
+        
         // restart if still joined
         if (streamRef.current) {
           try { recognition.start(); } catch {}
