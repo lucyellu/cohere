@@ -3,6 +3,7 @@ import { loadGoogleMaps, hasMapsKey } from '../../live/maps.js';
 import { cityCoords } from '../../account.js';
 import { fetchTour } from '../../tour.js';
 import { GOOGLE_PAPER_MAP } from '../../live/mapStyle.js';
+import { useMapPref, RouteControls } from './mapPrefs.jsx';
 
 // Per-artist tour route, in the same paper-map style as the passport journey.
 // Two tabs:
@@ -19,6 +20,17 @@ export default function ArtistTourMap({ stubs = [], entries = [] }) {
   const [artist, setArtist] = useState(artists[0] || '');
   const [tab, setTab] = useState('mine'); // 'mine' | 'full'
   const [tours, setTours] = useState({}); // artist -> { stops, loading, error }
+  const [showRoutes, toggleRoutes] = useMapPref('routes', true);
+  const [arcs, toggleArcs] = useMapPref('arcs', true);
+
+  // Forget this artist's (failed) fetch so the lazy-load effect tries again.
+  function retryTour() {
+    setTours((t) => {
+      const next = { ...t };
+      delete next[artist];
+      return next;
+    });
+  }
 
   // Keep the selected artist valid as the list changes.
   useEffect(() => {
@@ -56,18 +68,19 @@ export default function ArtistTourMap({ stubs = [], entries = [] }) {
   }, [stubs, entries, artist]);
 
   // Fetch the full tour lazily, the first time its tab is opened for an artist.
+  // NOTE: no cleanup-cancels here — setTours below changes `tours`, which
+  // re-runs this effect, and an unmount-style `alive` flag would cancel its
+  // own in-flight fetch (the old silent-hang bug). The ref marks in-flight
+  // fetches instead, and late setTours calls on a gone component are no-ops.
+  const inFlightRef = useRef(new Set());
   useEffect(() => {
-    if (tab !== 'full' || !artist || tours[artist]) return;
-    let alive = true;
+    if (tab !== 'full' || !artist || tours[artist] || inFlightRef.current.has(artist)) return;
+    inFlightRef.current.add(artist);
     setTours((t) => ({ ...t, [artist]: { stops: [], loading: true, error: null } }));
     fetchTour(artist)
-      .then((res) => {
-        if (alive) setTours((t) => ({ ...t, [artist]: { stops: res.stops || [], loading: false, error: null } }));
-      })
-      .catch((e) => {
-        if (alive) setTours((t) => ({ ...t, [artist]: { stops: [], loading: false, error: e.message || 'tour unavailable' } }));
-      });
-    return () => { alive = false; };
+      .then((res) => setTours((t) => ({ ...t, [artist]: { stops: res.stops || [], loading: false, error: null } })))
+      .catch((e) => setTours((t) => ({ ...t, [artist]: { stops: [], loading: false, error: e.message || 'tour unavailable' } })))
+      .finally(() => inFlightRef.current.delete(artist));
   }, [tab, artist, tours]);
 
   const tour = tours[artist];
@@ -105,20 +118,32 @@ export default function ArtistTourMap({ stubs = [], entries = [] }) {
             {artists.map((a) => <option key={a} value={a}>{a}</option>)}
           </select>
         </div>
-        <div className="flex overflow-hidden rounded-lg border border-black/20">
-          {[{ id: 'mine', label: 'Your stops' }, { id: 'full', label: 'Full tour' }].map((t) => (
-            <button
-              key={t.id}
-              className={`px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] transition ${tab === t.id ? 'bg-black/80 text-[var(--paper,#f1e7d0)]' : 'bg-transparent text-black/60 hover:text-black/90'}`}
-              onClick={() => setTab(t.id)}
-            >
-              {t.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          <RouteControls showRoutes={showRoutes} arcs={arcs} onToggleRoutes={toggleRoutes} onToggleArcs={toggleArcs} />
+          <div className="flex overflow-hidden rounded-lg border border-black/20">
+            {[{ id: 'mine', label: 'Your stops' }, { id: 'full', label: 'Full tour' }].map((t) => (
+              <button
+                key={t.id}
+                className={`px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] transition ${tab === t.id ? 'bg-black/80 text-[var(--paper,#f1e7d0)]' : 'bg-transparent text-black/60 hover:text-black/90'}`}
+                onClick={() => setTab(t.id)}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      <TourCanvas points={points} tab={tab} loading={loading} error={tour?.error} />
+      <TourCanvas
+        points={points}
+        tab={tab}
+        artist={artist}
+        loading={loading}
+        error={tour?.error}
+        onRetry={retryTour}
+        showRoutes={showRoutes}
+        arcs={arcs}
+      />
     </section>
   );
 }
@@ -126,11 +151,15 @@ export default function ArtistTourMap({ stubs = [], entries = [] }) {
 // The map (or paper-list fallback). One Google map instance, re-plotted whenever
 // the selected points change — markers numbered in tour order, joined by a dashed
 // route just like the passport journey map.
-function TourCanvas({ points, tab, loading, error }) {
+function TourCanvas({ points, tab, artist, loading, error, onRetry, showRoutes, arcs }) {
   const mapRef = useRef(null);
   const stateRef = useRef({ map: null, maps: null, markers: [], line: null, fitKey: '' });
   const [err, setErr] = useState(hasMapsKey() ? null : 'missing-key');
   const [ready, setReady] = useState(false);
+  // The plotting effect reads the toggles through this ref so flipping them
+  // doesn't re-plot the markers; a separate effect adjusts the live polyline.
+  const prefsRef = useRef({ showRoutes, arcs });
+  prefsRef.current = { showRoutes, arcs };
 
   useEffect(() => {
     if (!hasMapsKey()) return undefined;
@@ -142,6 +171,7 @@ function TourCanvas({ points, tab, loading, error }) {
         stateRef.current.map = new maps.Map(mapRef.current, {
           center: { lat: 25, lng: 0 },
           zoom: 2,
+          maxZoom: 16, // street level is plenty — beyond it the paper style dissolves
           disableDefaultUI: true,
           zoomControl: true,
           gestureHandling: 'greedy',
@@ -190,10 +220,10 @@ function TourCanvas({ points, tab, loading, error }) {
       const dash = { path: 'M 0,-1 0,1', strokeOpacity: 1, strokeColor: '#5b4a2a', scale: 2 };
       stateRef.current.line = new maps.Polyline({
         path: points.map((p) => ({ lat: Number(p.lat), lng: Number(p.lng) })),
-        geodesic: true,
+        geodesic: prefsRef.current.arcs,
         strokeOpacity: 0,
         icons: [{ icon: dash, offset: '0', repeat: '12px' }],
-        map,
+        map: prefsRef.current.showRoutes ? map : null,
       });
     }
 
@@ -205,12 +235,20 @@ function TourCanvas({ points, tab, loading, error }) {
     }
   }, [points, ready, tab]);
 
+  // Apply the route toggles to the live polyline without re-plotting anything.
+  useEffect(() => {
+    const { line, map } = stateRef.current;
+    if (!line) return;
+    line.setOptions({ geodesic: arcs });
+    line.setMap(showRoutes ? map : null);
+  }, [showRoutes, arcs, points, ready]);
+
   const caption = tab === 'mine'
     ? `${points.length} ${points.length === 1 ? 'stop' : 'stops'} you've stamped`
     : `${points.length} tour ${points.length === 1 ? 'city' : 'cities'}`;
 
   if (err) {
-    return <PaperFallback points={points} caption={caption} loading={loading} error={error} missingKey={err === 'missing-key'} />;
+    return <PaperFallback points={points} caption={caption} loading={loading} error={error} onRetry={onRetry} missingKey={err === 'missing-key'} />;
   }
 
   return (
@@ -227,14 +265,39 @@ function TourCanvas({ points, tab, loading, error }) {
       )}
       {!loading && !points.length && (
         <div className="pointer-events-none absolute inset-0 grid place-items-center bg-[#f1e7d0]/70 px-6 text-center text-sm text-black/60">
-          {error ? 'Tour unavailable right now.' : tab === 'full' ? 'No tour dates found for this artist yet.' : 'No stamped stops for this artist yet.'}
+          {error ? (
+            <TourError artist={artist} error={error} onRetry={onRetry} />
+          ) : tab === 'full' ? (
+            `No tour dates found for ${artist || 'this artist'} yet — new tours can take a while to appear. Check back soon.`
+          ) : (
+            'No stamped stops for this artist yet — join one of their live rooms and the stop pins itself here.'
+          )}
         </div>
       )}
     </div>
   );
 }
 
-function PaperFallback({ points, caption, loading, error, missingKey }) {
+// Shared "couldn't fetch the tour" notice with a retry — fetchTour used to fail
+// silently; now the failure is visible and recoverable in place.
+function TourError({ artist, error, onRetry }) {
+  return (
+    <div className="pointer-events-auto grid justify-items-center gap-2">
+      <span>Couldn&rsquo;t fetch {artist ? `${artist}'s` : 'the'} tour{error ? ` (${error})` : ''}.</span>
+      {onRetry && (
+        <button
+          type="button"
+          className="rounded-md border border-black/25 bg-black/80 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-[#f1e7d0] transition hover:bg-black"
+          onClick={onRetry}
+        >
+          ↻ Retry
+        </button>
+      )}
+    </div>
+  );
+}
+
+function PaperFallback({ points, caption, loading, error, onRetry, missingKey }) {
   return (
     <div className="p-4">
       <p className="mb-3 text-xs text-black/50">
@@ -259,9 +322,9 @@ function PaperFallback({ points, caption, loading, error, missingKey }) {
           ))}
         </ol>
       ) : (
-        <p className="grid min-h-20 place-items-center text-sm text-black/50">
-          {error ? 'Tour unavailable right now.' : 'No stops to show yet.'}
-        </p>
+        <div className="grid min-h-20 place-items-center text-sm text-black/50">
+          {error ? <TourError error={error} onRetry={onRetry} /> : 'No stops to show yet.'}
+        </div>
       )}
     </div>
   );

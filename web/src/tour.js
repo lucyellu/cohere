@@ -3,7 +3,15 @@
 
 // source: 'live' = real JamBase search, 'mock' = curated demo tour.
 export async function fetchTour(artist, source = 'live') {
-  const res = await fetch(`/api/jambase/events?artist=${encodeURIComponent(artist)}&source=${source}`);
+  // A dead/half-dead gateway can 500 with a body stream that never closes,
+  // which leaves res.json() (and the caller's spinner) hanging forever. The
+  // abort timeout covers the connection AND the body read, and a non-2xx
+  // becomes a real error the UI can show a Retry for.
+  const res = await fetch(
+    `/api/jambase/events?artist=${encodeURIComponent(artist)}&source=${source}`,
+    { signal: AbortSignal.timeout(15000) },
+  );
+  if (!res.ok) throw new Error(`tour lookup failed (${res.status})`);
   const payload = await res.json();
   const events = payload?.data?.events || [];
   return { stops: normalize(events), mode: payload?.mode, ok: payload?.ok };

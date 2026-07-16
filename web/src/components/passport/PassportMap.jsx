@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { loadGoogleMaps, hasMapsKey } from '../../live/maps.js';
 import { cityCoords } from '../../account.js';
 import { GOOGLE_PAPER_MAP } from '../../live/mapStyle.js';
+import { useMapPref, RouteControls } from './mapPrefs.jsx';
 
 // The traveller's own map: every city you've stamped, plotted in date order and
 // joined by a dashed route — your concert-hopping itinerary on a real, zoomable
@@ -11,6 +12,12 @@ export default function PassportMap({ entries, home }) {
   const stateRef = useRef({ map: null, maps: null, markers: [], line: null, fitKey: '' });
   const [err, setErr] = useState(hasMapsKey() ? null : 'missing-key');
   const [ready, setReady] = useState(false);
+  const [showRoutes, toggleRoutes] = useMapPref('routes', true);
+  const [arcs, toggleArcs] = useMapPref('arcs', true);
+  // The plotting effect only re-runs on data changes; it reads the current
+  // toggle values through this ref so toggling never re-plots the markers.
+  const prefsRef = useRef({ showRoutes, arcs });
+  prefsRef.current = { showRoutes, arcs };
 
   const points = useMemo(() => {
     const stops = entries
@@ -36,6 +43,7 @@ export default function PassportMap({ entries, home }) {
         stateRef.current.map = new maps.Map(mapRef.current, {
           center: { lat: 25, lng: 0 },
           zoom: 2,
+          maxZoom: 16, // street level is plenty — beyond it the paper style dissolves
           disableDefaultUI: true,
           zoomControl: true,
           gestureHandling: 'greedy',
@@ -84,10 +92,10 @@ export default function PassportMap({ entries, home }) {
       const dash = { path: 'M 0,-1 0,1', strokeOpacity: 1, strokeColor: '#5b4a2a', scale: 2 };
       stateRef.current.line = new maps.Polyline({
         path: points.map((p) => ({ lat: Number(p.lat), lng: Number(p.lng) })),
-        geodesic: true,
+        geodesic: prefsRef.current.arcs,
         strokeOpacity: 0,
         icons: [{ icon: dash, offset: '0', repeat: '12px' }],
-        map,
+        map: prefsRef.current.showRoutes ? map : null,
       });
     }
 
@@ -99,13 +107,24 @@ export default function PassportMap({ entries, home }) {
     }
   }, [points, ready]);
 
+  // Apply the route toggles to the live polyline without re-plotting anything.
+  useEffect(() => {
+    const { line, map } = stateRef.current;
+    if (!line) return;
+    line.setOptions({ geodesic: arcs });
+    line.setMap(showRoutes ? map : null);
+  }, [showRoutes, arcs, points, ready]);
+
   return (
     <section className="cohear-passport-page overflow-hidden">
-      <div className="flex items-center justify-between border-b border-black/15 px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/15 px-4 py-3">
         <h3 className="text-sm font-black uppercase tracking-[0.18em]">Your journey</h3>
-        <span className="text-xs font-semibold uppercase tracking-[0.1em] opacity-60">
-          {stopCount} {stopCount === 1 ? 'stop' : 'stops'}, in order
-        </span>
+        <div className="flex items-center gap-3">
+          {!err && <RouteControls showRoutes={showRoutes} arcs={arcs} onToggleRoutes={toggleRoutes} onToggleArcs={toggleArcs} />}
+          <span className="text-xs font-semibold uppercase tracking-[0.1em] opacity-60">
+            {stopCount} {stopCount === 1 ? 'stop' : 'stops'}, in order
+          </span>
+        </div>
       </div>
       {err ? (
         <PaperFallback points={points} missingKey={err === 'missing-key'} />
