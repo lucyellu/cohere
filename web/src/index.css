@@ -629,8 +629,10 @@ button:disabled { cursor: not-allowed; }
    alpha so the ink looks unevenly pressed. Fails open (solid stamp). */
 :root {
   --cohear-grunge: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.45' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.4 1.25'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
-  --cohear-parchment: #efe6d2;
-  --cohear-parchment-ink: #2c2418;
+  /* Pinkish-brown booklet paper (passport (2).jpg) — warm rosy tan so the
+     white paper of stick-on stamps and visas pops against the page. */
+  --cohear-parchment: #e1bfa9;
+  --cohear-parchment-ink: #3a281c;
 }
 
 /* ---- Passport page (light parchment the stamps + visas sit on) ---- */
@@ -1118,6 +1120,37 @@ button:disabled { cursor: not-allowed; }
   .cohear-spread__stamps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
+/* ---------- Section jump tabs (sticky, above the passport) ---------- */
+.cohear-passport-tabs {
+  position: sticky;
+  top: 8px;
+  z-index: 30;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 7px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(14, 12, 10, 0.78);
+  backdrop-filter: blur(12px);
+}
+.cohear-passport-tabs button {
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.cohear-passport-tabs button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+/* Jumped-to sections land clear of the sticky tab bar */
+[id^="pp-"] { scroll-margin-top: 64px; }
+
 /* ---------- Stats sidebar (lives outside the passport) ---------- */
 .cohear-passport-layout {
   display: flex;
@@ -1402,94 +1435,86 @@ button:disabled { cursor: not-allowed; }
 .cohear-pbook__nav.left { left: -14px; }
 .cohear-pbook__nav.right { right: -14px; }
 
-/* ---- Souvenir stamps (stick-on postage kind) ----
-   Thick sticker paper, scalloped perforation, a duotone vignette scene, and a
-   pointer-tracked 3D tilt + holographic foil (the stamp_foil reference). The
-   ink-pressed kind reuses .cohear-rubber. */
+/* ---- Souvenir stamps ----
+   City kind: a stick-on letterpress postage stamp — thick white paper with a
+   chunky zigzag die-cut (clip-path from SouvenirStamp.jsx), one saturated ink
+   block DEBOSSED into the sheet, white motif art, the show date hand-set in
+   serif (the Chu Jian letterpress reference), and a pointer-tracked 3D tilt +
+   holographic foil. State/country kind is a pictorial ink die (SVG). */
 .cohear-souvenir {
   perspective: 620px;
   transform: rotate(var(--rot, 0deg));
-  /* postage proportions — don't stretch to fill wide grid cells */
+  /* portrait postage proportions — don't stretch to fill wide grid cells */
   width: 100%;
-  max-width: 172px;
+  max-width: 132px;
   justify-self: center;
+  /* the drop shadow lives here so it follows the zigzag clip on __paper */
+  filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.3)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
 }
 .cohear-souvenir__paper {
-  --souv-ink: hsl(var(--hue, 210) 42% 34%);
-  --souv-mid: hsl(var(--hue, 210) 45% 62%);
-  --souv-pale: hsl(var(--hue, 210) 52% 88%);
+  --souv-block: hsl(var(--hue, 210) 74% 52%);
+  --souv-press: hsl(var(--hue, 210) 48% 15%);
   position: relative;
-  padding: 9px;
-  background: #f6f2e8;
+  aspect-ratio: 4 / 5;
+  padding: 11%;
+  background: linear-gradient(160deg, #fbf9f4, #efe9dd);
   transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
   transform-style: preserve-3d;
   transition: transform 0.18s ease-out;
-  filter: drop-shadow(0 5px 9px rgba(0, 0, 0, 0.32));
 }
-.cohear-souvenir__art {
+.cohear-souvenir__block {
   position: relative;
   display: grid;
-  aspect-ratio: 7 / 5; /* classic landscape commemorative stamp */
-  padding: 7px 8px;
-  border: 1.5px solid var(--souv-ink);
-  color: var(--souv-ink);
+  grid-template-rows: auto 1fr auto;
+  height: 100%;
+  padding: 7px 7px 5px;
+  background: var(--souv-block);
+  color: var(--souv-press);
   overflow: hidden;
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.14);
-}
-/* Three CSS-only duotone vignettes — placeholder art until the generator/
-   backend supplies real per-place illustrations. */
-.cohear-souvenir__art--0 { /* sunset: a half-set sun sinking behind the sea */
-  background:
-    linear-gradient(to bottom, transparent 0 62%, var(--souv-mid) 62%),
-    radial-gradient(circle 16px at 58% 62%, var(--souv-ink) 15px, transparent 16px),
-    repeating-linear-gradient(to bottom, var(--souv-pale) 0 5px, color-mix(in srgb, var(--souv-mid) 35%, var(--souv-pale)) 5px 10px);
-}
-.cohear-souvenir__art--1 { /* ridge: two overlapping hills */
-  background:
-    radial-gradient(90% 62% at 22% 108%, var(--souv-mid) 58%, transparent 59%),
-    radial-gradient(105% 74% at 82% 118%, color-mix(in srgb, var(--souv-ink) 55%, var(--souv-pale)) 55%, transparent 56%),
-    var(--souv-pale);
-}
-.cohear-souvenir__art--2 { /* tide: repeating wave bands */
-  background:
-    repeating-radial-gradient(120% 30% at 50% 118%, var(--souv-mid) 0 7px, var(--souv-pale) 7px 17px);
+  /* letterpress: the whole color block is pressed INTO the paper */
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.3),
+    inset 0 -1px 2px rgba(255, 255, 255, 0.28),
+    inset 2px 0 3px rgba(0, 0, 0, 0.12),
+    0 1px 0 rgba(255, 255, 255, 0.8);
 }
 .cohear-souvenir__place {
+  max-width: calc(100% - 20px); /* clear the QR block */
+  font: 700 11px/1.15 Georgia, "Times New Roman", serif;
+  letter-spacing: 0.04em;
+  /* debossed dark ink with a pressed-paper glint beneath */
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+.cohear-souvenir__qr {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 13px;
+  height: 13px;
+  fill: rgba(255, 255, 255, 0.85);
+  opacity: 0.9;
+}
+.cohear-souvenir__motif {
+  align-self: center;
   justify-self: center;
-  align-self: start;
-  max-width: 100%;
-  font: 900 12px/1.1 ui-sans-serif, system-ui, sans-serif;
-  letter-spacing: 0.06em;
-  text-align: center;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
+  width: 86%;
+  fill: rgba(255, 255, 255, 0.92);
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.18));
 }
-.cohear-souvenir__value {
-  position: absolute;
-  left: 6px;
-  bottom: 4px;
-  font: 900 17px/1 Georgia, "Times New Roman", serif;
+.cohear-souvenir__foot { text-align: center; }
+.cohear-souvenir__date {
+  display: block;
+  font: 900 15px/1 Georgia, "Times New Roman", serif;
+  letter-spacing: 0.03em;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
 }
-.cohear-souvenir__value small { font-size: 9px; font-weight: 700; }
-.cohear-souvenir__year {
-  position: absolute;
-  right: 6px;
-  bottom: 4px;
-  font: 700 9px/1 ui-monospace, "Courier New", monospace;
-  letter-spacing: 0.08em;
-}
-.cohear-souvenir__tier {
-  /* bottom centre — clear of the place name, between value and year */
-  position: absolute;
-  left: 50%;
-  bottom: 4px;
-  transform: translateX(-50%);
-  padding: 1px 4px;
-  border: 1px solid currentColor;
-  border-radius: 2px;
-  font: 800 7px/1.2 ui-sans-serif, system-ui, sans-serif;
-  letter-spacing: 0.14em;
+.cohear-souvenir__sub {
+  display: block;
+  margin-top: 2px;
+  font: 700 5.5px/1 ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0.28em;
   text-transform: uppercase;
-  opacity: 0.85;
+  opacity: 0.75;
 }
 /* Holographic foil — an iridescent hotspot pinned to the pointer */
 .cohear-souvenir__foil {
@@ -1500,11 +1525,21 @@ button:disabled { cursor: not-allowed; }
   transition: opacity 0.25s ease;
   mix-blend-mode: color-dodge;
   background:
-    radial-gradient(140px circle at var(--px, 50%) var(--py, 50%),
+    radial-gradient(120px circle at var(--px, 50%) var(--py, 50%),
       rgba(255, 120, 200, 0.5),
       rgba(120, 220, 255, 0.38) 34%,
       rgba(170, 255, 170, 0.24) 58%,
       transparent 75%);
+}
+/* Distressed-ink wear for the pictorial state/country dies — a gentler cut of
+   the grunge alpha (less erosion than the full postmark mask) so the frame and
+   lettering stay readable while the fill mottles like a half-dry stamp pad. */
+.cohear-rubber--grunge {
+  --cohear-grunge-soft: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.45' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -0.7 1.18'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  -webkit-mask-image: var(--cohear-grunge-soft);
+  -webkit-mask-size: 300px 300px;
+  mask-image: var(--cohear-grunge-soft);
+  mask-size: 300px 300px;
 }
 
 /* Clickable stamps / stubs (open a city page). */

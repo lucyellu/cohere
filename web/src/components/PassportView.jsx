@@ -96,6 +96,10 @@ export default function PassportView({ onOpenCity }) {
     setArtView((v) => ({ ...v, [id]: !v[id] }));
   }
 
+  function jumpTo(id) {
+    document.getElementById(`pp-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   useEffect(() => {
     if (!supabase) { setSessionLoading(false); return undefined; }
     let alive = true;
@@ -344,8 +348,23 @@ export default function PassportView({ onOpenCity }) {
         )}
       </div>
 
+      {/* Section tabs — jump straight to any part of the passport */}
+      <nav className="cohear-passport-tabs" aria-label="Passport sections">
+        {[
+          ['passport', 'Passport'],
+          ...(entries.length || stubs.length ? [['maps', 'Maps']] : []),
+          ['visas', 'Visas'],
+          ['entries', 'Entry stamps'],
+          ['souvenirs', 'Souvenirs'],
+          ['tickets', 'Tickets'],
+          ['history', 'History'],
+        ].map(([id, label]) => (
+          <button key={id} type="button" onClick={() => jumpTo(id)}>{label}</button>
+        ))}
+      </nav>
+
       {/* Passport + stats sidebar layout */}
-      <div className="cohear-passport-layout">
+      <div className="cohear-passport-layout" id="pp-passport">
         {/* Passport — open book spread: identity (left) + stamp pages (right) */}
         <PassportSpread
           profile={profile}
@@ -422,14 +441,16 @@ export default function PassportView({ onOpenCity }) {
         )}
       </div>
 
-      {/* Chronological journey map */}
-      {entries.length > 0 && <PassportMap entries={entries} home={home} />}
-
-      {/* Per-artist tour routes — your stops + the full tour */}
-      {(stubs.length > 0 || entries.length > 0) && <ArtistTourMap stubs={stubs} entries={entries} />}
+      {/* Maps — chronological journey + per-artist tour routes */}
+      {(entries.length > 0 || stubs.length > 0) && (
+        <div className="space-y-5" id="pp-maps">
+          {entries.length > 0 && <PassportMap entries={entries} home={home} />}
+          <ArtistTourMap stubs={stubs} entries={entries} />
+        </div>
+      )}
 
       {/* Visas */}
-      <PageSection title="Visas" caption={`${visas.length} ${visas.length === 1 ? 'country' : 'countries'}`}>
+      <PageSection id="pp-visas" title="Visas" caption={`${visas.length} ${visas.length === 1 ? 'country' : 'countries'}`}>
         {!visas.length ? (
           <Empty>No visas yet — open a live room to clear customs.</Empty>
         ) : (
@@ -451,7 +472,7 @@ export default function PassportView({ onOpenCity }) {
       </PageSection>
 
       {/* Entry stamps */}
-      <PageSection title="Entry stamps" caption={`${entries.length} ${entries.length === 1 ? 'visit' : 'visits'}`}>
+      <PageSection id="pp-entries" title="Entry stamps" caption={`${entries.length} ${entries.length === 1 ? 'visit' : 'visits'}`}>
         {!entries.length ? (
           <Empty>No entry stamps yet — each city + date you turn up earns one.</Empty>
         ) : (
@@ -464,7 +485,7 @@ export default function PassportView({ onOpenCity }) {
       {/* Souvenir stamps — one keepsake per entry: stick-on postage or pressed
           ink, scoped to the city / state / country. Assignment is a
           deterministic stand-in until the unique-id backend lands. */}
-      <PageSection title="Souvenir stamps" caption={`${entries.length} collected · randomly issued`}>
+      <PageSection id="pp-souvenirs" title="Souvenir stamps" caption={`${entries.length} collected · randomly issued`}>
         {!entries.length ? (
           <Empty>No souvenirs yet — every show you attend hands one out.</Empty>
         ) : (
@@ -475,7 +496,7 @@ export default function PassportView({ onOpenCity }) {
       </PageSection>
 
       {/* Ticket stubs */}
-      <section className="cohear-panel overflow-hidden">
+      <section className="cohear-panel overflow-hidden" id="pp-tickets">
         <SectionHeader title="Ticket stubs" caption="One mints automatically for every show you attend" />
         <div className="p-4">
           {!stubs.length ? (
@@ -500,7 +521,7 @@ export default function PassportView({ onOpenCity }) {
       </section>
 
       {/* History */}
-      <section className="cohear-panel overflow-hidden">
+      <section className="cohear-panel overflow-hidden" id="pp-history">
         <SectionHeader title="History" caption={`${history.length} ${history.length === 1 ? 'record' : 'records'}`} />
         <div className="max-h-[520px] overflow-y-auto p-3">
           {!history.length ? (
@@ -583,9 +604,9 @@ export default function PassportView({ onOpenCity }) {
   );
 }
 
-function PageSection({ title, caption, children }) {
+function PageSection({ id, title, caption, children }) {
   return (
-    <section className="cohear-passport-page overflow-hidden p-4">
+    <section className="cohear-passport-page overflow-hidden p-4" id={id}>
       <div className="mb-3 flex items-center justify-between border-b border-black/15 pb-2">
         <h3 className="text-sm font-black uppercase tracking-[0.18em]">{title}</h3>
         <span className="text-xs font-semibold uppercase tracking-[0.1em] opacity-60">{caption}</span>
