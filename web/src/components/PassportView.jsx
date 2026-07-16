@@ -31,6 +31,7 @@ import { readArtMap, generateArtFor } from './passport/passportArt.js';
 import PassportSpread from './passport/PassportSpread.jsx';
 import VisaCard from './passport/VisaCard.jsx';
 import EntryStamp from './passport/EntryStamp.jsx';
+import SouvenirStamp from './passport/SouvenirStamp.jsx';
 import TicketStub from './passport/TicketStub.jsx';
 import ExportSheet from './passport/ExportSheet.jsx';
 import PassportMap from './passport/PassportMap.jsx';
@@ -46,6 +47,9 @@ export default function PassportView({ onOpenCity }) {
   const [trash, setTrash] = useState(() => readTrash());
   const [dupCount, setDupCount] = useState(() => findDuplicateStubs().reduce((n, g) => n + g.length - 1, 0));
   const [art, setArt] = useState(() => readArtMap());
+  // Which cards are showing their art view (vs the standard printed card).
+  // Freshly generated art switches its card to the art view automatically.
+  const [artView, setArtView] = useState({});
   const [genId, setGenId] = useState(null);
   const [importMsg, setImportMsg] = useState('');
   const importRef = useRef(null);
@@ -80,11 +84,16 @@ export default function PassportView({ onOpenCity }) {
     try {
       const url = await generateArtFor(item);
       setArt((m) => ({ ...m, [item.id]: url }));
+      setArtView((v) => ({ ...v, [item.id]: true }));
     } catch {
       /* generation unavailable — CSS card stays */
     } finally {
       setGenId(null);
     }
+  }
+
+  function toggleArtView(id) {
+    setArtView((v) => ({ ...v, [id]: !v[id] }));
   }
 
   useEffect(() => {
@@ -431,6 +440,8 @@ export default function PassportView({ onOpenCity }) {
                 visa={visa}
                 entryCount={entriesByCountry[visa.country] || 1}
                 art={art[visa.id]}
+                showArt={Boolean(artView[visa.id])}
+                onToggleArt={() => toggleArtView(visa.id)}
                 onGenerate={() => generate(visa)}
                 generating={genId === visa.id}
               />
@@ -450,6 +461,19 @@ export default function PassportView({ onOpenCity }) {
         )}
       </PageSection>
 
+      {/* Souvenir stamps — one keepsake per entry: stick-on postage or pressed
+          ink, scoped to the city / state / country. Assignment is a
+          deterministic stand-in until the unique-id backend lands. */}
+      <PageSection title="Souvenir stamps" caption={`${entries.length} collected · randomly issued`}>
+        {!entries.length ? (
+          <Empty>No souvenirs yet — every show you attend hands one out.</Empty>
+        ) : (
+          <div className="grid grid-cols-2 gap-5 px-1 py-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+            {entries.map((entry) => <SouvenirStamp key={entry.id} entry={entry} />)}
+          </div>
+        )}
+      </PageSection>
+
       {/* Ticket stubs */}
       <section className="cohear-panel overflow-hidden">
         <SectionHeader title="Ticket stubs" caption="One mints automatically for every show you attend" />
@@ -463,6 +487,8 @@ export default function PassportView({ onOpenCity }) {
                   key={stub.serial}
                   stub={stub}
                   art={art[stub.id]}
+                  showArt={Boolean(artView[stub.id])}
+                  onToggleArt={() => toggleArtView(stub.id)}
                   onGenerate={() => generate(stub)}
                   generating={genId === stub.id}
                   onOpen={onOpenCity}

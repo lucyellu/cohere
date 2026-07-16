@@ -1,10 +1,12 @@
 import { useMemo, useRef, useState } from 'react';
-import { hashString, ticketPalette } from './palette.js';
+import { hashString, ticketPalette, regionInk } from './palette.js';
 import { countryEmoji } from './VisaCard.jsx';
+import RubberStamp from './RubberStamp.jsx';
+import { formatStampDate } from './EntryStamp.jsx';
 import { fileToAvatar, generateAvatar } from './avatar.js';
 import { COUNTRY_OPTIONS, visaRuleFor } from '../../account.js';
 
-const PER_PAGE = 6;
+const PER_PAGE = 9;
 
 // The passport as an open two-page book spread (like a real passport): the
 // identity/photo page on the left, and the collected visas, entry stamps and
@@ -227,7 +229,7 @@ function VisaStamp({ visa, rot }) {
       title={`${visa.country} — ${rule?.label || 'Visa'}`}
     >
       <div className="cohear-mvisa__inner">
-        <div className="flex items-center justify-between text-[6px] font-black uppercase tracking-[0.16em]">
+        <div className="flex w-full items-center justify-between text-[6px] font-black uppercase tracking-[0.16em]">
           <span>Cohere</span>
           <span>Visa</span>
         </div>
@@ -242,20 +244,19 @@ function VisaStamp({ visa, rot }) {
 function EntryRubberStamp({ entry, rot, onOpenCity }) {
   const interactive = Boolean(onOpenCity);
   return (
-    <div
-      className={`cohear-entry ${interactive ? 'cohear-entry--link' : ''}`}
-      style={{ '--rot': `${rot}deg`, minHeight: 84, width: '100%', padding: '0.45rem 0.35rem' }}
+    <RubberStamp
+      id={entry.id}
+      city={entry.city}
+      date={formatStampDate(entry.date || entry.issuedAt)}
+      ink={regionInk(entry.country, entry.city || entry.id)}
+      className={interactive ? 'cohear-rubber--link' : ''}
+      style={{ '--rot': `${rot}deg` }}
+      title={`${entry.city}${entry.date ? ` · ${entry.date}` : ''}`}
       onClick={interactive ? () => onOpenCity(entry) : undefined}
       role={interactive ? 'button' : undefined}
       tabIndex={interactive ? 0 : undefined}
       onKeyDown={interactive ? (e) => (e.key === 'Enter' || e.key === ' ') && onOpenCity(entry) : undefined}
-      title={`${entry.city}${entry.date ? ` · ${entry.date}` : ''}`}
-    >
-      <div className="cohear-entry__sub" style={{ fontSize: 7 }}>✈ Admitted</div>
-      <div className="cohear-entry__city" style={{ fontSize: 12 }}>{(entry.city || '').toUpperCase()}</div>
-      <div className="cohear-entry__date" style={{ fontSize: 8 }}>{(entry.date || '').slice(5) || '—'}</div>
-      <div className="cohear-entry__sub" style={{ fontSize: 6 }}>Cohere Border</div>
-    </div>
+    />
   );
 }
 

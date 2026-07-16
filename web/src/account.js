@@ -477,6 +477,7 @@ export function addEntryStamp(input) {
     id,
     type: 'entry',
     city: concert.city,
+    region: concert.region || '', // state/province when the source provides one
     country,
     date,
     lat: coords?.lat ?? null,
@@ -685,25 +686,31 @@ export function estTicketUsd(c = {}) {
 }
 
 // --- FLUX prompt builders (CSS renders by default; art is generated on demand) -
+// The art must read as part of the printed object — a stamp illustration or a
+// ticket's press-printed background — never a picture pasted onto the card.
+// No faces/portraits: real stubs are typographic, and generated artist faces
+// read as propaganda posters.
 export function visaPrompt({ country, rule }) {
   return [
-    `Vintage passport visa sticker for ${country || 'an international destination'}.`,
-    `Official immigration aesthetic: ornate guilloché security pattern, fine engraved border, a small national landmark motif, "${rule?.label || 'Tourist Visa'}" energy.`,
-    'Muted ink colors on aged paper, high detail, no readable paragraph text, souvenir-grade.',
+    `Engraved intaglio visa stamp print for ${country || 'an international destination'}, edge-to-edge full-bleed design.`,
+    `Flat two-or-three-color letterpress ink on aged cream paper: ornate guilloché security border framing a small national landmark or emblem vignette, "${rule?.label || 'Tourist Visa'}" energy.`,
+    'Looks pressed into the paper, muted inks, fine engraved linework. Strictly no faces, no portraits, no people, no photorealism, no readable paragraph text.',
   ].join(' ');
 }
 export function entryPrompt(entry) {
   const place = [entry.city, entry.country].filter(Boolean).join(', ');
   return [
-    `Illustrated postage stamp for ${place || 'a concert city'}, single iconic local landmark or motif,`,
-    'soft gouache illustration, perforated edge, denomination lettering, vintage philatelic style, no paragraph text.',
+    `Vintage postage stamp illustration of ${place || 'a concert city'}: one iconic local landmark, skyline silhouette or nature motif, full-bleed edge-to-edge.`,
+    'Flat gouache in three muted colors, hand-drawn philatelic linework, subtle paper grain, the design fills the whole frame like a real printed stamp.',
+    'No faces, no portraits, no people, no paragraph text.',
   ].join(' ');
 }
 export function ticketPrompt(entry) {
   const place = [entry.venue, entry.city].filter(Boolean).join(', ');
   return [
-    `Vintage concert ticket artwork for ${entry.artist || 'the headliner'} at ${place || 'the venue'} on ${entry.date || 'show night'}.`,
-    'Letterpress poster look, bold retro type, halftone band illustration, aged paper, ADMIT ONE energy, no long body text.',
+    `Vintage letterpress concert ticket background for ${entry.artist || 'the headliner'} at ${place || 'the venue'}: typography and print ornament are the artwork.`,
+    'Big wood-type block lettering of the band name, radiating sunburst rays or halftone texture behind it, ornamental rules and print-shop borders, two-color ink on aged paper.',
+    'Strictly typographic and geometric — absolutely NO faces, NO portraits, NO people, NO illustration of the artist. No long body text.',
   ].join(' ');
 }
 // Back-compat alias.

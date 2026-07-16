@@ -1,4 +1,5 @@
 import { generateImage } from '../../api.js';
+import { visaPrompt, entryPrompt, ticketPrompt } from '../../account.js';
 
 // On-demand FLUX art for passport items, cached to localStorage as data URLs so
 // each collectible is generated once. The CSS card always renders without it.
@@ -27,9 +28,19 @@ function saveArt(id, dataUrl) {
   }
 }
 
-// Generate art from the item's pre-built prompt (Groq could enrich later).
+// Prompts are rebuilt from the live builders at generation time (instead of
+// the snapshot minted onto the item) so prompt improvements reach items that
+// were minted before the change. The stored prompt is only a fallback.
+function promptFor(item) {
+  if (item?.type === 'visa') return visaPrompt({ country: item.country, rule: item.rule });
+  if (item?.type === 'entry') return entryPrompt(item);
+  if (item?.type === 'ticket') return ticketPrompt(item);
+  return item?.prompt || '';
+}
+
+// Generate art from the item's prompt (Groq could enrich later).
 export async function generateArtFor(item) {
-  const prompt = item?.prompt || '';
+  const prompt = promptFor(item) || item?.prompt || '';
   if (!prompt) throw new Error('No prompt for this item.');
   const res = await generateImage('pollinations', prompt, { label: `passport-${item.type || 'art'}` }).catch(() => null);
   if (res?.ok && res.image) {

@@ -25,7 +25,9 @@ const ExportSheet = forwardRef(function ExportSheet(
 
       <div className="cohear-export__id">
         <div className="cohear-export__photo">
-          {avatar ? <img src={avatar} alt="" /> : <span>{initials || '☻'}</span>}
+          {/* html2canvas ignores object-fit and stretches <img>; background-size:
+              cover IS supported, so the photo renders as a covered background. */}
+          {avatar ? <div className="cohear-export__photo-img" style={{ backgroundImage: `url(${avatar})` }} /> : <span>{initials || '☻'}</span>}
         </div>
         <div className="cohear-export__id-fields">
           <div className="cohear-export__name">{name}</div>
