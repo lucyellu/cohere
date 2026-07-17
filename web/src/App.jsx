@@ -6,10 +6,11 @@ import { eventFromRoomCode, syncRoomUrl, currentRoomCode } from './live/roomShar
 import ConcertsView from './components/ConcertsView.jsx';
 import SettingsDrawer from './components/SettingsDrawer.jsx';
 import AccountButton from './components/AccountButton.jsx';
-import ChatbotWidget from './components/ChatbotWidget.jsx';
+import BackToTop from './components/BackToTop.jsx';
 import { readSettings, writeSettings } from './settings.js';
 import { recordConcertAction, autoStampOnView } from './account.js';
 import { applyTheme } from './theme.js';
+import { initSfx, sfxEnabled, setSfxEnabled } from './sfx.js';
 import Onboarding, { shouldOnboard } from './components/Onboarding.jsx';
 
 // Non-landing views are split into their own chunks so the Discover view (what
@@ -40,6 +41,16 @@ export default function App() {
   useEffect(() => {
     applyTheme(settings.themeAccent || '#71717a');
   }, [settings.themeAccent]);
+
+  // Interaction sounds — bound once, on by default, toggled from the header.
+  const [sfxOn, setSfxOn] = useState(() => sfxEnabled());
+  useEffect(() => { initSfx(); }, []);
+  function toggleSfx() {
+    setSfxOn((on) => {
+      setSfxEnabled(!on);
+      return !on;
+    });
+  }
 
   // Open a shared room link (?room=…) on first load so friends land in the room.
   useEffect(() => {
@@ -135,6 +146,9 @@ export default function App() {
               {/* Mobile actions (hidden on desktop) */}
               <div className="flex items-center gap-2 lg:hidden shrink-0">
                 <AccountButton />
+                <button className="cohear-icon-button" data-cuelume-toggle onClick={toggleSfx} aria-label={sfxOn ? 'Mute sound effects' : 'Unmute sound effects'} title={sfxOn ? 'Sound effects on' : 'Sound effects off'}>
+                  <SoundIcon muted={!sfxOn} />
+                </button>
                 <button className="cohear-icon-button" onClick={() => setSettingsOpen(true)} aria-label="Open settings" title="Settings">
                   <GearIcon />
                 </button>
@@ -143,7 +157,7 @@ export default function App() {
 
             <nav className="cohear-nav w-full justify-between lg:w-auto lg:justify-start overflow-x-auto" aria-label="Primary navigation">
               {NAV.map((item) => (
-                <button key={item.id} onClick={() => setView(item.id)} className={view === item.id ? 'active' : ''}>
+                <button key={item.id} data-cuelume-toggle onClick={() => setView(item.id)} className={view === item.id ? 'active' : ''}>
                   {item.label}
                 </button>
               ))}
@@ -155,6 +169,9 @@ export default function App() {
                 Browse concerts
               </button>
               <AccountButton />
+              <button className="cohear-icon-button" data-cuelume-toggle onClick={toggleSfx} aria-label={sfxOn ? 'Mute sound effects' : 'Unmute sound effects'} title={sfxOn ? 'Sound effects on' : 'Sound effects off'}>
+                <SoundIcon muted={!sfxOn} />
+              </button>
               <button className="cohear-icon-button" onClick={() => setSettingsOpen(true)} aria-label="Open settings" title="Settings">
                 <GearIcon />
               </button>
@@ -196,7 +213,7 @@ export default function App() {
         <BottomPlayer />
         <SettingsDrawer open={settingsOpen} settings={settings} onChange={updateSettings} onClose={() => setSettingsOpen(false)} />
         {onboarding && <Onboarding onClose={() => setOnboarding(false)} />}
-        <ChatbotWidget settings={settings} />
+        <BackToTop />
       </div>
     </PlayerProvider>
   );
@@ -232,6 +249,22 @@ class ErrorBoundary extends React.Component {
     }
     return this.props.children;
   }
+}
+
+function SoundIcon({ muted }) {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M11 5 6 9H2v6h4l5 4V5Z" />
+      {muted ? (
+        <path d="m16 9 6 6M22 9l-6 6" />
+      ) : (
+        <>
+          <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+          <path d="M18.5 5.5a9.5 9.5 0 0 1 0 13" />
+        </>
+      )}
+    </svg>
+  );
 }
 
 function GearIcon() {

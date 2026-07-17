@@ -293,6 +293,7 @@ export default function PassportSpread({
               <button
                 key={i}
                 className={`h-2 w-2 rounded-full border border-black/40 transition ${i === safePage ? 'bg-black/70' : 'bg-transparent hover:bg-black/20'}`}
+                data-cuelume-toggle="page"
                 onClick={() => setPage(i)}
                 aria-label={`Page ${i + 1}`}
               />
@@ -312,6 +313,7 @@ export default function PassportSpread({
             type="button"
             className={safePage === target ? 'is-active' : ''}
             style={{ '--tab': color }}
+            data-cuelume-toggle="page"
             onClick={() => setPage(target)}
           >
             {label}
@@ -455,6 +457,7 @@ function MiniStub({ stub, rot, onOpenCity }) {
   return (
     <article
       className={`cohear-ministub ${interactive ? 'cohear-stub--link' : ''}`}
+      data-cuelume-toggle={interactive ? 'sparkle' : undefined}
       style={{ '--paper': pal.paper, '--ink': pal.ink, '--accent': pal.accent, transform: `rotate(${rot}deg)` }}
       onClick={interactive ? () => onOpenCity(stub.city, stub.country) : undefined}
       role={interactive ? 'button' : undefined}
@@ -509,6 +512,7 @@ function SideArrow({ side, children, ...props }) {
       type="button"
       className={`cohear-spread__nav cohear-spread__nav--${side}`}
       aria-label={side === 'left' ? 'Previous page' : 'Next page'}
+      data-cuelume-toggle="page"
       {...props}
     >
       {children}

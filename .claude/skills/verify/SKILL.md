@@ -19,7 +19,8 @@ Blanking env vars via shell prefix does NOT reliably override `.env` — rename 
 
 ## Driving it
 
-- `npm i --no-save playwright-core`, then launch with `chromium.launch({ channel: 'msedge', headless: true })` — uses system Edge, no browser download.
+- `npm i --no-save playwright-core`, then launch with `chromium.launch({ channel: 'msedge', headless: true })` — uses system Edge, no browser download. Any later `npm install <pkg>` prunes it (it's not in package.json) — just reinstall.
+- To observe cuelume sound effects firing, wrap AudioContext in `addInitScript` and count `createOscillator` AND `createBufferSource` calls — several sounds (toggle, press) are pure filtered noise with zero oscillators. Launch with `--autoplay-policy=no-user-gesture-required`.
 - Scripts outside `web/` need `NODE_PATH="L:/Projects/musicathon/web/node_modules"`.
 - No URL routing: navigate tabs by clicking the header buttons (`getByRole('button', { name: 'Passport' })`).
 - An onboarding modal (`.fixed.inset-0.z-[60]`) may block clicks on first load — dismiss via a skip/close button before anything else.
