@@ -17,6 +17,8 @@ export default function PassportSpread({
   onName,
   onAvatar,
   onHome,
+  onHomeCity,
+  onHomeCityCommit,
   photoGender,
   onPhotoGender,
   identitySeed,
@@ -134,6 +136,17 @@ export default function PassportSpread({
                 <option value="">Select your country…</option>
                 {COUNTRY_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
+            </NumberedField>
+            <NumberedField n="3" label="Home city">
+              <input
+                className="w-full border-b border-dashed border-black/30 bg-transparent font-mono text-[13px] font-bold outline-none placeholder:text-black/30 focus:border-black/60"
+                value={profile.homeCity || ''}
+                onChange={(e) => onHomeCity?.(e.target.value)}
+                onBlur={(e) => onHomeCityCommit?.(e.target.value)}
+                placeholder="e.g. Vancouver"
+                maxLength={40}
+                title="Where your journeys start and end — distances are measured from here"
+              />
             </NumberedField>
             <div className="grid grid-cols-2 gap-2">
               <KV label="Type" value="P" mono />

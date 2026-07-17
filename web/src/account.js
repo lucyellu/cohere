@@ -754,20 +754,22 @@ function isoDate(d) {
 }
 
 // --- Travel mileage ("as if you actually went there") ------------------------
-// Resolve the passport's home base from the profile: an explicit lat/lng if the
-// typed city was geocoded against the bundled table, otherwise null.
+// Resolve the passport's home base from the profile. A typed home city wins
+// (placed via the bundled table or a stored geocode); the chosen home country's
+// origin point (its capital) is only the fallback — otherwise everyone from
+// Canada "lives" in Ottawa.
 export function resolveHome(profile = {}) {
-  // Preferred: a chosen home country (like a real passport's nationality).
+  const city = (profile.homeCity || '').trim();
+  if (city) {
+    const coords = cityCoords(city, profile.homeLat, profile.homeLng);
+    if (coords) return { city, country: profile.homeCountry || coords.country || '', ...coords };
+  }
   const country = (profile.homeCountry || '').trim();
   if (country) {
     const c = countryOrigin(country);
-    return { country, city: country, lat: c?.lat ?? null, lng: c?.lng ?? null };
+    return { country, city: city || country, lat: c?.lat ?? null, lng: c?.lng ?? null };
   }
-  // Back-compat: an older typed home city.
-  const city = (profile.homeCity || '').trim();
-  if (!city) return null;
-  const coords = cityCoords(city, profile.homeLat, profile.homeLng);
-  return coords ? { city, ...coords } : { city, lat: null, lng: null };
+  return city ? { city, lat: null, lng: null } : null;
 }
 
 function entryCoords(entry) {

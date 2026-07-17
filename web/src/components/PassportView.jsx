@@ -18,6 +18,7 @@ import {
   writeProfile,
   resyncTokens,
   resolveHome,
+  cityCoords,
   travelItinerary,
   snapshotLocal,
   mergeState,
@@ -27,6 +28,7 @@ import {
   importJson,
 } from '../account.js';
 import { supabase, supabaseEnabled } from '../live/supabase.js';
+import { hasMapsKey, geocodeCity } from '../live/maps.js';
 import { readArtMap, generateArtFor } from './passport/passportArt.js';
 import PassportSpread from './passport/PassportSpread.jsx';
 import VisaCard from './passport/VisaCard.jsx';
@@ -141,6 +143,22 @@ export default function PassportView({ onOpenCity }) {
   function setHome(value) {
     // Place of issue is now a country (like a real passport), not a typed city.
     setProfile(writeProfile({ homeCountry: value }));
+  }
+
+  function setHomeCity(value) {
+    // Typing a new city invalidates any stored geocode for the old one.
+    setProfile(writeProfile({ homeCity: value, homeLat: null, homeLng: null }));
+  }
+
+  // On blur: if the bundled city table can't place it, ask Google's geocoder
+  // and store the coords so travel distances measure from the real home.
+  async function commitHomeCity(value) {
+    const name = String(value || '').trim();
+    if (!name || cityCoords(name) || !hasMapsKey()) return;
+    try {
+      const coords = await geocodeCity(name);
+      if (coords) setProfile(writeProfile({ homeLat: coords.lat, homeLng: coords.lng }));
+    } catch { /* unplaceable — falls back to the home country's origin */ }
   }
 
   async function doExport(kind) {
@@ -371,6 +389,8 @@ export default function PassportView({ onOpenCity }) {
           onName={(name) => setProfile(writeProfile({ name }))}
           onAvatar={(avatar) => setProfile(writeProfile({ avatar }))}
           onHome={setHome}
+          onHomeCity={setHomeCity}
+          onHomeCityCommit={commitHomeCity}
           photoGender={profile.photoGender}
           onPhotoGender={(g) => setProfile(writeProfile({ photoGender: g }))}
           identitySeed={session?.user?.email || profile.name || ''}

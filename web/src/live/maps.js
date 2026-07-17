@@ -73,3 +73,14 @@ export function loadGoogleMaps() {
 export function hasMapsKey() {
   return Boolean(mapsKey());
 }
+
+// Geocode a typed place name ("Vancouver") to {lat, lng}, or null if Google
+// can't place it either. Used for home cities missing from the bundled table.
+export async function geocodeCity(name) {
+  const query = String(name || '').trim();
+  if (!query) return null;
+  const maps = await loadGoogleMaps();
+  const { results } = await new maps.Geocoder().geocode({ address: query });
+  const loc = results?.[0]?.geometry?.location;
+  return loc ? { lat: loc.lat(), lng: loc.lng() } : null;
+}
