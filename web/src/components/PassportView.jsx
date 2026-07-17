@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   HISTORY_EVENT,
   autoStampHistory,
@@ -39,7 +40,7 @@ import TicketStub from './passport/TicketStub.jsx';
 import ExportSheet from './passport/ExportSheet.jsx';
 import PassportMap from './passport/PassportMap.jsx';
 import ArtistTourMap from './passport/ArtistTourMap.jsx';
-import { exportPng, exportPdf } from './passport/passportExport.js';
+import { exportPng, exportPdf, exportBookletPdf } from './passport/passportExport.js';
 
 export default function PassportView({ onOpenCity }) {
   const [history, setHistory] = useState(() => readHistory());
@@ -170,12 +171,31 @@ export default function PassportView({ onOpenCity }) {
     try {
       const slug = (profile.name || 'guest').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'guest';
       if (kind === 'pdf') await exportPdf(exportRef.current, `cohear-passport-${slug}.pdf`);
+      else if (kind === 'booklet') await exportBookletPdf(exportRef.current, `cohear-passport-booklet-${slug}.pdf`);
       else await exportPng(exportRef.current, `cohear-passport-${slug}.png`);
     } catch {
       setExportMsg('Export failed — try removing an AI-generated photo, then retry.');
     } finally {
       setExporting('');
     }
+  }
+
+  // Print the passport pages directly, one life-size 88×125mm page per sheet.
+  // The @page size is injected just for this print so it never affects other
+  // prints of the app; the body class scopes the print-only CSS.
+  function doPrint() {
+    const style = document.createElement('style');
+    style.textContent = '@page { size: 88mm 125mm; margin: 0; }';
+    document.head.appendChild(style);
+    document.body.classList.add('cohear-print-passport');
+    const done = () => {
+      document.body.classList.remove('cohear-print-passport');
+      style.remove();
+      window.removeEventListener('afterprint', done);
+    };
+    window.addEventListener('afterprint', done);
+    window.print();
+    setTimeout(done, 2000); // fallback — afterprint is flaky in some browsers
   }
 
   function doExportJson() {
@@ -359,8 +379,14 @@ export default function PassportView({ onOpenCity }) {
           <button className="cohear-secondary" onClick={() => doExport('png')} disabled={Boolean(exporting)} title="Download your passport as a PNG image">
             {exporting === 'png' ? 'Exporting…' : '⬇ PNG'}
           </button>
-          <button className="cohear-secondary" onClick={() => doExport('pdf')} disabled={Boolean(exporting)} title="Download your passport as a PDF">
+          <button className="cohear-secondary" onClick={() => doExport('pdf')} disabled={Boolean(exporting)} title="Download a PDF with one life-size (88×125mm) passport page per sheet">
             {exporting === 'pdf' ? 'Exporting…' : '⬇ PDF'}
+          </button>
+          <button className="cohear-secondary" onClick={() => doExport('booklet')} disabled={Boolean(exporting)} title="A4 booklet PDF — print double-sided (flip on short edge), fold down the middle and staple for a life-size mini passport">
+            {exporting === 'booklet' ? 'Exporting…' : '⬇ Booklet'}
+          </button>
+          <button className="cohear-secondary" onClick={doPrint} title="Print the passport pages life-size, one per sheet">
+            🖨 Print
           </button>
         </div>
         {(exportMsg || importMsg) && (
@@ -607,21 +633,26 @@ export default function PassportView({ onOpenCity }) {
         </section>
       )}
 
-      {/* Off-screen export sheet — the source for PNG / PDF downloads. */}
-      <div aria-hidden="true" style={{ position: 'fixed', top: 0, left: -99999, width: 860, pointerEvents: 'none', zIndex: -1 }}>
-        <ExportSheet
-          ref={exportRef}
-          profile={profile}
-          stats={stats}
-          travel={travel}
-          home={home}
-          memberSince={memberSince}
-          visas={visas}
-          entries={entries}
-          stubs={stubs}
-          identitySeed={session?.user?.email || profile.name || ''}
-        />
-      </div>
+      {/* Off-screen export sheet — the source for PNG / PDF downloads and the
+          print view. Portalled to <body> (outside #root) so the print CSS can
+          hide the whole app and show only these pages. */}
+      {createPortal(
+        <div aria-hidden="true" className="cohear-export-offscreen" style={{ position: 'fixed', top: 0, left: -99999, width: 860, pointerEvents: 'none', zIndex: -1 }}>
+          <ExportSheet
+            ref={exportRef}
+            profile={profile}
+            stats={stats}
+            travel={travel}
+            home={home}
+            memberSince={memberSince}
+            visas={visas}
+            entries={entries}
+            stubs={stubs}
+            identitySeed={session?.user?.email || profile.name || ''}
+          />
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }

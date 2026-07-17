@@ -1,10 +1,17 @@
 import { forwardRef } from 'react';
-import { hashString, entryInk, ticketPalette } from './palette.js';
+import { hashString, regionInk, ticketPalette, ticketTypography, barcodeBars, stampRotation } from './palette.js';
+import { countryEmoji } from './VisaCard.jsx';
+import { formatStampDate } from './EntryStamp.jsx';
+import RubberStamp from './RubberStamp.jsx';
 
-// A print/share-friendly rendering of the whole passport: identity + distance +
-// every visa, entry stamp and ticket stub, laid out on one tall cream page.
-// Uses only html2canvas-safe CSS (solid fills, borders — no masks, blend modes
-// or 3D), so the PNG/PDF export comes out crisp. Rendered off-screen.
+// A print/share-friendly rendering of the whole passport as REAL passport pages
+// (88mm × 125mm each): cover, identity, then visas, entry stamps and ticket
+// stubs paginated across booklet pages. The PDF export takes each page
+// life-size; the PNG lays them out as open spreads. Uses only html2canvas-safe
+// CSS (solid fills, borders, box-shadows, inline SVG — no masks, blend modes
+// or 3D). Rendered off-screen.
+const PER_PAGE = { visas: 3, entries: 4, stubs: 3 };
+
 const ExportSheet = forwardRef(function ExportSheet(
   { profile, stats, travel, home, memberSince, visas, entries, stubs, identitySeed },
   ref,
@@ -16,13 +23,87 @@ const ExportSheet = forwardRef(function ExportSheet(
   const avatar = typeof profile?.avatar === 'string' && profile.avatar.startsWith('data:') ? profile.avatar : '';
   const issued = new Date().toISOString().slice(0, 10);
 
+  const pages = [
+    { kind: 'cover' },
+    { kind: 'identity' },
+    ...chunk(visas, PER_PAGE.visas).map((items) => ({ kind: 'visas', title: 'Visas', items })),
+    ...chunk(entries, PER_PAGE.entries).map((items) => ({ kind: 'entries', title: 'Entries / Entrées', items })),
+    ...chunk(stubs, PER_PAGE.stubs).map((items) => ({ kind: 'stubs', title: 'Ticket stubs', items })),
+  ];
+
   return (
     <div className="cohear-export" ref={ref}>
-      <div className="cohear-export__head">
-        <span className="cohear-export__brand">✦ Cohere</span>
-        <span className="cohear-export__brand cohear-export__brand--right">Passport</span>
-      </div>
+      {pages.map((page, i) => (
+        <Page key={i} no={i + 1} of={pages.length} title={page.title} cover={page.kind === 'cover'}>
+          {page.kind === 'cover' && <Cover />}
+          {page.kind === 'identity' && (
+            <IdentityPage
+              name={name}
+              initials={initials}
+              avatar={avatar}
+              passportNo={passportNo}
+              profile={profile}
+              memberSince={memberSince}
+              travel={travel}
+              stats={stats}
+              issued={issued}
+            />
+          )}
+          {page.kind === 'visas' && page.items.map((v) => <VisaRow key={v.id} visa={v} />)}
+          {page.kind === 'entries' && (
+            <div className="cohear-export__stamps">
+              {page.items.map((e) => (
+                <div key={e.id} className="cohear-export__stamp-cell" style={{ transform: `rotate(${stampRotation(e.id, 6)}deg)` }}>
+                  <RubberStamp
+                    id={e.id}
+                    city={e.city}
+                    date={formatStampDate(e.date || e.issuedAt)}
+                    ink={regionInk(e.country, e.city || e.id)}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+          {page.kind === 'stubs' && page.items.map((s) => <StubRow key={s.serial || s.id} stub={s} />)}
+        </Page>
+      ))}
+    </div>
+  );
+});
 
+// One passport page at real 88×125mm proportions. data-export-page is what the
+// PDF/booklet exporters query to rasterise pages one by one.
+function Page({ no, of, title, cover, children }) {
+  return (
+    <div className={`cohear-export__page${cover ? ' cohear-export__page--cover' : ''}`} data-export-page>
+      {!cover && (
+        <div className="cohear-export__ph">
+          <span>{title || 'Cohere Passport'}</span>
+          <span>{no} / {of}</span>
+        </div>
+      )}
+      {children}
+      {!cover && <div className="cohear-export__pf">Cohere · Citizen of Live Music</div>}
+    </div>
+  );
+}
+
+function Cover() {
+  return (
+    <div className="cohear-export__cover">
+      <div className="cohear-export__cover-rule" />
+      <div className="cohear-export__cover-word">Passport</div>
+      <div className="cohear-export__cover-crest">✦</div>
+      <div className="cohear-export__cover-brand">Cohere</div>
+      <div className="cohear-export__cover-sub">Citizen of Live Music</div>
+      <div className="cohear-export__cover-rule" />
+    </div>
+  );
+}
+
+function IdentityPage({ name, initials, avatar, passportNo, profile, memberSince, travel, stats, issued }) {
+  return (
+    <>
       <div className="cohear-export__id">
         <div className="cohear-export__photo">
           {/* html2canvas ignores object-fit and stretches <img>; background-size:
@@ -34,15 +115,18 @@ const ExportSheet = forwardRef(function ExportSheet(
           <div className="cohear-export__meta">
             <span><b>No.</b> {passportNo}</span>
             <span><b>Authority</b> COHERE</span>
-            {(profile?.homeCountry || profile?.homeCity) && <span><b>Country of issue</b> {profile.homeCountry || profile.homeCity}</span>}
+            {(profile?.homeCountry || profile?.homeCity) && <span><b>Nationality</b> {profile.homeCountry || profile.homeCity}</span>}
+            {profile?.homeCity && <span><b>Home</b> {profile.homeCity}</span>}
             <span><b>Member since</b> {memberSince || '—'}</span>
+            <span><b>Issued</b> {issued}</span>
           </div>
         </div>
-        <div className="cohear-export__miles">
-          <div className="cohear-export__miles-num">{fmt(Math.round(travel?.miles || 0))}</div>
-          <div className="cohear-export__miles-unit">miles travelled</div>
-          <div className="cohear-export__miles-sub">{fmt(Math.round(travel?.km || 0))} km · {travel?.stops || 0} stops</div>
-        </div>
+      </div>
+
+      <div className="cohear-export__miles">
+        <div className="cohear-export__miles-num">{fmt(Math.round(travel?.miles || 0))}</div>
+        <div className="cohear-export__miles-unit">miles travelled</div>
+        <div className="cohear-export__miles-sub">{fmt(Math.round(travel?.km || 0))} km · {travel?.stops || 0} stops</div>
       </div>
 
       <div className="cohear-export__stats">
@@ -60,81 +144,73 @@ const ExportSheet = forwardRef(function ExportSheet(
         ))}
       </div>
 
-      <Section title="Visas" count={visas.length}>
-        <div className="cohear-export__grid cohear-export__grid--visa">
-          {visas.map((v) => {
-            const accent = v.rule?.accent || '#3b82f6';
-            return (
-              <div key={v.id} className="cohear-export__visa" style={{ borderColor: accent }}>
-                <div className="cohear-export__visa-top" style={{ color: accent }}>VISA · {v.rule?.label || 'Tourist'}</div>
-                <div className="cohear-export__visa-country">{v.country}</div>
-                <div className="cohear-export__visa-row">{v.rule?.entries === 'multiple' ? 'Multiple entry' : 'Single entry'}</div>
-                <div className="cohear-export__visa-row">Valid until {fmtDate(v.expiresAt)}</div>
-                <div className="cohear-export__serial">{v.serial}{v.mintNo != null ? ` · #${v.mintNo}` : ''}</div>
-              </div>
-            );
-          })}
-        </div>
-      </Section>
-
-      <Section title="Entry stamps" count={entries.length}>
-        <div className="cohear-export__grid cohear-export__grid--stamp">
-          {entries.map((e) => {
-            const ink = entryInk(e.city || e.id);
-            return (
-              <div key={e.id} className="cohear-export__stamp" style={{ borderColor: ink, color: ink }}>
-                <div className="cohear-export__stamp-sub">✈ Admitted</div>
-                <div className="cohear-export__stamp-city">{(e.city || 'Unknown').toUpperCase()}</div>
-                <div className="cohear-export__stamp-date">{fmtStamp(e.date || e.issuedAt)}</div>
-                <div className="cohear-export__stamp-sub">Cohere Border</div>
-              </div>
-            );
-          })}
-        </div>
-      </Section>
-
-      <Section title="Ticket stubs" count={stubs.length}>
-        <div className="cohear-export__grid cohear-export__grid--stub">
-          {stubs.map((s) => {
-            const pal = ticketPalette(s.artist || s.id);
-            const seat = s.seat || {};
-            const place = [s.venue, s.city].filter(Boolean).join(' · ');
-            return (
-              <div key={s.serial} className="cohear-export__stub" style={{ background: pal.paper, color: pal.ink }}>
-                <div className="cohear-export__stub-head" style={{ background: pal.ink, color: pal.paper }}>
-                  <span>{s.artist || 'Live Concert'}</span>
-                  <span style={{ color: pal.accent }}>ADMIT ONE</span>
-                </div>
-                <div className="cohear-export__stub-body">
-                  <div className="cohear-export__stub-venue">{place || '—'}</div>
-                  <div className="cohear-export__stub-line">{s.date || 'TBA'} · {seat.section || 'GA'} {seat.row || ''}{seat.seat ? ` ${seat.seat}` : ''}</div>
-                  <div className="cohear-export__serial">{s.serial}{s.mintNo != null ? ` · #${String(s.mintNo).padStart(4, '0')}` : ''}</div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </Section>
-
-      <div className="cohear-export__foot">
-        <pre>{mrz(name, passportNo, stats)}</pre>
-        <div className="cohear-export__issued">Issued {issued} · Cohere — Citizen of Live Music</div>
-      </div>
-    </div>
+      <pre className="cohear-export__mrz">{mrz(name, passportNo, stats)}</pre>
+    </>
   );
-});
+}
 
-function Section({ title, count, children }) {
-  if (!count) return null;
+function VisaRow({ visa: v }) {
+  const accent = v.rule?.accent || '#3b82f6';
   return (
-    <div className="cohear-export__section">
-      <div className="cohear-export__section-head">
-        <span>{title}</span>
-        <span>{count}</span>
+    <div className="cohear-export__visa" style={{ borderColor: accent }}>
+      <div className="cohear-export__visa-seal" style={{ borderColor: accent, color: accent }}>
+        <span>{countryEmoji(v.country)}</span>
       </div>
-      {children}
+      <div className="cohear-export__visa-fields">
+        <div className="cohear-export__visa-top" style={{ color: accent }}>VISA · {v.rule?.label || 'Tourist'}</div>
+        <div className="cohear-export__visa-country">{v.country}</div>
+        <div className="cohear-export__visa-row">{v.rule?.entries === 'multiple' ? 'Multiple entry' : 'Single entry'} · valid until {fmtDate(v.expiresAt)}</div>
+        <div className="cohear-export__serial">{v.serial}{v.mintNo != null ? ` · #${v.mintNo}` : ''}</div>
+      </div>
     </div>
   );
+}
+
+function StubRow({ stub: s }) {
+  const pal = ticketPalette(s.artist || s.id);
+  const type = ticketTypography(s.artist || s.id);
+  const seat = s.seat || {};
+  const place = [s.venue, s.city].filter(Boolean).join(' · ');
+  return (
+    <div className="cohear-export__stub" style={{ background: pal.paper, color: pal.ink }}>
+      <div className="cohear-export__stub-head" style={{ background: pal.ink, color: pal.paper }}>
+        <span style={{ fontFamily: type.head, fontWeight: type.headWeight, letterSpacing: type.headTracking }}>{s.artist || 'Live Concert'}</span>
+        <span style={{ color: pal.accent }}>ADMIT ONE</span>
+      </div>
+      <div className="cohear-export__stub-main">
+        <div className="cohear-export__stub-body">
+          <div className="cohear-export__stub-venue">{place || '—'}</div>
+          <div className="cohear-export__stub-line">{s.date || 'TBA'} · {seat.section || 'GA'} {seat.row || ''}{seat.seat ? ` ${seat.seat}` : ''}</div>
+          <div className="cohear-export__serial">{s.serial}{s.mintNo != null ? ` · #${String(s.mintNo).padStart(4, '0')}` : ''}</div>
+        </div>
+        <div className="cohear-export__stub-foil" style={{ borderColor: pal.ink }}>
+          <Barcode seed={s.serial || s.id} ink={pal.ink} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Inline-SVG barcode (html2canvas rasterises SVG natively, so this prints crisp).
+function Barcode({ seed, ink = '#1a1510', height = 24 }) {
+  const bars = barcodeBars(seed, 22);
+  let x = 0;
+  const rects = bars.map((b, i) => {
+    const r = <rect key={i} x={x} y={0} width={b.w} height={height} />;
+    x += b.w + b.gap;
+    return r;
+  });
+  return (
+    <svg width={x} height={height} viewBox={`0 0 ${x} ${height}`} fill={ink} aria-hidden="true">
+      {rects}
+    </svg>
+  );
+}
+
+function chunk(arr = [], n) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
+  return out;
 }
 
 function fmt(n) {
@@ -143,11 +219,6 @@ function fmt(n) {
 function fmtDate(value) {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value || ''));
   return m ? `${m[3]}/${m[2]}/${m[1]}` : '—';
-}
-const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-function fmtStamp(value) {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value || ''));
-  return m ? `${m[3]} ${MONTHS[Number(m[2]) - 1] || '—'} ${m[1]}` : '— — —';
 }
 function mrz(name, passportNo, stats) {
   const surname = name.split(/\s+/).slice(-1)[0] || 'TRAVELLER';
