@@ -1,3 +1,5 @@
+import { stampCollection, inkWord, regionInk } from './components/passport/palette.js';
+
 export const HISTORY_EVENT = 'cohear:history-changed';
 
 const HISTORY_KEY = 'cohear_concert_history_v1';
@@ -721,16 +723,43 @@ export function estTicketUsd(c = {}) {
 export function visaPrompt({ country, rule }) {
   return [
     `Engraved intaglio visa stamp print for ${country || 'an international destination'}, edge-to-edge full-bleed design.`,
-    `Flat two-or-three-color letterpress ink on aged cream paper: ornate guilloché security border framing a small national landmark or emblem vignette, "${rule?.label || 'Tourist Visa'}" energy.`,
-    'Looks pressed into the paper, muted inks, fine engraved linework. Strictly no faces, no portraits, no people, no photorealism, no readable paragraph text.',
+    `Monochromatic palette — two or three tints of a single muted ink on aged cream paper: ornate guilloché security border framing a small national landmark or emblem vignette, "${rule?.label || 'Tourist Visa'}" energy.`,
+    'Looks pressed into the paper, fine engraved linework, soft print grain. Strictly no faces, no portraits, no people, no photorealism, no readable paragraph text.',
   ].join(' ');
 }
 export function entryPrompt(entry) {
   const place = [entry.city, entry.country].filter(Boolean).join(', ');
   return [
-    `Vintage postage stamp illustration of ${place || 'a concert city'}: one iconic local landmark, skyline silhouette or nature motif, full-bleed edge-to-edge.`,
-    'Flat gouache in three muted colors, hand-drawn philatelic linework, subtle paper grain, the design fills the whole frame like a real printed stamp.',
+    `Vintage engraved postage stamp artwork of ${place || 'a concert city'}: one iconic local landmark, skyline silhouette or nature motif, full-bleed edge-to-edge.`,
+    'Monochromatic duotone — three tints of one muted ink, airbrushed grain and stippled shading, hand-drawn philatelic linework, the design fills the whole frame like a real printed stamp.',
     'No faces, no portraits, no people, no paragraph text.',
+  ].join(' ');
+}
+
+// Souvenir postage face — prompt-locked to the same print collection the
+// procedural face uses (marijanapav-style stamp album: monoline / textured /
+// typographic), so generated art drops into a matching frame.
+const SOUVENIR_STYLES = {
+  monoline: (place, ink) => [
+    `Mid-century minimalist postage stamp art of ${place}: a single landmark, sun or nature scene drawn as a single-weight monoline line illustration.`,
+    `One ${ink} ink on warm cream paper, thick even outlines, geometric simplification, generous negative space, flat print with no shading or gradients.`,
+  ],
+  textured: (place, ink) => [
+    `Vintage engraved postage stamp artwork of ${place}: bold landmark or nature motif with ornamental banner and botanical corner flourishes.`,
+    `Monochromatic ${ink} palette in three tints, airbrushed grain and stippled shading, looks screen-printed with soft noise texture, classical philatelic composition.`,
+  ],
+  typographic: (place, ink) => [
+    `Typographic vintage postage stamp for ${place}: giant overlapping letterforms and numerals ARE the artwork.`,
+    `Two spot colors (${ink} and one accent) on aged paper, bold grotesque and serif wood type mix, slight off-registration print charm, strictly typography and geometric ornament — no pictorial scene.`,
+  ],
+};
+export function souvenirPrompt(item) {
+  const style = SOUVENIR_STYLES[stampCollection(item.id)] || SOUVENIR_STYLES.textured;
+  const place = item.city || item.country || 'a concert city';
+  const ink = inkWord(regionInk(item.country, place));
+  return [
+    ...style(place, ink),
+    'Full-bleed edge-to-edge, no white border, no perforations. No faces, no portraits, no people, no readable paragraph text.',
   ].join(' ');
 }
 export function ticketPrompt(entry) {

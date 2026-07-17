@@ -33,6 +33,7 @@ import { supabase, supabaseEnabled } from '../live/supabase.js';
 import { hasMapsKey, geocodeCity } from '../live/maps.js';
 import { readArtMap, generateArtFor } from './passport/passportArt.js';
 import PassportSpread from './passport/PassportSpread.jsx';
+import PassportCover from './passport/PassportCover.jsx';
 import VisaCard from './passport/VisaCard.jsx';
 import EntryStamp from './passport/EntryStamp.jsx';
 import SouvenirStamp from './passport/SouvenirStamp.jsx';
@@ -64,6 +65,7 @@ export default function PassportView({ onOpenCity }) {
   const [syncMessage, setSyncMessage] = useState('');
   const [exporting, setExporting] = useState('');
   const [exportMsg, setExportMsg] = useState('');
+  const [coverOpen, setCoverOpen] = useState(false);
   const exportRef = useRef(null);
 
   useEffect(() => {
@@ -411,7 +413,13 @@ export default function PassportView({ onOpenCity }) {
 
       {/* Passport + stats sidebar layout */}
       <div className="cohear-passport-layout" id="pp-passport">
-        {/* Passport — open book spread: identity (left) + stamp pages (right) */}
+        {/* Closed passport first — the leather cover opens into the spread */}
+        {!coverOpen ? (
+        <button type="button" className="cohear-cover-btn" onClick={() => setCoverOpen(true)} aria-label="Open your passport">
+          <PassportCover />
+          <span className="cohear-cover-btn__hint">Tap to open</span>
+        </button>
+        ) : (
         <PassportSpread
           profile={profile}
           onName={(name) => setProfile(writeProfile({ name }))}
@@ -428,6 +436,7 @@ export default function PassportView({ onOpenCity }) {
           stubs={stubs}
           onOpenCity={onOpenCity}
         />
+        )}
 
         {/* Stats sidebar — moved out of the passport for realism */}
         <div className="cohear-stats-sidebar">
@@ -502,7 +511,7 @@ export default function PassportView({ onOpenCity }) {
         {!visas.length ? (
           <Empty>No visas yet — open a live room to clear customs.</Empty>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid items-end gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {visas.map((visa) => (
               <VisaCard
                 key={visa.id}
@@ -538,7 +547,20 @@ export default function PassportView({ onOpenCity }) {
           <Empty>No souvenirs yet — every show you attend hands one out.</Empty>
         ) : (
           <div className="grid grid-cols-2 gap-5 px-1 py-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-            {entries.map((entry) => <SouvenirStamp key={entry.id} entry={entry} />)}
+            {entries.map((entry) => {
+              const sid = `${entry.id}:souvenir`;
+              return (
+                <SouvenirStamp
+                  key={entry.id}
+                  entry={entry}
+                  art={art[sid]}
+                  showArt={Boolean(artView[sid])}
+                  onToggleArt={() => toggleArtView(sid)}
+                  onGenerate={() => generate({ ...entry, id: sid, type: 'souvenir' })}
+                  generating={genId === sid}
+                />
+              );
+            })}
           </div>
         )}
       </PageSection>
@@ -649,6 +671,7 @@ export default function PassportView({ onOpenCity }) {
             entries={entries}
             stubs={stubs}
             identitySeed={session?.user?.email || profile.name || ''}
+            art={art}
           />
         </div>,
         document.body,

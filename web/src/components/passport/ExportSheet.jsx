@@ -1,8 +1,10 @@
 import { forwardRef } from 'react';
 import { hashString, regionInk, ticketPalette, ticketTypography, barcodeBars, stampRotation } from './palette.js';
-import { countryEmoji } from './VisaCard.jsx';
 import { formatStampDate } from './EntryStamp.jsx';
 import RubberStamp from './RubberStamp.jsx';
+import SouvenirStamp from './SouvenirStamp.jsx';
+import VisaStamp from './VisaStamp.jsx';
+import PassportCover from './PassportCover.jsx';
 
 // A print/share-friendly rendering of the whole passport as REAL passport pages
 // (88mm × 125mm each): cover, identity, then visas, entry stamps and ticket
@@ -10,10 +12,10 @@ import RubberStamp from './RubberStamp.jsx';
 // life-size; the PNG lays them out as open spreads. Uses only html2canvas-safe
 // CSS (solid fills, borders, box-shadows, inline SVG — no masks, blend modes
 // or 3D). Rendered off-screen.
-const PER_PAGE = { visas: 3, entries: 4, stubs: 3 };
+const PER_PAGE = { visas: 2, entries: 4, souvenirs: 4, stubs: 3 };
 
 const ExportSheet = forwardRef(function ExportSheet(
-  { profile, stats, travel, home, memberSince, visas, entries, stubs, identitySeed },
+  { profile, stats, travel, home, memberSince, visas, entries, stubs, identitySeed, art = {} },
   ref,
 ) {
   const name = (profile?.name || '').trim() || 'Guest Traveller';
@@ -22,12 +24,15 @@ const ExportSheet = forwardRef(function ExportSheet(
   const initials = name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
   const avatar = typeof profile?.avatar === 'string' && profile.avatar.startsWith('data:') ? profile.avatar : '';
   const issued = new Date().toISOString().slice(0, 10);
+  const visaVisits = {};
+  for (const e of entries) if (e.country) visaVisits[e.country] = (visaVisits[e.country] || 0) + 1;
 
   const pages = [
     { kind: 'cover' },
     { kind: 'identity' },
     ...chunk(visas, PER_PAGE.visas).map((items) => ({ kind: 'visas', title: 'Visas', items })),
     ...chunk(entries, PER_PAGE.entries).map((items) => ({ kind: 'entries', title: 'Entries / Entrées', items })),
+    ...chunk(entries, PER_PAGE.souvenirs).map((items) => ({ kind: 'souvenirs', title: 'Souvenirs', items })),
     ...chunk(stubs, PER_PAGE.stubs).map((items) => ({ kind: 'stubs', title: 'Ticket stubs', items })),
   ];
 
@@ -49,7 +54,15 @@ const ExportSheet = forwardRef(function ExportSheet(
               issued={issued}
             />
           )}
-          {page.kind === 'visas' && page.items.map((v) => <VisaRow key={v.id} visa={v} />)}
+          {page.kind === 'visas' && (
+            <div className="cohear-export__visas">
+              {page.items.map((v) => (
+                <div key={v.id} className="cohear-export__visa-cell" style={{ transform: `rotate(${stampRotation(v.id, 2)}deg)` }}>
+                  <VisaStamp visa={v} entryCount={visaVisits[v.country] || 1} art={art[v.id]} />
+                </div>
+              ))}
+            </div>
+          )}
           {page.kind === 'entries' && (
             <div className="cohear-export__stamps">
               {page.items.map((e) => (
@@ -60,6 +73,16 @@ const ExportSheet = forwardRef(function ExportSheet(
                     date={formatStampDate(e.date || e.issuedAt)}
                     ink={regionInk(e.country, e.city || e.id)}
                   />
+                </div>
+              ))}
+            </div>
+          )}
+          {page.kind === 'souvenirs' && (
+            <div className="cohear-export__souvenirs">
+              {page.items.map((e) => (
+                <div key={e.id} className="cohear-export__souvenir-cell" style={{ transform: `rotate(${stampRotation(`${e.id}:souvenir`, 5)}deg)` }}>
+                  {/* no onGenerate → renders without hover controls; art shows when it exists */}
+                  <SouvenirStamp entry={e} art={art[`${e.id}:souvenir`]} showArt={Boolean(art[`${e.id}:souvenir`])} />
                 </div>
               ))}
             </div>
@@ -89,16 +112,7 @@ function Page({ no, of, title, cover, children }) {
 }
 
 function Cover() {
-  return (
-    <div className="cohear-export__cover">
-      <div className="cohear-export__cover-rule" />
-      <div className="cohear-export__cover-word">Passport</div>
-      <div className="cohear-export__cover-crest">✦</div>
-      <div className="cohear-export__cover-brand">Cohere</div>
-      <div className="cohear-export__cover-sub">Citizen of Live Music</div>
-      <div className="cohear-export__cover-rule" />
-    </div>
-  );
+  return <PassportCover className="cohear-cover--page" />;
 }
 
 function IdentityPage({ name, initials, avatar, passportNo, profile, memberSince, travel, stats, issued }) {
@@ -146,23 +160,6 @@ function IdentityPage({ name, initials, avatar, passportNo, profile, memberSince
 
       <pre className="cohear-export__mrz">{mrz(name, passportNo, stats)}</pre>
     </>
-  );
-}
-
-function VisaRow({ visa: v }) {
-  const accent = v.rule?.accent || '#3b82f6';
-  return (
-    <div className="cohear-export__visa" style={{ borderColor: accent }}>
-      <div className="cohear-export__visa-seal" style={{ borderColor: accent, color: accent }}>
-        <span>{countryEmoji(v.country)}</span>
-      </div>
-      <div className="cohear-export__visa-fields">
-        <div className="cohear-export__visa-top" style={{ color: accent }}>VISA · {v.rule?.label || 'Tourist'}</div>
-        <div className="cohear-export__visa-country">{v.country}</div>
-        <div className="cohear-export__visa-row">{v.rule?.entries === 'multiple' ? 'Multiple entry' : 'Single entry'} · valid until {fmtDate(v.expiresAt)}</div>
-        <div className="cohear-export__serial">{v.serial}{v.mintNo != null ? ` · #${v.mintNo}` : ''}</div>
-      </div>
-    </div>
   );
 }
 

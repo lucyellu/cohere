@@ -32,10 +32,13 @@ export function fileToAvatar(file) {
   });
 }
 
-// Generate a vintage passport-style portrait with free FLUX (Pollinations).
-// `seed` (e.g. the traveller name) varies the result so re-rolling looks
-// different. `gender` ('female' | 'male' | 'neutral') steers the subject so it
-// isn't always read as one gender; 'neutral' leaves it androgynous.
+// Generate a stylized cartoon passport portrait with free FLUX (Pollinations).
+// Two looks, rolled per generation: a flat 2D animation character (the
+// character-designer passport reference in assets/inspiration/passport (2).jpg)
+// or an abstract monoline drawing (Pixar Soul "Jerry" energy). `seed` (e.g.
+// the traveller name) varies the result so re-rolling looks different.
+// `gender` ('female' | 'male' | 'neutral') steers the subject; 'neutral'
+// leaves it androgynous.
 export async function generateAvatar(seed = '', gender = 'neutral') {
   const subject = gender === 'male'
     ? 'a stylish man, a male music fan'
@@ -44,10 +47,13 @@ export async function generateAvatar(seed = '', gender = 'neutral') {
       : 'a stylish androgynous person, a music fan of ambiguous gender';
   const flavor = seed ? `, inspired by the name ${seed}` : '';
   const variant = Math.floor(Math.random() * 100000);
+  const style = variant % 10 < 7
+    ? 'flat 2D cartoon character in a modern animation style: bold geometric shapes, clean thick outlines, expressive oversized stylized features, warm flat colors, subtle paper-grain shading, like a character designer drew their own passport photo'
+    : 'abstract minimalist line-art character: a few flowing continuous monoline curves suggesting a face, playful and airy, one or two soft accent colors, lots of negative space';
   const prompt = [
-    `Vintage passport photo portrait, head and shoulders of ${subject},`,
-    'neutral studio backdrop, warm sepia tone, soft analog film grain, centered, 1970s ID photo aesthetic,',
-    `no text, no border${flavor}. v${variant}`,
+    `Cartoon passport photo portrait, head and shoulders of ${subject}, drawn as a ${style}.`,
+    'Simple solid muted backdrop, centered, friendly character energy.',
+    `Strictly illustration — no photorealism, no photo, no 3D render, no text, no border${flavor}. v${variant}`,
   ].join(' ');
   const res = await generateImage('pollinations', prompt, { label: 'passport-avatar' }).catch(() => null);
   if (res?.ok && res.image) return res.image;

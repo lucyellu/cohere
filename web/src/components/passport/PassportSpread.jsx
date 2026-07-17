@@ -1,7 +1,8 @@
 import { useMemo, useRef, useState } from 'react';
 import { hashString, ticketPalette, regionInk } from './palette.js';
-import { countryEmoji } from './VisaCard.jsx';
+import VisaStamp from './VisaStamp.jsx';
 import RubberStamp from './RubberStamp.jsx';
+import Magnifier from './Magnifier.jsx';
 import { formatStampDate } from './EntryStamp.jsx';
 import { fileToAvatar, generateAvatar } from './avatar.js';
 import { COUNTRY_OPTIONS, visaRuleFor } from '../../account.js';
@@ -47,6 +48,7 @@ export default function PassportSpread({
 
   const pageCount = Math.max(1, Math.ceil(items.length / PER_PAGE));
   const [page, setPage] = useState(0);
+  const [loupe, setLoupe] = useState(false);
   const safePage = Math.min(page, pageCount - 1);
   const pageItems = items.slice(safePage * PER_PAGE, safePage * PER_PAGE + PER_PAGE);
 
@@ -183,8 +185,20 @@ export default function PassportSpread({
       <div className="cohear-spread__page cohear-passport-page right">
         <div className="flex items-center justify-between border-b border-black/15 pb-1.5">
           <span className="text-[11px] font-black uppercase tracking-[0.24em]">Stamps &amp; visas</span>
-          <span className="text-[9px] font-bold uppercase tracking-[0.14em] opacity-60">
-            {items.length ? `Page ${safePage + 1}/${pageCount}` : 'Empty'}
+          <span className="flex items-center gap-2">
+            {items.length > 0 && (
+              <button
+                type="button"
+                className={`cohear-spread__loupe-btn${loupe ? ' is-on' : ''}`}
+                onClick={() => setLoupe((v) => !v)}
+                title={loupe ? 'Put the loupe away' : 'Inspect the page with the loupe'}
+              >
+                🔍
+              </button>
+            )}
+            <span className="text-[9px] font-bold uppercase tracking-[0.14em] opacity-60">
+              {items.length ? `Page ${safePage + 1}/${pageCount}` : 'Empty'}
+            </span>
           </span>
         </div>
 
@@ -201,9 +215,16 @@ export default function PassportSpread({
             Your visas, entry stamps and ticket stubs land on these pages automatically as you attend shows.
           </div>
         ) : (
-          <div className="cohear-spread__stamps">
-            {pageItems.map((it, i) => <StampTile key={it.key} item={it} i={i} onOpenCity={onOpenCity} />)}
-          </div>
+          /* the loupe magnifies the whole page area — everything on it is small */
+          <Magnifier active={loupe} zoom={2.4} size={150} content={
+            <div className="cohear-spread__stamps">
+              {pageItems.map((it, i) => <StampTile key={it.key} item={it} i={i} />)}
+            </div>
+          }>
+            <div className="cohear-spread__stamps">
+              {pageItems.map((it, i) => <StampTile key={it.key} item={it} i={i} onOpenCity={onOpenCity} />)}
+            </div>
+          </Magnifier>
         )}
 
         {pageCount > 1 && (
@@ -226,30 +247,17 @@ export default function PassportSpread({
 // --- Stamp tiles --------------------------------------------------------------
 function StampTile({ item, i, onOpenCity }) {
   const rot = ((i * 53) % 9) - 4; // gentle scatter, like a real page
-  if (item.kind === 'visa') return <VisaStamp visa={item.data} rot={rot} />;
+  if (item.kind === 'visa') return <VisaTile visa={item.data} rot={rot} />;
   if (item.kind === 'entry') return <EntryRubberStamp entry={item.data} rot={rot} onOpenCity={onOpenCity} />;
   return <MiniStub stub={item.data} rot={rot} onOpenCity={onOpenCity} />;
 }
 
-// A postage-stamp-style country visa: perforated edge, denomination, seal.
-function VisaStamp({ visa, rot }) {
+// The real landscape visa stamp, seated small on the spread page.
+function VisaTile({ visa, rot }) {
   const rule = visa.rule || visaRuleFor(visa.country);
-  const accent = rule?.accent || '#3b82f6';
   return (
-    <div
-      className="cohear-mvisa cohear-perf"
-      style={{ '--accent': accent, transform: `rotate(${rot}deg)` }}
-      title={`${visa.country} — ${rule?.label || 'Visa'}`}
-    >
-      <div className="cohear-mvisa__inner">
-        <div className="flex w-full items-center justify-between text-[6px] font-black uppercase tracking-[0.16em]">
-          <span>Cohere</span>
-          <span>Visa</span>
-        </div>
-        <div className="cohear-mvisa__seal">{countryEmoji(visa.country)}</div>
-        <div className="text-[11px] font-black uppercase leading-none">{visa.country}</div>
-        <div className="text-[6px] font-semibold uppercase tracking-[0.12em] opacity-75">{rule?.label || 'Tourist Visa'}</div>
-      </div>
+    <div className="cohear-mvisa" style={{ transform: `rotate(${rot}deg)` }} title={`${visa.country} — ${rule?.label || 'Visa'}`}>
+      <VisaStamp visa={{ ...visa, rule }} />
     </div>
   );
 }
