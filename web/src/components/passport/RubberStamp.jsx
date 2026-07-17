@@ -2,10 +2,12 @@ import { useId } from 'react';
 import { hashString } from './palette.js';
 
 // A hand-inked immigration stamp drawn in SVG — curved lettering around a
-// circular / oval die, a centre date block with the little ✈, and a
-// turbulence-displaced outline so every impression looks pressed by a real
-// rubber stamp (see stamps (1).jpg). Shape and wear are deterministic per id,
-// so the same city always leaves the same mark.
+// circular / oval die and a centre date block with the little ✈. The wear is
+// the codepen rubber-stamp technique (assets/codepens/rubber-stamp-effect):
+// the linework stays perfectly CRISP and a hard-thresholded turbulence mask
+// punches sparse speckle holes out of the ink, like a die that didn't press
+// evenly. Shape and wear are deterministic per id, so the same city always
+// leaves the same mark.
 const SHAPES = ['circle', 'oval', 'box'];
 
 export default function RubberStamp({
@@ -46,10 +48,12 @@ export default function RubberStamp({
     >
       {title && <title>{title}</title>}
       <defs>
-        {/* Rough ink edge: fractal noise nudges every stroke like rubber on paper */}
-        <filter id={`rough-${uid}`} x="-10%" y="-10%" width="120%" height="120%">
-          <feTurbulence type="fractalNoise" baseFrequency="0.55" numOctaves="2" seed={seed} result="noise" />
-          <feDisplacementMap in="SourceGraphic" in2="noise" scale="2.4" />
+        {/* Uneven press: crisp ink with sparse speckle holes bitten out — a
+            steep alpha threshold keeps the erosion hard-edged, never blurry */}
+        <filter id={`rough-${uid}`} x="-5%" y="-5%" width="110%" height="110%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.5" numOctaves="3" seed={seed} result="noise" />
+          <feColorMatrix in="noise" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -7 5.9" result="holes" />
+          <feComposite in="SourceGraphic" in2="holes" operator="in" />
         </filter>
         {/* Text arcs — top carries the city, bottom the issuing office. Ovals
             get flattened arcs so the lettering hugs the elliptical die. */}

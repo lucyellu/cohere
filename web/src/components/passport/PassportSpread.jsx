@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { hashString, ticketPalette, regionInk } from './palette.js';
 import VisaStamp from './VisaStamp.jsx';
 import RubberStamp from './RubberStamp.jsx';
+import Magnifier from './Magnifier.jsx';
 import { formatStampDate } from './EntryStamp.jsx';
 import { fileToAvatar, generateAvatar } from './avatar.js';
 import { COUNTRY_OPTIONS, visaRuleFor } from '../../account.js';
@@ -47,6 +48,7 @@ export default function PassportSpread({
 
   const pageCount = Math.max(1, Math.ceil(items.length / PER_PAGE));
   const [page, setPage] = useState(0);
+  const [loupe, setLoupe] = useState(false);
   const safePage = Math.min(page, pageCount - 1);
   const pageItems = items.slice(safePage * PER_PAGE, safePage * PER_PAGE + PER_PAGE);
 
@@ -183,8 +185,20 @@ export default function PassportSpread({
       <div className="cohear-spread__page cohear-passport-page right">
         <div className="flex items-center justify-between border-b border-black/15 pb-1.5">
           <span className="text-[11px] font-black uppercase tracking-[0.24em]">Stamps &amp; visas</span>
-          <span className="text-[9px] font-bold uppercase tracking-[0.14em] opacity-60">
-            {items.length ? `Page ${safePage + 1}/${pageCount}` : 'Empty'}
+          <span className="flex items-center gap-2">
+            {items.length > 0 && (
+              <button
+                type="button"
+                className={`cohear-spread__loupe-btn${loupe ? ' is-on' : ''}`}
+                onClick={() => setLoupe((v) => !v)}
+                title={loupe ? 'Put the loupe away' : 'Inspect the page with the loupe'}
+              >
+                🔍
+              </button>
+            )}
+            <span className="text-[9px] font-bold uppercase tracking-[0.14em] opacity-60">
+              {items.length ? `Page ${safePage + 1}/${pageCount}` : 'Empty'}
+            </span>
           </span>
         </div>
 
@@ -201,9 +215,16 @@ export default function PassportSpread({
             Your visas, entry stamps and ticket stubs land on these pages automatically as you attend shows.
           </div>
         ) : (
-          <div className="cohear-spread__stamps">
-            {pageItems.map((it, i) => <StampTile key={it.key} item={it} i={i} onOpenCity={onOpenCity} />)}
-          </div>
+          /* the loupe magnifies the whole page area — everything on it is small */
+          <Magnifier active={loupe} zoom={2.4} size={150} content={
+            <div className="cohear-spread__stamps">
+              {pageItems.map((it, i) => <StampTile key={it.key} item={it} i={i} />)}
+            </div>
+          }>
+            <div className="cohear-spread__stamps">
+              {pageItems.map((it, i) => <StampTile key={it.key} item={it} i={i} onOpenCity={onOpenCity} />)}
+            </div>
+          </Magnifier>
         )}
 
         {pageCount > 1 && (

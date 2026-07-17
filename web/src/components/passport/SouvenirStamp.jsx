@@ -2,6 +2,7 @@ import { useId, useState } from 'react';
 import { hashString, regionInk, stampRotation, stampCollection } from './palette.js';
 import PostageStamp, { MotifPaths } from './PostageStamp.jsx';
 import Magnifier from './Magnifier.jsx';
+import StampHero from './StampHero.jsx';
 
 // Souvenir stamps — every show hands out a keepsake, and the physical kind
 // follows the scope:
@@ -48,7 +49,7 @@ export function souvenirFor(entry) {
 
 export default function SouvenirStamp({ entry, art, showArt, onToggleArt, onGenerate, generating }) {
   const s = souvenirFor(entry);
-  if (s.kind === 'ink') return <PictorialInkStamp entry={entry} s={s} />;
+  if (s.kind === 'ink') return <InkSouvenir entry={entry} s={s} />;
   return (
     <PostageSouvenir
       entry={entry}
@@ -72,6 +73,7 @@ function fmtShort(value) {
 
 function PostageSouvenir({ entry, s, art, showArt, onToggleArt, onGenerate, generating }) {
   const [loupe, setLoupe] = useState(false);
+  const [hero, setHero] = useState(false);
   const rot = stampRotation(s.seed, 5);
   const stamp = (
     <PostageStamp
@@ -88,9 +90,21 @@ function PostageSouvenir({ entry, s, art, showArt, onToggleArt, onGenerate, gene
   );
   return (
     <div className="cohear-postage" style={{ '--rot': `${rot}deg` }}>
-      <Magnifier active={loupe} content={stamp}>
+      <div
+        className="cohear-stamp-open"
+        role="button"
+        tabIndex={0}
+        aria-label={`Inspect the ${s.place} souvenir stamp`}
+        onClick={() => setHero(true)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setHero(true); } }}
+      >
+        <Magnifier active={loupe} content={stamp}>
+          {stamp}
+        </Magnifier>
+      </div>
+      <StampHero open={hero} onClose={() => setHero(false)} label={`${s.place} souvenir stamp`}>
         {stamp}
-      </Magnifier>
+      </StampHero>
       {onGenerate && (
         <div className="cohear-postage__tools">
           <button
@@ -112,6 +126,29 @@ function PostageSouvenir({ entry, s, art, showArt, onToggleArt, onGenerate, gene
         </div>
       )}
     </div>
+  );
+}
+
+// Ink souvenirs open the same hero lightbox as the postage kind.
+function InkSouvenir({ entry, s }) {
+  const [hero, setHero] = useState(false);
+  const stamp = <PictorialInkStamp entry={entry} s={s} />;
+  return (
+    <>
+      <div
+        className="cohear-stamp-open"
+        role="button"
+        tabIndex={0}
+        aria-label={`Inspect the ${s.place} souvenir stamp`}
+        onClick={() => setHero(true)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setHero(true); } }}
+      >
+        {stamp}
+      </div>
+      <StampHero open={hero} onClose={() => setHero(false)} wide label={`${s.place} souvenir stamp`}>
+        {stamp}
+      </StampHero>
+    </>
   );
 }
 
@@ -139,15 +176,17 @@ function PictorialInkStamp({ entry, s }) {
   return (
     <svg
       viewBox="0 0 140 104"
-      className="cohear-rubber cohear-rubber--grunge"
+      className="cohear-rubber"
       style={{ '--ink': ink, '--rot': `${rot}deg`, opacity: wear, maxWidth: 168 }}
       aria-label={`${s.place} ${s.tier} souvenir stamp`}
     >
       <title>{`${s.place} — ${s.tier} souvenir (ink)`}</title>
       <defs>
-        <filter id={`rough-${uid}`} x="-10%" y="-10%" width="120%" height="120%">
-          <feTurbulence type="fractalNoise" baseFrequency="0.55" numOctaves="2" seed={seed} result="noise" />
-          <feDisplacementMap in="SourceGraphic" in2="noise" scale="2.6" />
+        {/* codepen rubber-stamp wear: crisp ink, hard-edged speckle erosion */}
+        <filter id={`rough-${uid}`} x="-5%" y="-5%" width="110%" height="110%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.5" numOctaves="3" seed={seed} result="noise" />
+          <feColorMatrix in="noise" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -7 5.75" result="holes" />
+          <feComposite in="SourceGraphic" in2="holes" operator="in" />
         </filter>
       </defs>
       <g filter={`url(#rough-${uid})`} stroke="var(--ink)" fill="var(--ink)">

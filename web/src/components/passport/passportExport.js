@@ -69,9 +69,23 @@ function triggerDownload(url, filename) {
   a.remove();
 }
 
+// PNG lays the pages out as close to a square as possible (cols = ceil √n) so
+// the sheet browses like a contact sheet instead of a long skinny strip. The
+// grid override is temporary — applied for the render, then restored.
 export async function exportPng(node, filename = 'cohear-passport.png') {
-  const canvas = await renderNode(node);
-  triggerDownload(canvas.toDataURL('image/png'), filename);
+  const pages = node.querySelectorAll('[data-export-page]').length;
+  const cols = Math.max(2, Math.ceil(Math.sqrt(pages || 4)));
+  const prev = { grid: node.style.gridTemplateColumns, width: node.style.width };
+  node.style.gridTemplateColumns = `repeat(${cols}, max-content)`;
+  node.style.width = 'max-content';
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  try {
+    const canvas = await renderNode(node);
+    triggerDownload(canvas.toDataURL('image/png'), filename);
+  } finally {
+    node.style.gridTemplateColumns = prev.grid;
+    node.style.width = prev.width;
+  }
 }
 
 // One life-size (88×125mm) PDF page per passport page — print at 100% scale
