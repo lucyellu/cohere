@@ -1124,51 +1124,102 @@ button:disabled { cursor: not-allowed; }
   .cohear-spread__stamps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
-/* ---------- Section jump tabs (sticky, above the passport) ---------- */
-.cohear-passport-tabs {
-  position: sticky;
-  top: 8px;
-  z-index: 30;
+/* ---------- Sticky index tabs on the passport's fore-edge ----------
+   Like the plastic stick-on tabs people put in a real passport: colored tabs
+   poke out of the right edge of the book, each jumping to its section below.
+   The wrapper keeps them outside the spread's overflow:hidden. */
+.cohear-book-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+.cohear-book-wrap > .cohear-spread,
+.cohear-book-wrap > .cohear-cover-btn {
+  position: relative;
+  z-index: 1; /* the book covers the tabs' glued-in ends */
+}
+.cohear-side-tabs {
+  position: absolute;
+  top: 7%;
+  bottom: 7%;
+  left: 100%;
+  margin-left: -3px; /* tab ends tuck under the book edge, like they're stuck between pages */
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 7px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(14, 12, 10, 0.78);
-  backdrop-filter: blur(12px);
+  flex-direction: column;
+  justify-content: space-between;
+  z-index: 0;
 }
-.cohear-passport-tabs button {
-  padding: 5px 11px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
+/* Jump variant rides the stats panel's outer edge — no tuck, the panel is
+   translucent so a buried tab end would show through. */
+.cohear-side-tabs--jump { margin-left: 0; }
+.cohear-side-tabs button {
+  --tab: #b98a2f;
+  writing-mode: vertical-rl;
+  padding: 12px 6px 12px 7px;
+  border-radius: 0 7px 7px 0;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-left: none;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--tab) 82%, #000) 0%, var(--tab) 45%);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.6);
-  transition: background 0.15s ease, color 0.15s ease;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+  box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  transition: transform 0.15s ease, filter 0.15s ease;
 }
-.cohear-passport-tabs button:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+.cohear-side-tabs button:hover,
+.cohear-side-tabs button.is-active {
+  transform: translateX(3px);
+  filter: brightness(1.12);
 }
-/* Jumped-to sections land clear of the sticky tab bar */
-[id^="pp-"] { scroll-margin-top: 64px; }
+.cohear-side-tabs button.is-active {
+  box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+/* Jumped-to sections land clear of the viewport top */
+[id^="pp-"] { scroll-margin-top: 20px; }
 
 /* ---------- Stats sidebar (lives outside the passport) ---------- */
 .cohear-passport-layout {
   display: flex;
-  gap: 28px;
-  align-items: flex-start;
+  gap: 48px;
+  align-items: stretch; /* sidebar matches the open passport's height */
   justify-content: center;
 }
 .cohear-stats-sidebar {
+  position: relative; /* anchors the jump tabs on its outer edge */
   flex: 1;
-  min-width: 220px;
-  max-width: 320px;
+  min-width: 240px;
+  max-width: 340px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
+}
+/* Distance + $ saved side by side on one line */
+.cohear-stat-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.cohear-stat-row .cohear-stat-card { padding: 14px; }
+.cohear-stat-row .cohear-distance-hero { gap: 8px; }
+.cohear-stat-row .cohear-distance-hero__globe { font-size: 1.4rem; }
+.cohear-stat-row .cohear-distance-hero__value { font-size: 19px; }
+.cohear-stat-row .cohear-distance-hero__sub { font-size: 10px; }
+/* The stats card grows so the loupe button lands at the book's bottom edge */
+.cohear-stat-card--grow {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.cohear-stat-card--grow .cohear-stat-grid {
+  flex: 1;
+  align-content: stretch;
+}
+.cohear-stat-card--grow .cohear-stat-chip {
+  display: grid;
+  place-content: center;
 }
 .cohear-stat-card {
   border-radius: 14px;
@@ -1239,6 +1290,58 @@ button:disabled { cursor: not-allowed; }
   font-weight: 600;
   color: rgba(255, 255, 255, 0.45);
   margin-top: 2px;
+}
+
+/* ---------- Identity page details (QR, serial, signature) ---------- */
+.cohear-idpage__serial {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font: 700 10px/1 ui-monospace, "Courier New", monospace;
+  letter-spacing: 0.22em;
+  opacity: 0.75;
+  align-self: stretch;
+}
+.cohear-idpage__sign-btn {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+  min-height: 44px;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+.cohear-idpage__sign-btn:hover { background: rgba(0, 0, 0, 0.05); }
+.cohear-idpage__sig {
+  max-height: 52px;
+  max-width: 100%;
+  object-fit: contain;
+  mix-blend-mode: multiply; /* uploaded white-paper scans sink into the page */
+}
+
+/* Loupe toggle — lives under the stats sidebar */
+.cohear-loupe-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.cohear-loupe-toggle:hover { background: rgba(255, 255, 255, 0.09); color: #fff; }
+.cohear-loupe-toggle.is-on {
+  border-color: rgba(199, 154, 62, 0.5);
+  background: rgba(199, 154, 62, 0.18);
+  color: #f4d491;
 }
 
 /* Side-mounted page navigation arrows (hug the page edges, vertically centred) */
@@ -1334,6 +1437,24 @@ button:disabled { cursor: not-allowed; }
 .cohear-ministub__no { font: 700 7px/1.1 ui-monospace, "Courier New", monospace; color: var(--accent); }
 @media (max-width: 820px) {
   .cohear-passport-layout { flex-direction: column; align-items: stretch; }
+  /* No room to poke out sideways — the tabs become a row under the book */
+  .cohear-book-wrap { width: 100%; }
+  .cohear-side-tabs {
+    position: static;
+    margin: 8px 0 0;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .cohear-side-tabs button {
+    writing-mode: horizontal-tb;
+    padding: 6px 12px;
+    border-left: 1px solid rgba(0, 0, 0, 0.25);
+    border-top: none;
+    border-radius: 0 0 7px 7px;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--tab) 82%, #000) 0%, var(--tab) 45%);
+  }
+  .cohear-side-tabs button:hover { transform: translateY(2px); }
   /* Stacked pages: drop the open-book ratio, keep both pages reading as one
      booklet — shared edge, soft fold shadow where they meet. */
   .cohear-spread { width: 100%; aspect-ratio: auto; grid-template-columns: 1fr; }
@@ -1480,22 +1601,33 @@ button:disabled { cursor: not-allowed; }
 .cohear-loupe__view { position: absolute; }
 .cohear-loupe .cohear-postage__svg { filter: none; width: 100%; height: 100%; }
 .cohear-loupe .cohear-spread__stamps { width: 100%; height: 100%; }
+/* ---- Journey chart page (JourneyChart in PassportSpread.jsx) ---- */
+.cohear-chart {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 4px 0;
+}
+.cohear-chart svg {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+}
+.cohear-chart__caption {
+  padding: 6px 2px 2px;
+  text-align: center;
+  font: 700 8px/1.4 ui-sans-serif, system-ui, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  opacity: 0.55;
+}
+.cohear-spread .cohear-loupe-host > .cohear-chart { flex: 1; }
+.cohear-loupe .cohear-chart { width: 100%; height: 100%; }
+
 /* The loupe host sits between the page (flex column) and the stamps grid —
    keep the flex chain so the grid still stretches over the whole page. */
 .cohear-spread .cohear-loupe-host { flex: 1; display: flex; flex-direction: column; }
 .cohear-spread .cohear-loupe-host > .cohear-spread__stamps { flex: 1; }
-
-/* Loupe toggle on the spread's stamps page */
-.cohear-spread__loupe-btn {
-  border-radius: 4px;
-  padding: 1px 5px;
-  font-size: 11px;
-  line-height: 1.4;
-  cursor: pointer;
-  opacity: 0.65;
-}
-.cohear-spread__loupe-btn:hover { opacity: 1; background: rgba(0, 0, 0, 0.08); }
-.cohear-spread__loupe-btn.is-on { opacity: 1; background: rgba(199, 154, 62, 0.45); }
 
 /* ---- Stamp hero (StampHero.jsx) ----
    Click any stamp/visa → it opens large over a dimmed backdrop. */
@@ -1577,8 +1709,10 @@ button:disabled { cursor: not-allowed; }
 .cohear-cover-btn {
   position: relative;
   display: block;
-  width: min(340px, 82%);
-  margin: 12px auto;
+  /* Reads as the real closed book: same height as the open spread, half its
+     width (one cover, 88×125 ratio). */
+  width: min(88vw, 388px);
+  margin: 0 auto;
   cursor: pointer;
   transition: transform 0.25s ease;
 }

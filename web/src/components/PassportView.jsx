@@ -18,6 +18,8 @@ import {
   pruneViewedOnlyStamps,
   readProfile,
   writeProfile,
+  ensurePassportId,
+  personalStats,
   resyncTokens,
   resolveHome,
   cityCoords,
@@ -66,6 +68,7 @@ export default function PassportView({ onOpenCity }) {
   const [exporting, setExporting] = useState('');
   const [exportMsg, setExportMsg] = useState('');
   const [coverOpen, setCoverOpen] = useState(false);
+  const [loupe, setLoupe] = useState(false);
   const exportRef = useRef(null);
 
   useEffect(() => {
@@ -79,6 +82,7 @@ export default function PassportView({ onOpenCity }) {
       setDupCount(findDuplicateStubs().reduce((n, g) => n + g.length - 1, 0));
     }
     window.addEventListener(HISTORY_EVENT, refresh);
+    ensurePassportId(); // mint the permanent unique id the QR code encodes
     pruneDuplicates(); // silently collapse any duplicate stubs/stamps before showing them
     pruneViewedOnlyStamps(); // undo old over-stamping of merely-browsed concerts
     autoStampHistory(); // every attended show stamps itself — no manual button
@@ -130,6 +134,9 @@ export default function PassportView({ onOpenCity }) {
     artists: new Set([...history, ...stubs].map((x) => x.artist).filter(Boolean)).size,
     stubs: stubs.length,
   }), [visas, entries, stubs, history]);
+
+  // Same estimate the Discover header shows — face value of every stub.
+  const savedUsd = useMemo(() => personalStats().savedUsd, [stubs, entries]);
 
   const entriesByCountry = useMemo(() => {
     const m = {};
@@ -396,23 +403,12 @@ export default function PassportView({ onOpenCity }) {
         )}
       </div>
 
-      {/* Section tabs — jump straight to any part of the passport */}
-      <nav className="cohear-passport-tabs" aria-label="Passport sections">
-        {[
-          ['passport', 'Passport'],
-          ...(entries.length || stubs.length ? [['maps', 'Maps']] : []),
-          ['visas', 'Visas'],
-          ['entries', 'Entry stamps'],
-          ['souvenirs', 'Souvenirs'],
-          ['tickets', 'Tickets'],
-          ['history', 'History'],
-        ].map(([id, label]) => (
-          <button key={id} type="button" onClick={() => jumpTo(id)}>{label}</button>
-        ))}
-      </nav>
-
       {/* Passport + stats sidebar layout */}
       <div className="cohear-passport-layout" id="pp-passport">
+        {/* Book + its sticky index tabs. The tabs poke out of the fore-edge
+            like the plastic stick-on tabs people put in real passports —
+            each one jumps to where that section starts further down. */}
+        <div className="cohear-book-wrap">
         {/* Closed passport first — the leather cover opens into the spread */}
         {!coverOpen ? (
         <button type="button" className="cohear-cover-btn" onClick={() => setCoverOpen(true)} aria-label="Open your passport">
@@ -427,38 +423,57 @@ export default function PassportView({ onOpenCity }) {
           onHome={setHome}
           onHomeCity={setHomeCity}
           onHomeCityCommit={commitHomeCity}
+          onSignature={(signature) => setProfile(writeProfile({ signature }))}
           photoGender={profile.photoGender}
           onPhotoGender={(g) => setProfile(writeProfile({ photoGender: g }))}
           identitySeed={session?.user?.email || profile.name || ''}
           memberSince={memberSince}
+          loupe={loupe}
+          home={home}
           visas={visas}
           entries={entries}
           stubs={stubs}
           onOpenCity={onOpenCity}
         />
         )}
+        </div>
 
-        {/* Stats sidebar — moved out of the passport for realism */}
+        {/* Stats sidebar — matches the open passport's height; the section
+            jump tabs ride its outer edge */}
         <div className="cohear-stats-sidebar">
-          {/* Distance travelled */}
-          <div className="cohear-stat-card">
-            <div className="cohear-stat-card__title">Distance Travelled</div>
-            <div className="cohear-distance-hero">
-              <span className="cohear-distance-hero__globe" aria-hidden="true">🌍</span>
-              <div>
+          {/* Distance + money, side by side on one line */}
+          <div className="cohear-stat-row">
+            <div className="cohear-stat-card">
+              <div className="cohear-stat-card__title">Distance Travelled</div>
+              <div className="cohear-distance-hero">
+                <span className="cohear-distance-hero__globe" aria-hidden="true">🌍</span>
                 <div>
-                  <span className="cohear-distance-hero__value">{fmtStat(Math.round(travel?.miles || 0))}</span>
-                  {' '}<span className="cohear-distance-hero__unit">mi</span>
+                  <div>
+                    <span className="cohear-distance-hero__value">{fmtStat(Math.round(travel?.miles || 0))}</span>
+                    {' '}<span className="cohear-distance-hero__unit">mi</span>
+                  </div>
+                  <div className="cohear-distance-hero__sub">
+                    {fmtStat(Math.round(travel?.km || 0))} km · {travel?.stops || 0} stops
+                  </div>
                 </div>
-                <div className="cohear-distance-hero__sub">
-                  {fmtStat(Math.round(travel?.km || 0))} km · {travel?.stops || 0} stops
+              </div>
+            </div>
+            <div className="cohear-stat-card">
+              <div className="cohear-stat-card__title">Ticket $ Saved</div>
+              <div className="cohear-distance-hero" title="Estimated total face value of tickets for every show you attended virtually instead of buying in.">
+                <span className="cohear-distance-hero__globe" aria-hidden="true">💸</span>
+                <div>
+                  <div>
+                    <span className="cohear-distance-hero__value">${fmtStat(Math.round(savedUsd))}</span>
+                  </div>
+                  <div className="cohear-distance-hero__sub">est. · {stats.stubs} {stats.stubs === 1 ? 'ticket' : 'tickets'}</div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Concert stats */}
-          <div className="cohear-stat-card">
+          {/* Concert stats — grows so the sidebar fills the passport's height */}
+          <div className="cohear-stat-card cohear-stat-card--grow">
             <div className="cohear-stat-card__title">Your Stats</div>
             <div className="cohear-stat-grid">
               <StatChip label="Countries" value={stats.countries} />
@@ -469,6 +484,33 @@ export default function PassportView({ onOpenCity }) {
               <StatChip label="Member since" value={memberSince ? memberSince.slice(0, 4) : '—'} />
             </div>
           </div>
+
+          {/* Philatelist's loupe — inspect the stamp page up close */}
+          <button
+            type="button"
+            className={`cohear-loupe-toggle${loupe ? ' is-on' : ''}`}
+            onClick={() => { setLoupe((v) => !v); if (!coverOpen) setCoverOpen(true); }}
+            title="Magnify the stamps page — move your cursor over the open passport"
+          >
+            🔍 {loupe ? 'Put the loupe away' : 'Inspect with loupe'}
+          </button>
+
+          {/* Section jump tabs on the panel's outer edge — scroll to the
+              full-width sections further down the page */}
+          <nav className="cohear-side-tabs cohear-side-tabs--jump" aria-label="Passport sections">
+            {[
+              ...(entries.length || stubs.length ? [['maps', 'Maps', '#c2543a']] : []),
+              ['visas', 'Visas', '#b98a2f'],
+              ['entries', 'Stamps', '#3a7d4f'],
+              ['souvenirs', 'Souvenirs', '#2f6f9e'],
+              ['tickets', 'Tickets', '#8a3f93'],
+              ['history', 'History', '#71685c'],
+            ].map(([id, label, color]) => (
+              <button key={id} type="button" style={{ '--tab': color }} onClick={() => jumpTo(id)}>
+                {label}
+              </button>
+            ))}
+          </nav>
         </div>
       </div>
 
