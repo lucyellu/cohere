@@ -8,8 +8,8 @@ const CACHE_TTL_MS = 8 * 60 * 60 * 1000;
 const memoryCache = new Map();
 const pending = new Map();
 
-function cacheKey(artist, source, window) {
-  return `cohear_concerts_v4:${artist || 'browse'}:${source || 'default'}:${window || 'default'}`;
+function cacheKey(artist, source, window, customStart, customEnd) {
+  return `cohear_concerts_v8:${artist || 'browse'}:${source || 'default'}:${window || 'default'}:${customStart || ''}:${customEnd || ''}`;
 }
 
 function readCached(key) {
@@ -27,8 +27,8 @@ function readCached(key) {
   return null;
 }
 
-export function getCachedConcerts(artist, source = 'live', window = 'week') {
-  return readCached(cacheKey(artist, source, window));
+export function getCachedConcerts(artist, source = 'live', window = 'week', customStart, customEnd) {
+  return readCached(cacheKey(artist, source, window, customStart, customEnd));
 }
 
 function writeCached(key, value) {
@@ -43,12 +43,15 @@ function writeCached(key, value) {
 
 // No artist => DISCOVER everything in a date window ('tonight'|'week'|'upcoming'|'past').
 // An artist => that artist's past (setlist.fm) + upcoming (JamBase).
-export async function fetchConcerts(artist, source = 'live', window = 'week', { force = false } = {}) {
+export async function fetchConcerts(artist, source = 'live', window = 'week', { force = false, customStart, customEnd } = {}) {
   const p = new URLSearchParams();
   if (artist) p.set('artist', artist);
   if (source) p.set('source', source);
   if (!artist && window) p.set('window', window);
-  const key = cacheKey(artist, source, window);
+  if (customStart) p.set('customStart', customStart);
+  if (customEnd) p.set('customEnd', customEnd);
+  
+  const key = cacheKey(artist, source, window, customStart, customEnd);
   if (!force) {
     const cached = readCached(key);
     if (cached) return { ...cached, cached: true };
