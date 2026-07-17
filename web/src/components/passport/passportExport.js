@@ -26,20 +26,38 @@ async function renderNode(node, scale = 2) {
   });
 }
 
-// Rasterise each passport page separately. scale 3 over an ~333px-wide page
-// gives ~290dpi at the printed 88mm — crisp enough for real-size printing.
+// Rasterise the passport pages. scale 3 over an ~333px-wide page gives
+// ~290dpi at the printed 88mm — crisp enough for real-size printing.
+//
+// IMPORTANT: this renders the whole sheet in ONE html2canvas pass and slices
+// the pages out of the big canvas. Every html2canvas call clones the entire
+// document (including the Google Maps DOM, thousands of nodes), so rendering
+// each page separately made a 10-page export take minutes.
+//
 // Pages go into the PDF as JPEG: PNG data-URLs at this resolution balloon the
 // file to ~4MB per page, JPEG at q0.92 is visually identical on paper.
 async function renderPages(node, scale = 3) {
   const pages = [...node.querySelectorAll('[data-export-page]')];
   if (!pages.length) return null;
-  const html2canvas = await loadHtml2canvas();
-  const out = [];
-  for (const page of pages) {
-    const canvas = await html2canvas(page, { scale, backgroundColor: '#f2ead6', useCORS: true, logging: false });
-    out.push(canvas.toDataURL('image/jpeg', 0.92));
-  }
-  return out;
+  // Very stamp-heavy passports get a slightly lower dpi so the intermediate
+  // canvas stays comfortably under browser canvas limits.
+  const effScale = pages.length > 24 ? 2 : scale;
+  const sheet = await renderNode(node, effScale);
+  const origin = node.getBoundingClientRect();
+  return pages.map((page) => {
+    const r = page.getBoundingClientRect();
+    const c = document.createElement('canvas');
+    c.width = Math.round(r.width * effScale);
+    c.height = Math.round(r.height * effScale);
+    c.getContext('2d').drawImage(
+      sheet,
+      Math.round((r.left - origin.left) * effScale),
+      Math.round((r.top - origin.top) * effScale),
+      c.width, c.height,
+      0, 0, c.width, c.height,
+    );
+    return c.toDataURL('image/jpeg', 0.92);
+  });
 }
 
 function triggerDownload(url, filename) {
