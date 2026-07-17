@@ -10,6 +10,20 @@ export function hashString(value) {
   return h >>> 0;
 }
 
+// The passport's printed identity. The number derives from the minted
+// passportId when one exists (stable across renames), else the login seed.
+// The QR payload is a link into the app carrying the unique id, so scanning
+// a printed passport resolves back to its owner.
+export function passportIdentity(profile = {}, seed = '') {
+  const basis = profile.passportId || seed || 'cohear-guest';
+  const no = 'CO' + String(hashString(basis) % 9000000 + 1000000);
+  const origin = typeof window !== 'undefined' && window.location?.origin && !window.location.origin.startsWith('file:')
+    ? window.location.origin
+    : 'https://cohere-app.netlify.app';
+  const qr = `${origin}/#/passport/${profile.passportId || no}`;
+  return { no, qr };
+}
+
 // Aged-paper ticket palettes (paper / ink / accent).
 const TICKET_PALETTES = [
   { paper: '#f3d9df', ink: '#3a1c24', accent: '#c0394f' }, // faded rose

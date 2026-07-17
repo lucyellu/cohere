@@ -370,6 +370,18 @@ export function writeProfile(patch) {
   return next;
 }
 
+// Every passport carries a permanent unique id, minted once and then carried
+// in the profile (so it syncs across devices with the rest of the identity).
+// The QR code on the identity page encodes it.
+export function ensurePassportId() {
+  const profile = readProfile();
+  if (profile.passportId) return profile.passportId;
+  const id = globalThis.crypto?.randomUUID?.()
+    || `pp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  writeProfile({ passportId: id });
+  return id;
+}
+
 function clearOptOut(id) {
   const list = readOptOut();
   if (!id || !list.includes(id)) return;

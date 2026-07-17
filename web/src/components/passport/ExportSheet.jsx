@@ -1,10 +1,11 @@
 import { forwardRef } from 'react';
-import { hashString, regionInk, ticketPalette, ticketTypography, barcodeBars, stampRotation } from './palette.js';
+import { passportIdentity, regionInk, ticketPalette, ticketTypography, barcodeBars, stampRotation } from './palette.js';
 import { formatStampDate } from './EntryStamp.jsx';
 import RubberStamp from './RubberStamp.jsx';
 import SouvenirStamp from './SouvenirStamp.jsx';
 import VisaStamp from './VisaStamp.jsx';
 import PassportCover from './PassportCover.jsx';
+import QrBadge from './QrBadge.jsx';
 
 // A print/share-friendly rendering of the whole passport as REAL passport pages
 // (88mm × 125mm each): cover, identity, then visas, entry stamps and ticket
@@ -20,7 +21,7 @@ const ExportSheet = forwardRef(function ExportSheet(
 ) {
   const name = (profile?.name || '').trim() || 'Guest Traveller';
   const seed = identitySeed || name || 'cohear-guest';
-  const passportNo = 'CO' + String(hashString(seed) % 9000000 + 1000000);
+  const { no: passportNo, qr: qrValue } = passportIdentity(profile, seed);
   const initials = name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
   const avatar = typeof profile?.avatar === 'string' && profile.avatar.startsWith('data:') ? profile.avatar : '';
   const issued = new Date().toISOString().slice(0, 10);
@@ -47,6 +48,7 @@ const ExportSheet = forwardRef(function ExportSheet(
               initials={initials}
               avatar={avatar}
               passportNo={passportNo}
+              qrValue={qrValue}
               profile={profile}
               memberSince={memberSince}
               travel={travel}
@@ -115,7 +117,7 @@ function Cover() {
   return <PassportCover className="cohear-cover--page" />;
 }
 
-function IdentityPage({ name, initials, avatar, passportNo, profile, memberSince, travel, stats, issued }) {
+function IdentityPage({ name, initials, avatar, passportNo, qrValue, profile, memberSince, travel, stats, issued }) {
   return (
     <>
       <div className="cohear-export__id">
@@ -156,6 +158,22 @@ function IdentityPage({ name, initials, avatar, passportNo, profile, memberSince
             <div className="cohear-export__stat-label">{label}</div>
           </div>
         ))}
+      </div>
+
+      {/* QR + signature strip, mirroring the on-screen identity page.
+          Inline styles + opaque QR backing keep it html2canvas-safe. */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10, margin: '2px 2px 2px' }}>
+        <QrBadge value={qrValue} size={40} light="#ffffff" />
+        <div style={{ flex: 1, minWidth: 0, textAlign: 'center' }}>
+          {profile?.signature ? (
+            <img src={profile.signature} alt="" style={{ maxHeight: 26, maxWidth: '80%', objectFit: 'contain' }} />
+          ) : (
+            <div style={{ height: 16 }} />
+          )}
+          <div style={{ borderTop: '1px solid rgba(0,0,0,0.5)', paddingTop: 2, fontSize: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', opacity: 0.65 }}>
+            Signature of bearer
+          </div>
+        </div>
       </div>
 
       <pre className="cohear-export__mrz">{mrz(name, passportNo, stats)}</pre>
