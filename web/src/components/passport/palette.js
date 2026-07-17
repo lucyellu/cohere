@@ -23,12 +23,64 @@ const TICKET_PALETTES = [
 // Ink colors for rubber-stamp postmarks (entry stamps).
 const ENTRY_INKS = ['#b4452f', '#2f5fb4', '#3a7d4f', '#8a3f6a', '#3f6d7d', '#9c5a1f'];
 
+// One ink per immigration office: stamps from the same part of the world share
+// a color, so a page of a real trip reads coherently (blue Americas, red
+// Europe, green Asia…) instead of random confetti.
+const REGION_INKS = {
+  northamerica: '#2f5fb4', // blue
+  europe: '#b4452f',       // red
+  asia: '#3a7d4f',         // green
+  southamerica: '#8a3f6a', // plum
+  oceania: '#3f6d7d',      // teal
+  africa: '#9c5a1f',       // sienna
+};
+const COUNTRY_REGION = {
+  Canada: 'northamerica', 'United States': 'northamerica', Mexico: 'northamerica',
+  'United Kingdom': 'europe', Ireland: 'europe', France: 'europe', Germany: 'europe',
+  Spain: 'europe', Italy: 'europe', Netherlands: 'europe', Portugal: 'europe',
+  Switzerland: 'europe', Austria: 'europe',
+  Japan: 'asia', 'South Korea': 'asia', Singapore: 'asia', India: 'asia',
+  'United Arab Emirates': 'asia',
+  Australia: 'oceania', 'New Zealand': 'oceania',
+  Brazil: 'southamerica', Argentina: 'southamerica', Chile: 'southamerica', Colombia: 'southamerica',
+};
+
 export function ticketPalette(seed) {
   return TICKET_PALETTES[hashString(seed || 'cohear') % TICKET_PALETTES.length];
 }
 
 export function entryInk(seed) {
   return ENTRY_INKS[hashString(seed || 'cohear') % ENTRY_INKS.length];
+}
+
+// Region-keyed ink with a per-seed fallback for countries we don't know.
+export function regionInk(country, fallbackSeed) {
+  const region = COUNTRY_REGION[country];
+  return region ? REGION_INKS[region] : entryInk(fallbackSeed || country);
+}
+
+// Per-artist typography so no two tickets read the same — real vintage stubs
+// were set by whichever print shop the promoter used (see ticketstubs (2).jpg).
+const TICKET_TYPE_STYLES = [
+  { head: '"Arial Black", "Helvetica Neue", ui-sans-serif, sans-serif', headWeight: 900, headTracking: '0.04em', headSize: '1rem' },     // wood-type block
+  { head: 'Georgia, "Times New Roman", serif', headWeight: 700, headTracking: '0.02em', headSize: '1.1rem' },                            // playbill serif
+  { head: 'ui-monospace, "Courier New", monospace', headWeight: 700, headTracking: '0.1em', headSize: '0.95rem' },                       // box-office teletype
+  { head: 'Impact, "Arial Narrow", ui-sans-serif, sans-serif', headWeight: 400, headTracking: '0.09em', headSize: '1.12rem' },           // condensed poster
+  { head: '"Trebuchet MS", Verdana, ui-sans-serif, sans-serif', headWeight: 800, headTracking: '0.06em', headSize: '0.98rem' },          // 70s promoter
+];
+export function ticketTypography(seed) {
+  return TICKET_TYPE_STYLES[hashString(`${seed}:type`) % TICKET_TYPE_STYLES.length];
+}
+
+// Deterministic pseudo-random bar widths so barcodes look scanned, not striped.
+export function barcodeBars(seed, count = 34) {
+  let h = hashString(`${seed}:barcode`);
+  const bars = [];
+  for (let i = 0; i < count; i += 1) {
+    h = Math.imul(h ^ (h >>> 15), 2246822519) >>> 0;
+    bars.push({ w: 1 + (h % 3), gap: 1 + ((h >>> 4) % 3) });
+  }
+  return bars;
 }
 
 // A small deterministic rotation so a wall of stamps looks hand-applied.

@@ -629,8 +629,10 @@ button:disabled { cursor: not-allowed; }
    alpha so the ink looks unevenly pressed. Fails open (solid stamp). */
 :root {
   --cohear-grunge: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.45' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.4 1.25'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
-  --cohear-parchment: #efe6d2;
-  --cohear-parchment-ink: #2c2418;
+  /* Pinkish-brown booklet paper (passport (2).jpg) — warm rosy tan so the
+     white paper of stick-on stamps and visas pops against the page. */
+  --cohear-parchment: #e1bfa9;
+  --cohear-parchment-ink: #3a281c;
 }
 
 /* ---- Passport page (light parchment the stamps + visas sit on) ---- */
@@ -645,41 +647,25 @@ button:disabled { cursor: not-allowed; }
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
-/* ---- Entry stamp (rubber-stamp postmark, per city + date) ---- */
-.cohear-entry {
-  --ink: #b4452f;
-  position: relative;
-  display: grid;
-  place-items: center;
-  gap: 1px;
-  min-height: 96px;
-  padding: 0.55rem 0.4rem;
-  text-align: center;
-  color: var(--ink);
-  border: 2.5px solid var(--ink);
-  border-radius: 8px;
-  font-family: ui-monospace, "Courier New", monospace;
-  text-transform: uppercase;
-  transform: rotate(var(--rot, -6deg));
+/* ---- Entry stamp (SVG rubber-stamp postmark, per city + date) ----
+   The die itself is drawn in RubberStamp.jsx; here we just seat the impression
+   on the page: hand-applied rotation + multiply so the ink sinks into paper. */
+.cohear-rubber {
+  width: 100%;
+  max-width: 132px;
+  height: auto;
+  justify-self: center;
+  transform: rotate(var(--rot, -4deg));
   mix-blend-mode: multiply;
-  opacity: 0.92;
 }
-.cohear-entry::after { /* concentric inner ring like a real postmark */
-  content: "";
-  position: absolute;
-  inset: 4px;
-  border: 1.5px solid var(--ink);
-  border-radius: 6px;
-  opacity: 0.5;
-}
-.cohear-entry__city { font-size: 13px; font-weight: 800; letter-spacing: 0.04em; line-height: 1.05; }
-.cohear-entry__date { font-size: 10px; font-weight: 700; letter-spacing: 0.12em; }
-.cohear-entry__sub { font-size: 8px; letter-spacing: 0.18em; opacity: 0.8; }
+.cohear-rubber--link { cursor: pointer; transition: filter 0.15s ease, transform 0.15s ease; }
+.cohear-rubber--link:hover { filter: brightness(1.1); transform: scale(1.05) rotate(var(--rot, 0deg)); }
+.cohear-rubber--link:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: 50%; }
 
 /* ---- Perforated postage edge (visas) — 4-edge scalloped mask ---- */
 .cohear-perf {
-  --r: 5px;
-  --cell: 15px;
+  --r: 6px;
+  --cell: 17px;
   -webkit-mask:
     radial-gradient(circle var(--r) at 50% 0, #0000 var(--r), #000 0) 0 0 / var(--cell) 100% repeat-x,
     radial-gradient(circle var(--r) at 50% 100%, #0000 var(--r), #000 0) 0 0 / var(--cell) 100% repeat-x,
@@ -689,24 +675,36 @@ button:disabled { cursor: not-allowed; }
   mask-composite: intersect;
 }
 
-/* ---- Visa (per country, postage-stamp styled) ---- */
+/* ---- Visa (per country, letterpress postage-stamp styled) ----
+   Modelled on the thick-paper foil stamp reference (stamps (2).jpg): the frame
+   and lettering read debossed INTO the paper, the seal sits in a guilloché
+   rosette, and a slow foil sheen sweeps across on hover. */
 .cohear-visa {
   --accent: #3b82f6;
   position: relative;
-  padding: 10px;
+  padding: 11px;
   background:
-    repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.04) 0 6px, transparent 6px 12px),
+    radial-gradient(120% 90% at 20% 0%, rgba(255, 255, 255, 0.55), transparent 55%),
+    repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.035) 0 6px, transparent 6px 12px),
     #f7f1e3;
-  filter: drop-shadow(0 4px 9px rgba(0, 0, 0, 0.35));
+  filter: drop-shadow(0 5px 10px rgba(0, 0, 0, 0.35));
 }
 .cohear-visa__inner {
+  position: relative;
   border: 2px solid var(--accent);
   border-radius: 3px;
   padding: 0.7rem;
   display: grid;
   gap: 0.45rem;
   color: #2c2418;
+  /* letterpress: paper rises around the printed area, the plate sinks in */
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.14),
+    inset 0 -1px 1px rgba(255, 255, 255, 0.65),
+    0 1px 0 rgba(255, 255, 255, 0.7);
 }
+/* Debossed lettering — a hairline of paper-white under each glyph */
+.cohear-visa__press { text-shadow: 0 1px 0 rgba(255, 255, 255, 0.75); }
 .cohear-visa__vignette {
   position: relative;
   display: grid;
@@ -719,15 +717,78 @@ button:disabled { cursor: not-allowed; }
     radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 60%),
     repeating-radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.05) 0 2px, transparent 2px 6px),
     #fbf7ee;
+  /* the impression well the art/seal sits in */
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.16), inset 0 -1px 1px rgba(255, 255, 255, 0.5);
 }
-.cohear-visa__vignette img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
-.cohear-visa__seal { font-size: 2.6rem; filter: saturate(0.85); }
+.cohear-visa__vignette img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  position: absolute;
+  inset: 0;
+  /* printed onto the paper, not displayed on it */
+  mix-blend-mode: multiply;
+  filter: sepia(0.12) saturate(0.92);
+}
+/* Guilloché rosette — concentric engraved rings around the country seal */
+.cohear-visa__seal-ring {
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  border-radius: 999px;
+  background:
+    repeating-radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--accent) 38%, transparent) 0 1px, transparent 1px 5px),
+    repeating-conic-gradient(color-mix(in srgb, var(--accent) 22%, transparent) 0deg 4deg, transparent 4deg 10deg);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.cohear-visa__seal { font-size: 2.2rem; filter: saturate(0.85); }
+/* Denomination corner — visit count as the stamp's face value */
+.cohear-visa__denom {
+  position: absolute;
+  left: 5px;
+  bottom: 3px;
+  font: 900 20px/1 Georgia, "Times New Roman", serif;
+  color: var(--accent);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+  opacity: 0.9;
+}
+.cohear-visa__denom small { font-size: 10px; font-weight: 700; letter-spacing: 0.04em; }
+/* Foil sheen — a metallic band sweeps the stamp on hover (stamp_foil videos) */
+.cohear-visa__foil {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.38) 46%, rgba(255, 235, 200, 0.22) 50%, rgba(255, 255, 255, 0.38) 54%, transparent 70%);
+  background-size: 250% 100%;
+  background-position: 100% 0;
+  transition: opacity 0.25s ease;
+}
+.cohear-visa:hover .cohear-visa__foil {
+  opacity: 1;
+  animation: cohear-foil-sweep 1.8s ease both;
+}
+@keyframes cohear-foil-sweep {
+  from { background-position: 110% 0; }
+  to { background-position: -10% 0; }
+}
+/* Art view — the illustration becomes the stamp's full vignette; frame,
+   perforation and lettering stay printed over it. */
+.cohear-visa--art .cohear-visa__vignette { min-height: 118px; }
 
-/* ---- Ticket stub (vintage admit-one, train-ticket grid) ---- */
+/* ---- Ticket stub (vintage admit-one, train-ticket grid) ----
+   Typography is per-artist (--head-* vars set from ticketTypography), the seam
+   carries real punched perforation holes, and a paper-grain overlay keeps it
+   feeling like stock from a 1970s print shop (ticketstubs (2).jpg). */
 .cohear-stub {
   --paper: #f3ead0;
   --ink: #2a2118;
   --accent: #c02a28;
+  --head-font: ui-sans-serif, system-ui, sans-serif;
+  --head-weight: 900;
+  --head-tracking: 0.06em;
+  --head-size: 1.05rem;
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 116px;
@@ -740,51 +801,114 @@ button:disabled { cursor: not-allowed; }
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.38);
   overflow: hidden;
   font-family: ui-sans-serif, system-ui, sans-serif;
-  /* two notches punched at the perforation seam (seam is 116px from the right) */
+  /* the perforation seam: two edge notches + a run of punched holes 116px
+     from the right, so the counterfoil visibly tears off */
   -webkit-mask:
     radial-gradient(circle 7px at calc(100% - 116px) -2px, #0000 7px, #000 0),
-    radial-gradient(circle 7px at calc(100% - 116px) calc(100% + 2px), #0000 7px, #000 0);
-  -webkit-mask-composite: source-in;
+    radial-gradient(circle 7px at calc(100% - 116px) calc(100% + 2px), #0000 7px, #000 0),
+    radial-gradient(circle 2.2px at calc(100% - 116px) 50%, #0000 2.2px, #000 0) 0 0 / 100% 13px repeat-y;
+  -webkit-mask-composite: source-in, source-in;
   mask-composite: intersect;
 }
-.cohear-stub__main { padding: 0.7rem 0.85rem; display: grid; gap: 0.5rem; align-content: start; }
+/* Paper grain — SVG noise printed over everything at very low opacity */
+.cohear-stub::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.cohear-stub__main { position: relative; padding: 0.7rem 0.85rem; display: grid; gap: 0.5rem; align-content: start; }
 .cohear-stub__head {
+  position: relative;
+  z-index: 1;
   margin: -0.7rem -0.85rem 0;
   padding: 0.4rem 0.85rem;
   background: var(--ink);
   color: var(--paper);
-  font-weight: 900;
-  letter-spacing: 0.06em;
+  font-weight: var(--head-weight);
+  letter-spacing: var(--head-tracking);
   text-transform: uppercase;
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 0.5rem;
 }
-.cohear-stub__artist { font-size: 1.05rem; line-height: 1.1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cohear-stub__artist { font-family: var(--head-font); font-size: var(--head-size); line-height: 1.1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cohear-stub__admit { font-size: 0.6rem; letter-spacing: 0.18em; color: var(--accent); background: var(--paper); padding: 1px 5px; border-radius: 3px; white-space: nowrap; }
-.cohear-stub__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem 0.6rem; }
+.cohear-stub__grid { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem 0.6rem; }
 .cohear-stub__f { min-width: 0; }
 .cohear-stub__f label { display: block; font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.65; }
 .cohear-stub__f b { font: 700 13px/1.1 ui-monospace, "Courier New", monospace; letter-spacing: 0.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
 .cohear-stub__barcode {
+  position: relative;
+  display: block;
+  width: 100%;
   height: 30px;
   margin-top: 0.1rem;
   border-radius: 2px;
-  background-image: repeating-linear-gradient(90deg, #1c1712 0 1px, transparent 1px 3px, #1c1712 3px 5px, transparent 5px 8px, #1c1712 8px 9px, transparent 9px 12px);
+  fill: #1c1712;
 }
 .cohear-stub__side {
   position: relative;
   background: color-mix(in srgb, var(--accent) 16%, var(--paper));
   border-left: 2px dashed rgba(0, 0, 0, 0.45);
   display: grid;
-  grid-template-rows: 1fr auto;
+  grid-template-rows: 1fr auto auto;
   gap: 0.4rem;
   padding: 0.6rem 0.4rem;
   text-align: center;
 }
-.cohear-stub__side-artist { writing-mode: vertical-rl; transform: rotate(180deg); justify-self: center; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; font-size: 0.8rem; color: var(--ink); overflow: hidden; }
-.cohear-stub__serial { font: 700 9px/1.2 ui-monospace, "Courier New", monospace; letter-spacing: 0.08em; color: var(--accent); }
+.cohear-stub__side-artist { writing-mode: vertical-rl; transform: rotate(180deg); justify-self: center; font-family: var(--head-font); font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; font-size: 0.8rem; color: var(--ink); overflow: hidden; }
+.cohear-stub__serial { position: relative; font: 700 9px/1.2 ui-monospace, "Courier New", monospace; letter-spacing: 0.08em; color: var(--accent); }
+/* ADMIT ONE rosette — a scalloped inked seal on the counterfoil */
+.cohear-stub__rosette {
+  justify-self: center;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  color: var(--accent);
+  background: radial-gradient(circle, transparent 58%, color-mix(in srgb, var(--accent) 30%, transparent) 59% 72%, transparent 73%);
+  box-shadow: inset 0 0 0 1.5px var(--accent), inset 0 0 0 4px transparent, inset 0 0 0 5.5px color-mix(in srgb, var(--accent) 55%, transparent);
+  font: 900 8px/1.15 ui-sans-serif, system-ui, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.85;
+}
+/* Art view — the generated poster becomes the ticket body's printed fill; the
+   header and counterfoil keep their structural inks, the fields float on
+   translucent paper panels so everything stays readable. */
+.cohear-stub--art .cohear-stub__main::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--art);
+  background-size: cover;
+  background-position: center;
+  mix-blend-mode: multiply;
+  filter: sepia(0.1) saturate(0.95);
+  /* pressed into the card, not floating on it */
+  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.35);
+}
+.cohear-stub--art .cohear-stub__main::after { /* holographic sweep over the art */
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 32%, rgba(255, 255, 255, 0.22) 48%, rgba(255, 255, 255, 0.05) 52%, transparent 68%);
+  background-size: 240% 100%;
+  animation: cohear-foil-sweep 5.5s ease-in-out infinite alternate;
+}
+.cohear-stub--art .cohear-stub__grid,
+.cohear-stub--art .cohear-stub__serial {
+  background: color-mix(in srgb, var(--paper) 82%, transparent);
+  border-radius: 4px;
+}
+.cohear-stub--art .cohear-stub__grid { padding: 0.35rem 0.45rem; }
+.cohear-stub--art .cohear-stub__barcode { background: color-mix(in srgb, var(--paper) 88%, transparent); }
 
 /* ---- The passport as an openable booklet ---- */
 .cohear-book {
@@ -944,35 +1068,39 @@ button:disabled { cursor: not-allowed; }
   position: relative;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  width: 720px;            /* fixed realistic open-passport width */
+  /* A real open passport is ~250×176mm — enforce the ~1.42:1 landscape ratio
+     and let width flex to the viewport instead of a hard 720px. Content can
+     still grow the book taller if it must. */
+  width: min(92vw, 780px);
+  aspect-ratio: 1.42 / 1;
   flex-shrink: 0;
   border-radius: 14px;
   overflow: hidden;
   box-shadow:
-    0 28px 64px -30px rgba(0, 0, 0, 0.78),
-    inset 0 0 0 1px rgba(0, 0, 0, 0.14);
+    0 24px 56px -30px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.12);
 }
-.cohear-spread::before { /* centre spine */
+.cohear-spread::before { /* centre spine — a gentle fold, not a gutter */
   content: "";
   position: absolute;
   top: 0;
   bottom: 0;
   left: 50%;
-  width: 3px;
-  transform: translateX(-1.5px);
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.24) 50%, rgba(0, 0, 0, 0.04));
+  width: 2px;
+  transform: translateX(-1px);
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.03), rgba(0, 0, 0, 0.14) 50%, rgba(0, 0, 0, 0.03));
   z-index: 3;
   pointer-events: none;
 }
 .cohear-spread__page {
   position: relative;
-  min-height: 540px;       /* taller — fills more of the viewport like a real passport */
-  padding: 22px 24px;
+  min-height: 100%;
+  padding: 20px 22px;
   border-radius: 0;
 }
-.cohear-spread__page.left { box-shadow: inset -24px 0 32px -24px rgba(0, 0, 0, 0.45); }
+.cohear-spread__page.left { box-shadow: inset -18px 0 26px -20px rgba(0, 0, 0, 0.25); }
 .cohear-spread__page.right {
-  box-shadow: inset 24px 0 32px -24px rgba(0, 0, 0, 0.45);
+  box-shadow: inset 18px 0 26px -20px rgba(0, 0, 0, 0.25);
   display: flex;
   flex-direction: column;
 }
@@ -980,14 +1108,48 @@ button:disabled { cursor: not-allowed; }
   flex: 1;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-content: start;
-  gap: 18px 14px;
+  /* stamps spread over the WHOLE page height, packed like passport (2).jpg */
+  grid-auto-rows: minmax(0, 1fr);
+  align-content: stretch;
+  align-items: center;
+  gap: 10px 10px;
   /* horizontal room so the side arrows never sit on top of a stamp */
-  padding: 18px 30px 12px;
+  padding: 10px 26px 8px;
 }
 @media (min-width: 1024px) {
   .cohear-spread__stamps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+
+/* ---------- Section jump tabs (sticky, above the passport) ---------- */
+.cohear-passport-tabs {
+  position: sticky;
+  top: 8px;
+  z-index: 30;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 7px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(14, 12, 10, 0.78);
+  backdrop-filter: blur(12px);
+}
+.cohear-passport-tabs button {
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.cohear-passport-tabs button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+/* Jumped-to sections land clear of the sticky tab bar */
+[id^="pp-"] { scroll-margin-top: 64px; }
 
 /* ---------- Stats sidebar (lives outside the passport) ---------- */
 .cohear-passport-layout {
@@ -1107,7 +1269,8 @@ button:disabled { cursor: not-allowed; }
   width: 100%;
   padding: 5px;
   background:
-    repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.04) 0 5px, transparent 5px 10px),
+    radial-gradient(120% 90% at 20% 0%, rgba(255, 255, 255, 0.5), transparent 55%),
+    repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.035) 0 5px, transparent 5px 10px),
     #f7f1e3;
   filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.3));
 }
@@ -1121,8 +1284,21 @@ button:disabled { cursor: not-allowed; }
   gap: 2px;
   padding: 6px 4px;
   text-align: center;
+  /* same letterpress well as the full-size visa */
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.12), inset 0 -1px 1px rgba(255, 255, 255, 0.55);
 }
-.cohear-mvisa__seal { font-size: 1.5rem; line-height: 1; }
+.cohear-mvisa__seal {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  font-size: 1.25rem;
+  line-height: 1;
+  /* mini guilloché ring around the seal */
+  background: repeating-radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--accent) 34%, transparent) 0 1px, transparent 1px 4px);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 45%, transparent);
+}
 
 /* Mini ticket stub — same anatomy as .cohear-stub, scaled for a passport page */
 .cohear-ministub {
@@ -1183,11 +1359,13 @@ button:disabled { cursor: not-allowed; }
 .cohear-ministub__no { font: 700 7px/1.1 ui-monospace, "Courier New", monospace; color: var(--accent); }
 @media (max-width: 820px) {
   .cohear-passport-layout { flex-direction: column; align-items: stretch; }
-  .cohear-spread { width: 100%; }
-  .cohear-spread { grid-template-columns: 1fr; }
+  /* Stacked pages: drop the open-book ratio, keep both pages reading as one
+     booklet — shared edge, soft fold shadow where they meet. */
+  .cohear-spread { width: 100%; aspect-ratio: auto; grid-template-columns: 1fr; }
   .cohear-spread::before { display: none; }
-  .cohear-spread__page.left { box-shadow: inset 0 -24px 32px -24px rgba(0, 0, 0, 0.4); }
-  .cohear-spread__page.right { box-shadow: inset 0 24px 32px -24px rgba(0, 0, 0, 0.4); min-height: 0; }
+  .cohear-spread__page { min-height: 0; }
+  .cohear-spread__page.left { box-shadow: inset 0 -18px 26px -20px rgba(0, 0, 0, 0.22); border-bottom: 1px solid rgba(0, 0, 0, 0.12); }
+  .cohear-spread__page.right { box-shadow: inset 0 18px 26px -20px rgba(0, 0, 0, 0.22); }
   .cohear-stats-sidebar { max-width: none; }
 }
 
@@ -1257,10 +1435,114 @@ button:disabled { cursor: not-allowed; }
 .cohear-pbook__nav.left { left: -14px; }
 .cohear-pbook__nav.right { right: -14px; }
 
+/* ---- Souvenir stamps ----
+   City kind: a stick-on letterpress postage stamp — thick white paper with a
+   chunky zigzag die-cut (clip-path from SouvenirStamp.jsx), one saturated ink
+   block DEBOSSED into the sheet, white motif art, the show date hand-set in
+   serif (the Chu Jian letterpress reference), and a pointer-tracked 3D tilt +
+   holographic foil. State/country kind is a pictorial ink die (SVG). */
+.cohear-souvenir {
+  perspective: 620px;
+  transform: rotate(var(--rot, 0deg));
+  /* portrait postage proportions — don't stretch to fill wide grid cells */
+  width: 100%;
+  max-width: 132px;
+  justify-self: center;
+  /* the drop shadow lives here so it follows the zigzag clip on __paper */
+  filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.3)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+}
+.cohear-souvenir__paper {
+  --souv-block: hsl(var(--hue, 210) 74% 52%);
+  --souv-press: hsl(var(--hue, 210) 48% 15%);
+  position: relative;
+  aspect-ratio: 4 / 5;
+  padding: 11%;
+  background: linear-gradient(160deg, #fbf9f4, #efe9dd);
+  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transform-style: preserve-3d;
+  transition: transform 0.18s ease-out;
+}
+.cohear-souvenir__block {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100%;
+  padding: 7px 7px 5px;
+  background: var(--souv-block);
+  color: var(--souv-press);
+  overflow: hidden;
+  /* letterpress: the whole color block is pressed INTO the paper */
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.3),
+    inset 0 -1px 2px rgba(255, 255, 255, 0.28),
+    inset 2px 0 3px rgba(0, 0, 0, 0.12),
+    0 1px 0 rgba(255, 255, 255, 0.8);
+}
+.cohear-souvenir__place {
+  max-width: calc(100% - 20px); /* clear the QR block */
+  font: 700 11px/1.15 Georgia, "Times New Roman", serif;
+  letter-spacing: 0.04em;
+  /* debossed dark ink with a pressed-paper glint beneath */
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+.cohear-souvenir__qr {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 13px;
+  height: 13px;
+  fill: rgba(255, 255, 255, 0.85);
+  opacity: 0.9;
+}
+.cohear-souvenir__motif {
+  align-self: center;
+  justify-self: center;
+  width: 86%;
+  fill: rgba(255, 255, 255, 0.92);
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.18));
+}
+.cohear-souvenir__foot { text-align: center; }
+.cohear-souvenir__date {
+  display: block;
+  font: 900 15px/1 Georgia, "Times New Roman", serif;
+  letter-spacing: 0.03em;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+.cohear-souvenir__sub {
+  display: block;
+  margin-top: 2px;
+  font: 700 5.5px/1 ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+/* Holographic foil — an iridescent hotspot pinned to the pointer */
+.cohear-souvenir__foil {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: var(--foil, 0);
+  transition: opacity 0.25s ease;
+  mix-blend-mode: color-dodge;
+  background:
+    radial-gradient(120px circle at var(--px, 50%) var(--py, 50%),
+      rgba(255, 120, 200, 0.5),
+      rgba(120, 220, 255, 0.38) 34%,
+      rgba(170, 255, 170, 0.24) 58%,
+      transparent 75%);
+}
+/* Distressed-ink wear for the pictorial state/country dies — a gentler cut of
+   the grunge alpha (less erosion than the full postmark mask) so the frame and
+   lettering stay readable while the fill mottles like a half-dry stamp pad. */
+.cohear-rubber--grunge {
+  --cohear-grunge-soft: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.45' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -0.7 1.18'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  -webkit-mask-image: var(--cohear-grunge-soft);
+  -webkit-mask-size: 300px 300px;
+  mask-image: var(--cohear-grunge-soft);
+  mask-size: 300px 300px;
+}
+
 /* Clickable stamps / stubs (open a city page). */
-.cohear-entry--link { cursor: pointer; transition: filter 0.15s ease, transform 0.15s ease; }
-.cohear-entry--link:hover { filter: brightness(1.08); transform: scale(1.03) rotate(var(--rot, 0deg)); }
-.cohear-entry--link:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
 .cohear-stub--link { cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease; }
 .cohear-stub--link:hover { transform: translateY(-3px); box-shadow: 0 16px 30px rgba(0, 0, 0, 0.46); }
 .cohear-stub--link:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.7); outline-offset: 3px; }
@@ -1281,46 +1563,90 @@ button:disabled { cursor: not-allowed; }
   background: linear-gradient(90deg, var(--accent-dim), var(--accent), var(--accent-dim));
 }
 
-/* ---- Export sheet (html2canvas-safe; off-screen source for PNG/PDF) ---- */
+/* ---- Export sheet (html2canvas-safe; off-screen source for PNG/PDF/print) ----
+   Rendered as REAL passport pages: 88mm x 125mm each (333x473 CSS px at 96dpi).
+   Pages lay out two-up like open spreads for the PNG; the PDF/booklet exporters
+   rasterise each [data-export-page] separately and place it life-size. Only
+   html2canvas-safe CSS in here: solid fills, borders, box-shadows, inline SVG.
+   No masks, no blend modes, no 3D transforms. */
 .cohear-export {
-  width: 820px;
+  width: 780px;
   box-sizing: border-box;
-  padding: 28px 30px 24px;
+  padding: 26px;
   background: #ece3cf;
   color: #2c2418;
   font-family: ui-sans-serif, system-ui, sans-serif;
+  display: grid;
+  grid-template-columns: repeat(2, 333px);
+  gap: 22px;
+  justify-content: center;
 }
-.cohear-export__head {
+.cohear-export__page {
+  width: 333px;
+  height: 473px;
+  box-sizing: border-box;
+  padding: 14px 16px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #f2ead6;
+  border: 1px solid rgba(90, 70, 40, 0.4);
+  border-radius: 6px;
+  box-shadow: 0 1px 4px rgba(40, 28, 12, 0.18);
+  overflow: hidden;
+}
+.cohear-export__ph {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  padding: 12px 18px;
-  border-radius: 8px;
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  opacity: 0.6;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+  padding-bottom: 5px;
+}
+.cohear-export__pf {
+  margin-top: auto;
+  border-top: 1px solid rgba(0, 0, 0, 0.14);
+  padding-top: 5px;
+  text-align: center;
+  font-size: 7.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.26em;
+  opacity: 0.45;
+}
+
+/* Cover leaf: deep navy with gold blocking, like a real passport cover */
+.cohear-export__page--cover {
   background: linear-gradient(160deg, #1b2a4a, #0d1830);
   border: 2px solid #c79a3e;
+  justify-content: center;
 }
-.cohear-export__brand {
-  font-size: 20px;
-  font-weight: 900;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
+.cohear-export__cover {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
   color: #e8c977;
+  text-align: center;
 }
-.cohear-export__brand--right { letter-spacing: 0.44em; }
-.cohear-export__id {
-  display: flex;
-  gap: 18px;
-  align-items: stretch;
-  margin-top: 18px;
-}
+.cohear-export__cover-rule { width: 70%; height: 2px; background: #c79a3e; }
+.cohear-export__cover-word { font-size: 13px; font-weight: 800; letter-spacing: 0.5em; text-transform: uppercase; }
+.cohear-export__cover-crest { font-size: 52px; line-height: 1; }
+.cohear-export__cover-brand { font-size: 27px; font-weight: 900; letter-spacing: 0.34em; text-transform: uppercase; }
+.cohear-export__cover-sub { font-size: 9px; font-weight: 700; letter-spacing: 0.3em; text-transform: uppercase; opacity: 0.85; }
+
+/* Identity page */
+.cohear-export__id { display: flex; gap: 12px; align-items: flex-start; }
 .cohear-export__photo {
-  width: 96px;
-  height: 116px;
+  width: 82px;
+  height: 102px;
   flex: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 30px;
+  font-size: 26px;
   font-weight: 900;
   color: #fff;
   background: #34507e;
@@ -1328,81 +1654,94 @@ button:disabled { cursor: not-allowed; }
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
   overflow: hidden;
 }
-.cohear-export__photo img { width: 100%; height: 100%; object-fit: cover; }
+/* Covered background div, not <img> - html2canvas ignores object-fit and would
+   stretch the photo, but it renders background-size: cover correctly. */
+.cohear-export__photo-img { width: 100%; height: 100%; background-size: cover; background-position: center; }
 .cohear-export__id-fields { flex: 1 1 auto; min-width: 0; }
-.cohear-export__name { font-size: 26px; font-weight: 900; line-height: 1.1; }
+.cohear-export__name { font-size: 17px; font-weight: 900; line-height: 1.15; }
 .cohear-export__meta {
-  margin-top: 10px;
+  margin-top: 8px;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px 18px;
-  font-size: 12px;
+  gap: 4px;
+  font-size: 9.5px;
 }
 .cohear-export__meta b { font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.6; margin-right: 4px; }
 .cohear-export__miles {
-  flex: none;
-  width: 168px;
-  text-align: right;
-  padding: 8px 12px;
-  border-radius: 8px;
+  text-align: center;
+  padding: 10px 12px;
+  border-radius: 6px;
   border: 1px solid rgba(120, 96, 50, 0.4);
-  background: #f3ead2;
+  background: #f6efdd;
 }
-.cohear-export__miles-num { font-size: 30px; font-weight: 900; line-height: 1; }
-.cohear-export__miles-unit { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.65; }
-.cohear-export__miles-sub { margin-top: 4px; font-size: 11px; opacity: 0.7; }
+.cohear-export__miles-num { font-size: 27px; font-weight: 900; line-height: 1; }
+.cohear-export__miles-unit { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.14em; opacity: 0.65; margin-top: 3px; }
+.cohear-export__miles-sub { margin-top: 3px; font-size: 9px; opacity: 0.7; }
 .cohear-export__stats {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 8px;
-  margin-top: 16px;
+  gap: 5px;
 }
 .cohear-export__stat {
   text-align: center;
-  padding: 8px 4px;
-  border-radius: 6px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  background: rgba(255, 255, 255, 0.4);
+  padding: 7px 2px;
+  border-radius: 5px;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  background: rgba(255, 255, 255, 0.45);
 }
-.cohear-export__stat-num { font-size: 22px; font-weight: 900; }
-.cohear-export__stat-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.6; }
-.cohear-export__section { margin-top: 22px; }
-.cohear-export__section-head {
-  display: flex;
-  justify-content: space-between;
-  font-size: 13px;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: 0.18em;
-  padding-bottom: 6px;
-  margin-bottom: 12px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.18);
+.cohear-export__stat-num { font-size: 15px; font-weight: 900; }
+.cohear-export__stat-label { font-size: 6.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; opacity: 0.6; }
+.cohear-export__mrz {
+  margin: auto 0 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.2);
+  padding-top: 7px;
+  font: 700 8.5px/1.5 ui-monospace, "Courier New", monospace;
+  letter-spacing: 0.04em;
+  white-space: pre-wrap;
+  word-break: break-all;
+  opacity: 0.8;
 }
-.cohear-export__grid { display: grid; gap: 12px; }
-.cohear-export__grid--visa { grid-template-columns: repeat(3, 1fr); }
-.cohear-export__grid--stamp { grid-template-columns: repeat(5, 1fr); }
-.cohear-export__grid--stub { grid-template-columns: repeat(2, 1fr); }
+
+/* Visa pages: one generous card per row, seal + fields */
 .cohear-export__visa {
-  padding: 10px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 12px;
   border: 2px solid #3b82f6;
-  border-radius: 4px;
+  border-radius: 5px;
   background: #f7f1e3;
 }
-.cohear-export__visa-top { font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.12em; }
-.cohear-export__visa-country { font-size: 16px; font-weight: 900; text-transform: uppercase; margin: 4px 0; }
-.cohear-export__visa-row { font-size: 11px; opacity: 0.8; }
-.cohear-export__stamp {
-  text-align: center;
-  padding: 10px 6px;
-  border: 2.5px solid #b4452f;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.25);
+.cohear-export__visa-seal {
+  flex: none;
+  width: 58px;
+  height: 58px;
+  border: 2px dashed currentColor;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
 }
-.cohear-export__stamp-sub { font-size: 8px; text-transform: uppercase; letter-spacing: 0.16em; opacity: 0.85; }
-.cohear-export__stamp-city { font-size: 13px; font-weight: 900; letter-spacing: 0.03em; margin: 2px 0; }
-.cohear-export__stamp-date { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; }
+.cohear-export__visa-fields { min-width: 0; }
+.cohear-export__visa-top { font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.14em; }
+.cohear-export__visa-country { font-size: 17px; font-weight: 900; text-transform: uppercase; margin: 3px 0; }
+.cohear-export__visa-row { font-size: 10px; opacity: 0.8; }
+
+/* Entry-stamp pages: 2x2 of the real SVG rubber stamps, hand-scattered */
+.cohear-export__stamps {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-content: space-evenly;
+  justify-items: center;
+  row-gap: 8px;
+}
+.cohear-export__stamp-cell { width: 138px; }
+.cohear-export .cohear-rubber { width: 138px; max-width: none; }
+
+/* Ticket-stub pages: full-width rows with head bar, body and barcode counterfoil */
 .cohear-export__stub {
-  border-radius: 8px;
+  border-radius: 6px;
   border: 1px solid rgba(0, 0, 0, 0.35);
   overflow: hidden;
 }
@@ -1410,32 +1749,66 @@ button:disabled { cursor: not-allowed; }
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 12px;
-  font-size: 14px;
-  font-weight: 900;
+  gap: 8px;
+  padding: 6px 12px 8px;
+  font-size: 13px;
+  line-height: 1.45; /* generous line box — html2canvas clips tight ones */
   text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
-.cohear-export__stub-head span:last-child { font-size: 9px; letter-spacing: 0.14em; }
-.cohear-export__stub-body { padding: 8px 12px 10px; }
-.cohear-export__stub-venue { font-size: 13px; font-weight: 800; }
-.cohear-export__stub-line { font-size: 11px; opacity: 0.8; margin-top: 2px; }
+/* No overflow/ellipsis clipping here — html2canvas shaves glyph bottoms inside
+   clipped inline boxes. Long artist names simply wrap to a second line. */
+.cohear-export__stub-head span:first-child { min-width: 0; padding-bottom: 1px; }
+.cohear-export__stub-head span:last-child { flex: none; font-size: 8px; font-weight: 900; letter-spacing: 0.16em; }
+.cohear-export__stub-main { display: flex; align-items: stretch; }
+.cohear-export__stub-body { flex: 1 1 auto; min-width: 0; padding: 9px 12px 10px; }
+.cohear-export__stub-venue { font-size: 12px; font-weight: 800; }
+.cohear-export__stub-line { font-size: 10px; opacity: 0.8; margin-top: 2px; }
+.cohear-export__stub-foil {
+  flex: none;
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
+  border-left: 1.5px dashed;
+  opacity: 0.85;
+}
 .cohear-export__serial {
   margin-top: 6px;
-  font: 700 9px/1.3 ui-monospace, "Courier New", monospace;
+  font: 700 8px/1.3 ui-monospace, "Courier New", monospace;
   letter-spacing: 0.06em;
   opacity: 0.7;
 }
-.cohear-export__foot { margin-top: 24px; border-top: 1px solid rgba(0, 0, 0, 0.18); padding-top: 10px; }
-.cohear-export__foot pre {
-  font: 700 12px/1.4 ui-monospace, "Courier New", monospace;
-  letter-spacing: 0.04em;
-  white-space: pre-wrap;
-  word-break: break-all;
-  opacity: 0.8;
-  margin: 0;
+
+/* Printing the passport directly (the Print button): only the export pages
+   show, one per 88x125mm sheet - a life-size mini passport off any printer.
+   The @page size itself is injected by the Print button so it never leaks
+   into other prints of the app. */
+@media print {
+  /* The export sheet is portalled to <body>, so the whole app (#root and any
+     other portals) can be display-none'd and only the pages remain in flow. */
+  body.cohear-print-passport > :not(.cohear-export-offscreen) { display: none !important; }
+  body.cohear-print-passport .cohear-export-offscreen {
+    position: static !important;
+    width: auto !important;
+    z-index: auto !important;
+  }
+  body.cohear-print-passport .cohear-export {
+    display: block;
+    width: auto;
+    padding: 0;
+    background: #fff;
+  }
+  body.cohear-print-passport .cohear-export__page {
+    width: 88mm;
+    height: 125mm;
+    margin: 0;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    break-inside: avoid;
+    page-break-after: always;
+  }
+  body.cohear-print-passport .cohear-export__page:last-child { page-break-after: auto; }
 }
-.cohear-export__issued { margin-top: 8px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; opacity: 0.55; }
 
 .cohear-link {
   color: var(--accent);

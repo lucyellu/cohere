@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   HISTORY_EVENT,
   autoStampHistory,
@@ -14,10 +15,12 @@ import {
   findDuplicateStubs,
   deduplicateStubs,
   pruneDuplicates,
+  pruneViewedOnlyStamps,
   readProfile,
   writeProfile,
   resyncTokens,
   resolveHome,
+  cityCoords,
   travelItinerary,
   snapshotLocal,
   mergeState,
@@ -27,15 +30,17 @@ import {
   importJson,
 } from '../account.js';
 import { supabase, supabaseEnabled } from '../live/supabase.js';
+import { hasMapsKey, geocodeCity } from '../live/maps.js';
 import { readArtMap, generateArtFor } from './passport/passportArt.js';
 import PassportSpread from './passport/PassportSpread.jsx';
 import VisaCard from './passport/VisaCard.jsx';
 import EntryStamp from './passport/EntryStamp.jsx';
+import SouvenirStamp from './passport/SouvenirStamp.jsx';
 import TicketStub from './passport/TicketStub.jsx';
 import ExportSheet from './passport/ExportSheet.jsx';
 import PassportMap from './passport/PassportMap.jsx';
 import ArtistTourMap from './passport/ArtistTourMap.jsx';
-import { exportPng, exportPdf } from './passport/passportExport.js';
+import { exportPng, exportPdf, exportBookletPdf } from './passport/passportExport.js';
 
 export default function PassportView({ onOpenCity }) {
   const [history, setHistory] = useState(() => readHistory());
@@ -46,6 +51,9 @@ export default function PassportView({ onOpenCity }) {
   const [trash, setTrash] = useState(() => readTrash());
   const [dupCount, setDupCount] = useState(() => findDuplicateStubs().reduce((n, g) => n + g.length - 1, 0));
   const [art, setArt] = useState(() => readArtMap());
+  // Which cards are showing their art view (vs the standard printed card).
+  // Freshly generated art switches its card to the art view automatically.
+  const [artView, setArtView] = useState({});
   const [genId, setGenId] = useState(null);
   const [importMsg, setImportMsg] = useState('');
   const importRef = useRef(null);
@@ -70,7 +78,8 @@ export default function PassportView({ onOpenCity }) {
     }
     window.addEventListener(HISTORY_EVENT, refresh);
     pruneDuplicates(); // silently collapse any duplicate stubs/stamps before showing them
-    autoStampHistory(); // every show in the record stamps itself — no manual button
+    pruneViewedOnlyStamps(); // undo old over-stamping of merely-browsed concerts
+    autoStampHistory(); // every attended show stamps itself — no manual button
     resyncTokens(); // re-attempt signing for anything still "pending"
     return () => window.removeEventListener(HISTORY_EVENT, refresh);
   }, []);
@@ -80,11 +89,20 @@ export default function PassportView({ onOpenCity }) {
     try {
       const url = await generateArtFor(item);
       setArt((m) => ({ ...m, [item.id]: url }));
+      setArtView((v) => ({ ...v, [item.id]: true }));
     } catch {
       /* generation unavailable — CSS card stays */
     } finally {
       setGenId(null);
     }
+  }
+
+  function toggleArtView(id) {
+    setArtView((v) => ({ ...v, [id]: !v[id] }));
+  }
+
+  function jumpTo(id) {
+    document.getElementById(`pp-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   useEffect(() => {
@@ -130,6 +148,22 @@ export default function PassportView({ onOpenCity }) {
     setProfile(writeProfile({ homeCountry: value }));
   }
 
+  function setHomeCity(value) {
+    // Typing a new city invalidates any stored geocode for the old one.
+    setProfile(writeProfile({ homeCity: value, homeLat: null, homeLng: null }));
+  }
+
+  // On blur: if the bundled city table can't place it, ask Google's geocoder
+  // and store the coords so travel distances measure from the real home.
+  async function commitHomeCity(value) {
+    const name = String(value || '').trim();
+    if (!name || cityCoords(name) || !hasMapsKey()) return;
+    try {
+      const coords = await geocodeCity(name);
+      if (coords) setProfile(writeProfile({ homeLat: coords.lat, homeLng: coords.lng }));
+    } catch { /* unplaceable — falls back to the home country's origin */ }
+  }
+
   async function doExport(kind) {
     if (!exportRef.current || exporting) return;
     setExporting(kind);
@@ -137,12 +171,31 @@ export default function PassportView({ onOpenCity }) {
     try {
       const slug = (profile.name || 'guest').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'guest';
       if (kind === 'pdf') await exportPdf(exportRef.current, `cohear-passport-${slug}.pdf`);
+      else if (kind === 'booklet') await exportBookletPdf(exportRef.current, `cohear-passport-booklet-${slug}.pdf`);
       else await exportPng(exportRef.current, `cohear-passport-${slug}.png`);
     } catch {
       setExportMsg('Export failed — try removing an AI-generated photo, then retry.');
     } finally {
       setExporting('');
     }
+  }
+
+  // Print the passport pages directly, one life-size 88×125mm page per sheet.
+  // The @page size is injected just for this print so it never affects other
+  // prints of the app; the body class scopes the print-only CSS.
+  function doPrint() {
+    const style = document.createElement('style');
+    style.textContent = '@page { size: 88mm 125mm; margin: 0; }';
+    document.head.appendChild(style);
+    document.body.classList.add('cohear-print-passport');
+    const done = () => {
+      document.body.classList.remove('cohear-print-passport');
+      style.remove();
+      window.removeEventListener('afterprint', done);
+    };
+    window.addEventListener('afterprint', done);
+    window.print();
+    setTimeout(done, 2000); // fallback — afterprint is flaky in some browsers
   }
 
   function doExportJson() {
@@ -326,8 +379,14 @@ export default function PassportView({ onOpenCity }) {
           <button className="cohear-secondary" onClick={() => doExport('png')} disabled={Boolean(exporting)} title="Download your passport as a PNG image">
             {exporting === 'png' ? 'Exporting…' : '⬇ PNG'}
           </button>
-          <button className="cohear-secondary" onClick={() => doExport('pdf')} disabled={Boolean(exporting)} title="Download your passport as a PDF">
+          <button className="cohear-secondary" onClick={() => doExport('pdf')} disabled={Boolean(exporting)} title="Download a PDF with one life-size (88×125mm) passport page per sheet">
             {exporting === 'pdf' ? 'Exporting…' : '⬇ PDF'}
+          </button>
+          <button className="cohear-secondary" onClick={() => doExport('booklet')} disabled={Boolean(exporting)} title="A4 booklet PDF — print double-sided (flip on short edge), fold down the middle and staple for a life-size mini passport">
+            {exporting === 'booklet' ? 'Exporting…' : '⬇ Booklet'}
+          </button>
+          <button className="cohear-secondary" onClick={doPrint} title="Print the passport pages life-size, one per sheet">
+            🖨 Print
           </button>
         </div>
         {(exportMsg || importMsg) && (
@@ -335,14 +394,31 @@ export default function PassportView({ onOpenCity }) {
         )}
       </div>
 
+      {/* Section tabs — jump straight to any part of the passport */}
+      <nav className="cohear-passport-tabs" aria-label="Passport sections">
+        {[
+          ['passport', 'Passport'],
+          ...(entries.length || stubs.length ? [['maps', 'Maps']] : []),
+          ['visas', 'Visas'],
+          ['entries', 'Entry stamps'],
+          ['souvenirs', 'Souvenirs'],
+          ['tickets', 'Tickets'],
+          ['history', 'History'],
+        ].map(([id, label]) => (
+          <button key={id} type="button" onClick={() => jumpTo(id)}>{label}</button>
+        ))}
+      </nav>
+
       {/* Passport + stats sidebar layout */}
-      <div className="cohear-passport-layout">
+      <div className="cohear-passport-layout" id="pp-passport">
         {/* Passport — open book spread: identity (left) + stamp pages (right) */}
         <PassportSpread
           profile={profile}
           onName={(name) => setProfile(writeProfile({ name }))}
           onAvatar={(avatar) => setProfile(writeProfile({ avatar }))}
           onHome={setHome}
+          onHomeCity={setHomeCity}
+          onHomeCityCommit={commitHomeCity}
           photoGender={profile.photoGender}
           onPhotoGender={(g) => setProfile(writeProfile({ photoGender: g }))}
           identitySeed={session?.user?.email || profile.name || ''}
@@ -413,14 +489,16 @@ export default function PassportView({ onOpenCity }) {
         )}
       </div>
 
-      {/* Chronological journey map */}
-      {entries.length > 0 && <PassportMap entries={entries} home={home} />}
-
-      {/* Per-artist tour routes — your stops + the full tour */}
-      {(stubs.length > 0 || entries.length > 0) && <ArtistTourMap stubs={stubs} entries={entries} />}
+      {/* Maps — chronological journey + per-artist tour routes */}
+      {(entries.length > 0 || stubs.length > 0) && (
+        <div className="space-y-5" id="pp-maps">
+          {entries.length > 0 && <PassportMap entries={entries} home={home} />}
+          <ArtistTourMap stubs={stubs} entries={entries} />
+        </div>
+      )}
 
       {/* Visas */}
-      <PageSection title="Visas" caption={`${visas.length} ${visas.length === 1 ? 'country' : 'countries'}`}>
+      <PageSection id="pp-visas" title="Visas" caption={`${visas.length} ${visas.length === 1 ? 'country' : 'countries'}`}>
         {!visas.length ? (
           <Empty>No visas yet — open a live room to clear customs.</Empty>
         ) : (
@@ -431,6 +509,8 @@ export default function PassportView({ onOpenCity }) {
                 visa={visa}
                 entryCount={entriesByCountry[visa.country] || 1}
                 art={art[visa.id]}
+                showArt={Boolean(artView[visa.id])}
+                onToggleArt={() => toggleArtView(visa.id)}
                 onGenerate={() => generate(visa)}
                 generating={genId === visa.id}
               />
@@ -440,7 +520,7 @@ export default function PassportView({ onOpenCity }) {
       </PageSection>
 
       {/* Entry stamps */}
-      <PageSection title="Entry stamps" caption={`${entries.length} ${entries.length === 1 ? 'visit' : 'visits'}`}>
+      <PageSection id="pp-entries" title="Entry stamps" caption={`${entries.length} ${entries.length === 1 ? 'visit' : 'visits'}`}>
         {!entries.length ? (
           <Empty>No entry stamps yet — each city + date you turn up earns one.</Empty>
         ) : (
@@ -450,8 +530,21 @@ export default function PassportView({ onOpenCity }) {
         )}
       </PageSection>
 
+      {/* Souvenir stamps — one keepsake per entry: stick-on postage or pressed
+          ink, scoped to the city / state / country. Assignment is a
+          deterministic stand-in until the unique-id backend lands. */}
+      <PageSection id="pp-souvenirs" title="Souvenir stamps" caption={`${entries.length} collected · randomly issued`}>
+        {!entries.length ? (
+          <Empty>No souvenirs yet — every show you attend hands one out.</Empty>
+        ) : (
+          <div className="grid grid-cols-2 gap-5 px-1 py-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+            {entries.map((entry) => <SouvenirStamp key={entry.id} entry={entry} />)}
+          </div>
+        )}
+      </PageSection>
+
       {/* Ticket stubs */}
-      <section className="cohear-panel overflow-hidden">
+      <section className="cohear-panel overflow-hidden" id="pp-tickets">
         <SectionHeader title="Ticket stubs" caption="One mints automatically for every show you attend" />
         <div className="p-4">
           {!stubs.length ? (
@@ -463,6 +556,8 @@ export default function PassportView({ onOpenCity }) {
                   key={stub.serial}
                   stub={stub}
                   art={art[stub.id]}
+                  showArt={Boolean(artView[stub.id])}
+                  onToggleArt={() => toggleArtView(stub.id)}
                   onGenerate={() => generate(stub)}
                   generating={genId === stub.id}
                   onOpen={onOpenCity}
@@ -474,7 +569,7 @@ export default function PassportView({ onOpenCity }) {
       </section>
 
       {/* History */}
-      <section className="cohear-panel overflow-hidden">
+      <section className="cohear-panel overflow-hidden" id="pp-history">
         <SectionHeader title="History" caption={`${history.length} ${history.length === 1 ? 'record' : 'records'}`} />
         <div className="max-h-[520px] overflow-y-auto p-3">
           {!history.length ? (
@@ -538,28 +633,33 @@ export default function PassportView({ onOpenCity }) {
         </section>
       )}
 
-      {/* Off-screen export sheet — the source for PNG / PDF downloads. */}
-      <div aria-hidden="true" style={{ position: 'fixed', top: 0, left: -99999, width: 860, pointerEvents: 'none', zIndex: -1 }}>
-        <ExportSheet
-          ref={exportRef}
-          profile={profile}
-          stats={stats}
-          travel={travel}
-          home={home}
-          memberSince={memberSince}
-          visas={visas}
-          entries={entries}
-          stubs={stubs}
-          identitySeed={session?.user?.email || profile.name || ''}
-        />
-      </div>
+      {/* Off-screen export sheet — the source for PNG / PDF downloads and the
+          print view. Portalled to <body> (outside #root) so the print CSS can
+          hide the whole app and show only these pages. */}
+      {createPortal(
+        <div aria-hidden="true" className="cohear-export-offscreen" style={{ position: 'fixed', top: 0, left: -99999, width: 860, pointerEvents: 'none', zIndex: -1 }}>
+          <ExportSheet
+            ref={exportRef}
+            profile={profile}
+            stats={stats}
+            travel={travel}
+            home={home}
+            memberSince={memberSince}
+            visas={visas}
+            entries={entries}
+            stubs={stubs}
+            identitySeed={session?.user?.email || profile.name || ''}
+          />
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }
 
-function PageSection({ title, caption, children }) {
+function PageSection({ id, title, caption, children }) {
   return (
-    <section className="cohear-passport-page overflow-hidden p-4">
+    <section className="cohear-passport-page overflow-hidden p-4" id={id}>
       <div className="mb-3 flex items-center justify-between border-b border-black/15 pb-2">
         <h3 className="text-sm font-black uppercase tracking-[0.18em]">{title}</h3>
         <span className="text-xs font-semibold uppercase tracking-[0.1em] opacity-60">{caption}</span>

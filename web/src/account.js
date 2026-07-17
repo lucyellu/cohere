@@ -477,6 +477,7 @@ export function addEntryStamp(input) {
     id,
     type: 'entry',
     city: concert.city,
+    region: concert.region || '', // state/province when the source provides one
     country,
     date,
     lat: coords?.lat ?? null,
@@ -610,24 +611,52 @@ export function backfillStubs() {
   return made;
 }
 
-// Stamp every show in the record automatically. Anything you've viewed (and not
-// deleted with "I was never here") earns its visa, dated entry stamp and ticket
-// stub — no manual "stamp passport" button. Idempotent and dedup-safe, so
-// re-running on each Passport open never creates a second stamp or ticket.
+// The actions that mean you actually experienced the show — as opposed to
+// 'viewed', which is just tapping a card in Discover to read about it.
+const REAL_ATTENDANCE = ['joined_live', 'opened_replay', 'listened', 'stamp_claimed'];
+
+// Stamp every attended show in the record automatically — no manual "stamp
+// passport" button. Only shows you genuinely joined (live room, replay, or an
+// explicit claim) qualify; merely having looked at a concert in Discover never
+// earns a souvenir. Idempotent and dedup-safe, so re-running on each Passport
+// open never creates a second stamp or ticket.
 export function autoStampHistory() {
   let stamped = 0;
+  const have = new Set(readStubs().map((s) => s.id));
   for (const item of readHistory()) {
     if (!item.id || isOptedOut(item.id)) continue;
-    if (!isStampable(item)) continue; // not started yet → stays "visited", no souvenir
+    if (item.status !== 'attended') continue; // browsing Discover isn't attending
+    if (!isStampable(item)) continue; // not started yet → no souvenir
     issueVisa(item);
     addEntryStamp(item);
     issueTicketStub(item);
-    if (item.status !== 'attended') {
-      recordConcertAction(item, 'attended', { source: 'auto' });
-      stamped += 1;
-    }
+    if (!have.has(item.id)) stamped += 1;
   }
   return stamped;
+}
+
+// One-time repair for data the old autoStampHistory over-stamped: it promoted
+// shows you had only *looked at* in Discover to "attended" (tagged source
+// 'auto') and minted stubs/stamps for them — filling the passport with artists
+// you never saw. Demote those records and pull their souvenirs; anything with a
+// real attendance action, or marked attended manually, is untouched.
+export function pruneViewedOnlyStamps() {
+  const history = readHistory();
+  const junk = new Set();
+  const repaired = history.map((item) => {
+    if (item.status !== 'attended' || item.source !== 'auto') return item;
+    if (REAL_ATTENDANCE.some((k) => item.actions?.[k])) return item;
+    junk.add(item.id);
+    const { attendedAt, ...rest } = item;
+    return { ...rest, status: 'visited' };
+  });
+  if (!junk.size) return 0;
+  writeArray(HISTORY_KEY, repaired);
+  writeArray(STUBS_KEY, readStubs().filter((s) => !junk.has(s.id)));
+  writeArray(ENTRIES_KEY, readEntries().filter((e) => !junk.has(e.concertId)));
+  reconcileVisas();
+  emitHistoryChanged();
+  return junk.size;
 }
 
 // Aggregate "your live passport" stats for the Discover header.
@@ -685,25 +714,31 @@ export function estTicketUsd(c = {}) {
 }
 
 // --- FLUX prompt builders (CSS renders by default; art is generated on demand) -
+// The art must read as part of the printed object — a stamp illustration or a
+// ticket's press-printed background — never a picture pasted onto the card.
+// No faces/portraits: real stubs are typographic, and generated artist faces
+// read as propaganda posters.
 export function visaPrompt({ country, rule }) {
   return [
-    `Vintage passport visa sticker for ${country || 'an international destination'}.`,
-    `Official immigration aesthetic: ornate guilloché security pattern, fine engraved border, a small national landmark motif, "${rule?.label || 'Tourist Visa'}" energy.`,
-    'Muted ink colors on aged paper, high detail, no readable paragraph text, souvenir-grade.',
+    `Engraved intaglio visa stamp print for ${country || 'an international destination'}, edge-to-edge full-bleed design.`,
+    `Flat two-or-three-color letterpress ink on aged cream paper: ornate guilloché security border framing a small national landmark or emblem vignette, "${rule?.label || 'Tourist Visa'}" energy.`,
+    'Looks pressed into the paper, muted inks, fine engraved linework. Strictly no faces, no portraits, no people, no photorealism, no readable paragraph text.',
   ].join(' ');
 }
 export function entryPrompt(entry) {
   const place = [entry.city, entry.country].filter(Boolean).join(', ');
   return [
-    `Illustrated postage stamp for ${place || 'a concert city'}, single iconic local landmark or motif,`,
-    'soft gouache illustration, perforated edge, denomination lettering, vintage philatelic style, no paragraph text.',
+    `Vintage postage stamp illustration of ${place || 'a concert city'}: one iconic local landmark, skyline silhouette or nature motif, full-bleed edge-to-edge.`,
+    'Flat gouache in three muted colors, hand-drawn philatelic linework, subtle paper grain, the design fills the whole frame like a real printed stamp.',
+    'No faces, no portraits, no people, no paragraph text.',
   ].join(' ');
 }
 export function ticketPrompt(entry) {
   const place = [entry.venue, entry.city].filter(Boolean).join(', ');
   return [
-    `Vintage concert ticket artwork for ${entry.artist || 'the headliner'} at ${place || 'the venue'} on ${entry.date || 'show night'}.`,
-    'Letterpress poster look, bold retro type, halftone band illustration, aged paper, ADMIT ONE energy, no long body text.',
+    `Vintage letterpress concert ticket background for ${entry.artist || 'the headliner'} at ${place || 'the venue'}: typography and print ornament are the artwork.`,
+    'Big wood-type block lettering of the band name, radiating sunburst rays or halftone texture behind it, ornamental rules and print-shop borders, two-color ink on aged paper.',
+    'Strictly typographic and geometric — absolutely NO faces, NO portraits, NO people, NO illustration of the artist. No long body text.',
   ].join(' ');
 }
 // Back-compat alias.
@@ -747,20 +782,22 @@ function isoDate(d) {
 }
 
 // --- Travel mileage ("as if you actually went there") ------------------------
-// Resolve the passport's home base from the profile: an explicit lat/lng if the
-// typed city was geocoded against the bundled table, otherwise null.
+// Resolve the passport's home base from the profile. A typed home city wins
+// (placed via the bundled table or a stored geocode); the chosen home country's
+// origin point (its capital) is only the fallback — otherwise everyone from
+// Canada "lives" in Ottawa.
 export function resolveHome(profile = {}) {
-  // Preferred: a chosen home country (like a real passport's nationality).
+  const city = (profile.homeCity || '').trim();
+  if (city) {
+    const coords = cityCoords(city, profile.homeLat, profile.homeLng);
+    if (coords) return { city, country: profile.homeCountry || coords.country || '', ...coords };
+  }
   const country = (profile.homeCountry || '').trim();
   if (country) {
     const c = countryOrigin(country);
-    return { country, city: country, lat: c?.lat ?? null, lng: c?.lng ?? null };
+    return { country, city: city || country, lat: c?.lat ?? null, lng: c?.lng ?? null };
   }
-  // Back-compat: an older typed home city.
-  const city = (profile.homeCity || '').trim();
-  if (!city) return null;
-  const coords = cityCoords(city, profile.homeLat, profile.homeLng);
-  return coords ? { city, ...coords } : { city, lat: null, lng: null };
+  return city ? { city, lat: null, lng: null } : null;
 }
 
 function entryCoords(entry) {
