@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { play } from '../../sfx.js';
 
 // Modal signature pad: draw with pointer/touch on a transparent canvas, or
 // upload an existing signature image. Saves a PNG data URL — transparent for
@@ -71,6 +72,7 @@ export default function SignaturePad({ open, hasSignature, onSave, onClose }) {
   function save() {
     if (!dirty) return;
     onSave?.(canvasRef.current.toDataURL('image/png'));
+    play('success');
     onClose?.();
   }
 
@@ -92,6 +94,7 @@ export default function SignaturePad({ open, hasSignature, onSave, onClose }) {
         canvas.height = h;
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
         onSave?.(canvas.toDataURL('image/png'));
+        play('success');
         onClose?.();
       };
       img.src = reader.result;
@@ -142,7 +145,7 @@ export default function SignaturePad({ open, hasSignature, onSave, onClose }) {
             <button
               type="button"
               className="rounded-md border border-red-800/40 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-red-800 hover:bg-red-800/10"
-              onClick={() => { onSave?.(''); onClose?.(); }}
+              onClick={() => { onSave?.(''); play('droplet'); onClose?.(); }}
             >
               Remove
             </button>

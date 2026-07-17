@@ -32,6 +32,7 @@ import {
   importJson,
 } from '../account.js';
 import { supabase, supabaseEnabled } from '../live/supabase.js';
+import { play } from '../sfx.js';
 import { hasMapsKey, geocodeCity } from '../live/maps.js';
 import { readArtMap, generateArtFor } from './passport/passportArt.js';
 import PassportSpread from './passport/PassportSpread.jsx';
@@ -70,6 +71,20 @@ export default function PassportView({ onOpenCity }) {
   const [coverOpen, setCoverOpen] = useState(false);
   const [loupe, setLoupe] = useState(false);
   const exportRef = useRef(null);
+  const layoutRef = useRef(null);
+  const [railVisible, setRailVisible] = useState(false);
+
+  // Once the passport (and its edge tabs) scrolls out of view, a slim rail of
+  // the same section tabs pins to the top so navigation is never out of reach.
+  useEffect(() => {
+    function onScroll() {
+      const el = layoutRef.current;
+      if (el) setRailVisible(el.getBoundingClientRect().bottom < 60);
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   useEffect(() => {
     function refresh() {
@@ -182,7 +197,9 @@ export default function PassportView({ onOpenCity }) {
       if (kind === 'pdf') await exportPdf(exportRef.current, `cohear-passport-${slug}.pdf`);
       else if (kind === 'booklet') await exportBookletPdf(exportRef.current, `cohear-passport-booklet-${slug}.pdf`);
       else await exportPng(exportRef.current, `cohear-passport-${slug}.png`);
+      play('success');
     } catch {
+      play('error');
       setExportMsg('Export failed — try removing an AI-generated photo, then retry.');
     } finally {
       setExporting('');
@@ -312,6 +329,16 @@ export default function PassportView({ onOpenCity }) {
 
   const isLoggedIn = !supabaseEnabled || (session?.user && !session.user.is_anonymous);
 
+  // One list drives both the stats-panel edge tabs and the sticky top rail.
+  const jumpSections = [
+    ...(entries.length || stubs.length ? [['maps', 'Maps', '#c2543a']] : []),
+    ['visas', 'Visas', '#b98a2f'],
+    ['entries', 'Stamps', '#3a7d4f'],
+    ['souvenirs', 'Souvenirs', '#2f6f9e'],
+    ['tickets', 'Tickets', '#8a3f93'],
+    ['history', 'History', '#71685c'],
+  ];
+
   if (supabaseEnabled && sessionLoading) {
     return <div className="grid min-h-64 place-items-center text-sm text-zinc-600">Loading…</div>;
   }
@@ -385,16 +412,16 @@ export default function PassportView({ onOpenCity }) {
             ↑ Restore backup
             <input ref={importRef} type="file" accept=".json,application/json" className="sr-only" onChange={handleImportFile} />
           </label>
-          <button className="cohear-secondary" onClick={() => doExport('png')} disabled={Boolean(exporting)} title="Download your passport as a PNG image">
+          <button className="cohear-secondary" data-cuelume-toggle="loading" onClick={() => doExport('png')} disabled={Boolean(exporting)} title="Download your passport as a PNG image">
             {exporting === 'png' ? 'Exporting…' : '⬇ PNG'}
           </button>
-          <button className="cohear-secondary" onClick={() => doExport('pdf')} disabled={Boolean(exporting)} title="Download a PDF with one life-size (88×125mm) passport page per sheet">
+          <button className="cohear-secondary" data-cuelume-toggle="loading" onClick={() => doExport('pdf')} disabled={Boolean(exporting)} title="Download a PDF with one life-size (88×125mm) passport page per sheet">
             {exporting === 'pdf' ? 'Exporting…' : '⬇ PDF'}
           </button>
-          <button className="cohear-secondary" onClick={() => doExport('booklet')} disabled={Boolean(exporting)} title="A4 booklet PDF — print double-sided (flip on short edge), fold down the middle and staple for a life-size mini passport">
+          <button className="cohear-secondary" data-cuelume-toggle="loading" onClick={() => doExport('booklet')} disabled={Boolean(exporting)} title="A4 booklet PDF — print double-sided (flip on short edge), fold down the middle and staple for a life-size mini passport">
             {exporting === 'booklet' ? 'Exporting…' : '⬇ Booklet'}
           </button>
-          <button className="cohear-secondary" onClick={doPrint} title="Print the passport pages life-size, one per sheet">
+          <button className="cohear-secondary" data-cuelume-toggle="loading" onClick={doPrint} title="Print the passport pages life-size, one per sheet">
             🖨 Print
           </button>
         </div>
@@ -403,15 +430,29 @@ export default function PassportView({ onOpenCity }) {
         )}
       </div>
 
+      {/* Sticky section rail — appears once the passport scrolls away */}
+      {railVisible && (
+        <nav className="cohear-sticky-rail" aria-label="Passport sections">
+          <button type="button" data-cuelume-toggle="page" style={{ '--tab': '#1c2e6e' }} onClick={() => jumpTo('passport')}>
+            ⌃ Passport
+          </button>
+          {jumpSections.map(([id, label, color]) => (
+            <button key={id} type="button" data-cuelume-toggle="page" style={{ '--tab': color }} onClick={() => jumpTo(id)}>
+              {label}
+            </button>
+          ))}
+        </nav>
+      )}
+
       {/* Passport + stats sidebar layout */}
-      <div className="cohear-passport-layout" id="pp-passport">
+      <div className="cohear-passport-layout" id="pp-passport" ref={layoutRef}>
         {/* Book + its sticky index tabs. The tabs poke out of the fore-edge
             like the plastic stick-on tabs people put in real passports —
             each one jumps to where that section starts further down. */}
         <div className="cohear-book-wrap">
         {/* Closed passport first — the leather cover opens into the spread */}
         {!coverOpen ? (
-        <button type="button" className="cohear-cover-btn" onClick={() => setCoverOpen(true)} aria-label="Open your passport">
+        <button type="button" className="cohear-cover-btn" data-cuelume-toggle="bloom" onClick={() => setCoverOpen(true)} aria-label="Open your passport">
           <PassportCover />
           <span className="cohear-cover-btn__hint">Tap to open</span>
         </button>
@@ -498,15 +539,8 @@ export default function PassportView({ onOpenCity }) {
           {/* Section jump tabs on the panel's outer edge — scroll to the
               full-width sections further down the page */}
           <nav className="cohear-side-tabs cohear-side-tabs--jump" aria-label="Passport sections">
-            {[
-              ...(entries.length || stubs.length ? [['maps', 'Maps', '#c2543a']] : []),
-              ['visas', 'Visas', '#b98a2f'],
-              ['entries', 'Stamps', '#3a7d4f'],
-              ['souvenirs', 'Souvenirs', '#2f6f9e'],
-              ['tickets', 'Tickets', '#8a3f93'],
-              ['history', 'History', '#71685c'],
-            ].map(([id, label, color]) => (
-              <button key={id} type="button" style={{ '--tab': color }} onClick={() => jumpTo(id)}>
+            {jumpSections.map(([id, label, color]) => (
+              <button key={id} type="button" data-cuelume-toggle="page" style={{ '--tab': color }} onClick={() => jumpTo(id)}>
                 {label}
               </button>
             ))}
