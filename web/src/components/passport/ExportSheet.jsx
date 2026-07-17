@@ -3,6 +3,7 @@ import { hashString, regionInk, ticketPalette, ticketTypography, barcodeBars, st
 import { countryEmoji } from './VisaCard.jsx';
 import { formatStampDate } from './EntryStamp.jsx';
 import RubberStamp from './RubberStamp.jsx';
+import SouvenirStamp from './SouvenirStamp.jsx';
 
 // A print/share-friendly rendering of the whole passport as REAL passport pages
 // (88mm × 125mm each): cover, identity, then visas, entry stamps and ticket
@@ -10,10 +11,10 @@ import RubberStamp from './RubberStamp.jsx';
 // life-size; the PNG lays them out as open spreads. Uses only html2canvas-safe
 // CSS (solid fills, borders, box-shadows, inline SVG — no masks, blend modes
 // or 3D). Rendered off-screen.
-const PER_PAGE = { visas: 3, entries: 4, stubs: 3 };
+const PER_PAGE = { visas: 3, entries: 4, souvenirs: 4, stubs: 3 };
 
 const ExportSheet = forwardRef(function ExportSheet(
-  { profile, stats, travel, home, memberSince, visas, entries, stubs, identitySeed },
+  { profile, stats, travel, home, memberSince, visas, entries, stubs, identitySeed, art = {} },
   ref,
 ) {
   const name = (profile?.name || '').trim() || 'Guest Traveller';
@@ -28,6 +29,7 @@ const ExportSheet = forwardRef(function ExportSheet(
     { kind: 'identity' },
     ...chunk(visas, PER_PAGE.visas).map((items) => ({ kind: 'visas', title: 'Visas', items })),
     ...chunk(entries, PER_PAGE.entries).map((items) => ({ kind: 'entries', title: 'Entries / Entrées', items })),
+    ...chunk(entries, PER_PAGE.souvenirs).map((items) => ({ kind: 'souvenirs', title: 'Souvenirs', items })),
     ...chunk(stubs, PER_PAGE.stubs).map((items) => ({ kind: 'stubs', title: 'Ticket stubs', items })),
   ];
 
@@ -60,6 +62,16 @@ const ExportSheet = forwardRef(function ExportSheet(
                     date={formatStampDate(e.date || e.issuedAt)}
                     ink={regionInk(e.country, e.city || e.id)}
                   />
+                </div>
+              ))}
+            </div>
+          )}
+          {page.kind === 'souvenirs' && (
+            <div className="cohear-export__souvenirs">
+              {page.items.map((e) => (
+                <div key={e.id} className="cohear-export__souvenir-cell" style={{ transform: `rotate(${stampRotation(`${e.id}:souvenir`, 5)}deg)` }}>
+                  {/* no onGenerate → renders without hover controls; art shows when it exists */}
+                  <SouvenirStamp entry={e} art={art[`${e.id}:souvenir`]} showArt={Boolean(art[`${e.id}:souvenir`])} />
                 </div>
               ))}
             </div>

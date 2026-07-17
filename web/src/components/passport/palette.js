@@ -88,3 +88,28 @@ export function stampRotation(seed, spread = 9) {
   const n = hashString(`${seed}:rot`) % (spread * 2 + 1);
   return n - spread; // -spread..+spread degrees
 }
+
+// --- Postage collections (the marijanapav.com stamp-album look) ---------------
+// Every postage stamp face belongs to one of three print styles, echoing that
+// site's monoline / textured / typographic collections. The same seed drives
+// both the procedural face and the art-generation prompt so they always agree.
+export const STAMP_COLLECTIONS = ['monoline', 'textured', 'typographic'];
+export function stampCollection(seed) {
+  return STAMP_COLLECTIONS[hashString(`${seed}:collection`) % STAMP_COLLECTIONS.length];
+}
+
+// Duotone hue family for textured/typographic faces — muted philatelic tones
+// (ultramarine, carmine, viridian…), not the full random wheel.
+const POSTAGE_HUES = [222, 355, 158, 28, 268, 195, 45, 330];
+export function postageHue(seed) {
+  return POSTAGE_HUES[hashString(`${seed}:hue`) % POSTAGE_HUES.length];
+}
+
+// Color words for prompt building — image models respond to names, not hexes.
+const INK_WORDS = {
+  '#2f5fb4': 'cobalt blue', '#b4452f': 'brick red', '#3a7d4f': 'forest green',
+  '#8a3f6a': 'plum', '#3f6d7d': 'slate teal', '#9c5a1f': 'sienna brown',
+};
+export function inkWord(hex) {
+  return INK_WORDS[hex] || 'deep ultramarine';
+}

@@ -538,7 +538,20 @@ export default function PassportView({ onOpenCity }) {
           <Empty>No souvenirs yet — every show you attend hands one out.</Empty>
         ) : (
           <div className="grid grid-cols-2 gap-5 px-1 py-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-            {entries.map((entry) => <SouvenirStamp key={entry.id} entry={entry} />)}
+            {entries.map((entry) => {
+              const sid = `${entry.id}:souvenir`;
+              return (
+                <SouvenirStamp
+                  key={entry.id}
+                  entry={entry}
+                  art={art[sid]}
+                  showArt={Boolean(artView[sid])}
+                  onToggleArt={() => toggleArtView(sid)}
+                  onGenerate={() => generate({ ...entry, id: sid, type: 'souvenir' })}
+                  generating={genId === sid}
+                />
+              );
+            })}
           </div>
         )}
       </PageSection>
@@ -649,6 +662,7 @@ export default function PassportView({ onOpenCity }) {
             entries={entries}
             stubs={stubs}
             identitySeed={session?.user?.email || profile.name || ''}
+            art={art}
           />
         </div>,
         document.body,

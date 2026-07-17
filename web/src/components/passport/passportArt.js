@@ -1,5 +1,5 @@
 import { generateImage } from '../../api.js';
-import { visaPrompt, entryPrompt, ticketPrompt } from '../../account.js';
+import { visaPrompt, entryPrompt, ticketPrompt, souvenirPrompt } from '../../account.js';
 
 // On-demand FLUX art for passport items, cached to localStorage as data URLs so
 // each collectible is generated once. The CSS card always renders without it.
@@ -35,6 +35,7 @@ function promptFor(item) {
   if (item?.type === 'visa') return visaPrompt({ country: item.country, rule: item.rule });
   if (item?.type === 'entry') return entryPrompt(item);
   if (item?.type === 'ticket') return ticketPrompt(item);
+  if (item?.type === 'souvenir') return souvenirPrompt(item);
   return item?.prompt || '';
 }
 
