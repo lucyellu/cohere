@@ -633,6 +633,9 @@ button:disabled { cursor: not-allowed; }
      white paper of stick-on stamps and visas pops against the page. */
   --cohear-parchment: #e1bfa9;
   --cohear-parchment-ink: #3a281c;
+  /* Subtle fibrous paper speckle (feTurbulence, sparse low-alpha dark grain)
+     layered over page fills — the stamp-album paper feel. */
+  --cohear-paper-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.55 -0.26'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)'/%3E%3C/svg%3E");
 }
 
 /* ---- Passport page (light parchment the stamps + visas sit on) ---- */
@@ -640,6 +643,7 @@ button:disabled { cursor: not-allowed; }
   position: relative;
   border-radius: 12px;
   background:
+    var(--cohear-paper-noise),
     radial-gradient(120% 80% at 0% 0%, rgba(255, 255, 255, 0.5), transparent 60%),
     repeating-linear-gradient(135deg, rgba(0, 0, 0, 0.015) 0 2px, transparent 2px 4px),
     var(--cohear-parchment);
@@ -1264,41 +1268,12 @@ button:disabled { cursor: not-allowed; }
 .cohear-spread__nav--right { right: 4px; }
 
 /* Mini country visa (postage-stamp styled) for the spread pages */
+/* The real landscape VisaStamp SVG seated small on a spread page. */
 .cohear-mvisa {
-  --accent: #3b82f6;
   width: 100%;
-  padding: 5px;
-  background:
-    radial-gradient(120% 90% at 20% 0%, rgba(255, 255, 255, 0.5), transparent 55%),
-    repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.035) 0 5px, transparent 5px 10px),
-    #f7f1e3;
   filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.3));
 }
-.cohear-mvisa__inner {
-  min-height: 78px;
-  border: 1.5px solid var(--accent);
-  border-radius: 2px;
-  color: var(--accent);
-  display: grid;
-  place-items: center;
-  gap: 2px;
-  padding: 6px 4px;
-  text-align: center;
-  /* same letterpress well as the full-size visa */
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.12), inset 0 -1px 1px rgba(255, 255, 255, 0.55);
-}
-.cohear-mvisa__seal {
-  display: grid;
-  place-items: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 999px;
-  font-size: 1.25rem;
-  line-height: 1;
-  /* mini guilloché ring around the seal */
-  background: repeating-radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--accent) 34%, transparent) 0 1px, transparent 1px 4px);
-  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 45%, transparent);
-}
+.cohear-mvisa .cohear-postage__svg { filter: none; }
 
 /* Mini ticket stub — same anatomy as .cohear-stub, scaled for a passport page */
 .cohear-ministub {
@@ -1479,6 +1454,86 @@ button:disabled { cursor: not-allowed; }
 }
 .cohear-postage__tools button:hover { background: rgba(0, 0, 0, 0.7); }
 .cohear-postage__tools button:disabled { opacity: 0.6; cursor: default; }
+.cohear-postage__tools button.is-on { background: rgba(199, 154, 62, 0.9); color: #1a1408; }
+
+/* Visas are the wide airmail format of the same die-cut system. */
+.cohear-postage--visa { max-width: 252px; }
+
+/* ---- Philatelist's loupe (Magnifier.jsx) ----
+   A circular lens follows the pointer showing a 2.6× second render of the
+   stamp, offset so the point under the cursor stays centered. */
+.cohear-loupe-host { position: relative; }
+.cohear-loupe {
+  position: absolute;
+  z-index: 40;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  overflow: hidden;
+  background: #efe8d6;
+  border: 3px solid #35322c;
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.4),
+    0 12px 26px rgba(0, 0, 0, 0.45),
+    inset 0 0 16px rgba(0, 0, 0, 0.2);
+}
+.cohear-loupe__view { position: absolute; }
+.cohear-loupe .cohear-postage__svg { filter: none; width: 100%; height: 100%; }
+
+/* ---- Passport cover (PassportCover.jsx) ----
+   Black pebbled leather photo under a navy tint — layered, not blended, so
+   html2canvas exports it — with gold-foil type, the lyre-viol crest and the
+   ICAO biometric chip symbol. */
+.cohear-cover {
+  position: relative;
+  aspect-ratio: 88 / 125;
+  border-radius: 10px 16px 16px 10px;
+  overflow: hidden;
+  box-shadow:
+    0 18px 38px rgba(0, 0, 0, 0.5),
+    0 3px 8px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.09);
+}
+.cohear-cover__leather {
+  position: absolute;
+  inset: 0;
+  background: url('/textures/pebble-leather.jpg') center / cover;
+}
+.cohear-cover__tint {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(130% 110% at 50% 42%, transparent 52%, rgba(4, 8, 20, 0.6)),
+    linear-gradient(172deg, rgba(27, 40, 82, 0.82), rgba(16, 25, 54, 0.86) 55%, rgba(11, 18, 40, 0.88));
+}
+.cohear-cover__face {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Closed passport on the shelf — click to open the spread */
+.cohear-cover-btn {
+  position: relative;
+  display: block;
+  width: min(340px, 82%);
+  margin: 12px auto;
+  cursor: pointer;
+  transition: transform 0.25s ease;
+}
+.cohear-cover-btn:hover { transform: translateY(-5px) rotate(-1deg); }
+.cohear-cover-btn:focus-visible { outline: 2px solid rgba(217, 169, 78, 0.8); outline-offset: 6px; border-radius: 12px; }
+.cohear-cover-btn__hint {
+  display: block;
+  margin-top: 12px;
+  font: 700 10px/1 ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0.28em;
+  text-indent: 0.28em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--muted, rgba(255, 255, 255, 0.55));
+}
 /* Distressed-ink wear for the pictorial state/country dies — a gentler cut of
    the grunge alpha (less erosion than the full postmark mask) so the frame and
    lettering stay readable while the fill mottles like a half-dry stamp pad. */
@@ -1537,7 +1592,7 @@ button:disabled { cursor: not-allowed; }
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background: #f2ead6;
+  background: var(--cohear-paper-noise), #f2ead6;
   border: 1px solid rgba(90, 70, 40, 0.4);
   border-radius: 6px;
   box-shadow: 0 1px 4px rgba(40, 28, 12, 0.18);
@@ -1566,24 +1621,20 @@ button:disabled { cursor: not-allowed; }
   opacity: 0.45;
 }
 
-/* Cover leaf: deep navy with gold blocking, like a real passport cover */
+/* Cover leaf: the real PassportCover fills the page exactly (same 88×125mm
+   size as every other page — padding removed so it bleeds to the trim). */
 .cohear-export__page--cover {
-  background: linear-gradient(160deg, #1b2a4a, #0d1830);
-  border: 2px solid #c79a3e;
-  justify-content: center;
+  padding: 0;
+  border: none;
+  background: #0f1830;
 }
-.cohear-export__cover {
-  display: grid;
-  justify-items: center;
-  gap: 14px;
-  color: #e8c977;
-  text-align: center;
+.cohear-cover--page {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  border-radius: 0;
+  box-shadow: none;
 }
-.cohear-export__cover-rule { width: 70%; height: 2px; background: #c79a3e; }
-.cohear-export__cover-word { font-size: 13px; font-weight: 800; letter-spacing: 0.5em; text-transform: uppercase; }
-.cohear-export__cover-crest { font-size: 52px; line-height: 1; }
-.cohear-export__cover-brand { font-size: 27px; font-weight: 900; letter-spacing: 0.34em; text-transform: uppercase; }
-.cohear-export__cover-sub { font-size: 9px; font-weight: 700; letter-spacing: 0.3em; text-transform: uppercase; opacity: 0.85; }
 
 /* Identity page */
 .cohear-export__id { display: flex; gap: 12px; align-items: flex-start; }
@@ -1649,31 +1700,14 @@ button:disabled { cursor: not-allowed; }
   opacity: 0.8;
 }
 
-/* Visa pages: one generous card per row, seal + fields */
-.cohear-export__visa {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  padding: 14px 12px;
-  border: 2px solid #3b82f6;
-  border-radius: 5px;
-  background: #f7f1e3;
+/* Visa pages: two landscape visa stamps per page, gently scattered */
+.cohear-export__visas {
+  flex: 1 1 auto;
+  display: grid;
+  align-content: space-evenly;
+  justify-items: center;
 }
-.cohear-export__visa-seal {
-  flex: none;
-  width: 58px;
-  height: 58px;
-  border: 2px dashed currentColor;
-  border-radius: 999px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 26px;
-}
-.cohear-export__visa-fields { min-width: 0; }
-.cohear-export__visa-top { font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.14em; }
-.cohear-export__visa-country { font-size: 17px; font-weight: 900; text-transform: uppercase; margin: 3px 0; }
-.cohear-export__visa-row { font-size: 10px; opacity: 0.8; }
+.cohear-export__visa-cell { width: 262px; }
 
 /* Entry-stamp pages: 2x2 of the real SVG rubber stamps, hand-scattered */
 .cohear-export__stamps {

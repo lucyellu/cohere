@@ -105,6 +105,19 @@ export function postageHue(seed) {
   return POSTAGE_HUES[hashString(`${seed}:hue`) % POSTAGE_HUES.length];
 }
 
+// National seal emoji for visa faces (lives here so VisaCard/VisaStamp/export
+// can all share it without import cycles).
+const COUNTRY_EMOJI = {
+  Canada: '🍁', 'United States': '🗽', 'United Kingdom': '🎡', Ireland: '☘️',
+  France: '🗼', Germany: '🍺', Spain: '💃', Italy: '🏛️', Netherlands: '🌷',
+  Portugal: '⛵', Switzerland: '🏔️', Austria: '🎻', Japan: '🗾', 'South Korea': '🏯',
+  Singapore: '🦁', Australia: '🦘', 'New Zealand': '🥝', Mexico: '🌮', Brazil: '🎉',
+  India: '🛕', 'United Arab Emirates': '🕌',
+};
+export function countryEmoji(country) {
+  return COUNTRY_EMOJI[country] || '🛂';
+}
+
 // Color words for prompt building — image models respond to names, not hexes.
 const INK_WORDS = {
   '#2f5fb4': 'cobalt blue', '#b4452f': 'brick red', '#3a7d4f': 'forest green',

@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { hashString, ticketPalette, regionInk } from './palette.js';
-import { countryEmoji } from './VisaCard.jsx';
+import VisaStamp from './VisaStamp.jsx';
 import RubberStamp from './RubberStamp.jsx';
 import { formatStampDate } from './EntryStamp.jsx';
 import { fileToAvatar, generateAvatar } from './avatar.js';
@@ -226,30 +226,17 @@ export default function PassportSpread({
 // --- Stamp tiles --------------------------------------------------------------
 function StampTile({ item, i, onOpenCity }) {
   const rot = ((i * 53) % 9) - 4; // gentle scatter, like a real page
-  if (item.kind === 'visa') return <VisaStamp visa={item.data} rot={rot} />;
+  if (item.kind === 'visa') return <VisaTile visa={item.data} rot={rot} />;
   if (item.kind === 'entry') return <EntryRubberStamp entry={item.data} rot={rot} onOpenCity={onOpenCity} />;
   return <MiniStub stub={item.data} rot={rot} onOpenCity={onOpenCity} />;
 }
 
-// A postage-stamp-style country visa: perforated edge, denomination, seal.
-function VisaStamp({ visa, rot }) {
+// The real landscape visa stamp, seated small on the spread page.
+function VisaTile({ visa, rot }) {
   const rule = visa.rule || visaRuleFor(visa.country);
-  const accent = rule?.accent || '#3b82f6';
   return (
-    <div
-      className="cohear-mvisa cohear-perf"
-      style={{ '--accent': accent, transform: `rotate(${rot}deg)` }}
-      title={`${visa.country} — ${rule?.label || 'Visa'}`}
-    >
-      <div className="cohear-mvisa__inner">
-        <div className="flex w-full items-center justify-between text-[6px] font-black uppercase tracking-[0.16em]">
-          <span>Cohere</span>
-          <span>Visa</span>
-        </div>
-        <div className="cohear-mvisa__seal">{countryEmoji(visa.country)}</div>
-        <div className="text-[11px] font-black uppercase leading-none">{visa.country}</div>
-        <div className="text-[6px] font-semibold uppercase tracking-[0.12em] opacity-75">{rule?.label || 'Tourist Visa'}</div>
-      </div>
+    <div className="cohear-mvisa" style={{ transform: `rotate(${rot}deg)` }} title={`${visa.country} — ${rule?.label || 'Visa'}`}>
+      <VisaStamp visa={{ ...visa, rule }} />
     </div>
   );
 }

@@ -35,7 +35,7 @@ function perfHoles(w, h, step = 10.4) {
   return pts;
 }
 
-function paperPath(w, h, r = 3.1) {
+export function paperPath(w, h, r = 3.1) {
   const circles = perfHoles(w, h)
     .map(([cx, cy]) => `M ${cx - r} ${cy} a ${r} ${r} 0 1 0 ${r * 2} 0 a ${r} ${r} 0 1 0 ${-r * 2} 0`)
     .join(' ');
@@ -117,7 +117,7 @@ export default function PostageStamp({
 
 // Legibility trick for text over artwork: a paper-colored stroke pass under the
 // inked fill (two <text> nodes — paint-order isn't html2canvas-safe).
-function PlateText({ x, y, children, fontSize, anchor = 'start', fill, font, weight = 800, tracking = '1.2', halo = '#f7f2e4' }) {
+export function PlateText({ x, y, children, fontSize, anchor = 'start', fill, font, weight = 800, tracking = '1.2', halo = '#f7f2e4' }) {
   const common = {
     x, y, fontSize, textAnchor: anchor, fontFamily: font, fontWeight: weight, letterSpacing: tracking,
   };
@@ -129,9 +129,9 @@ function PlateText({ x, y, children, fontSize, anchor = 'start', fill, font, wei
   );
 }
 
-const SERIF = 'Georgia, "Times New Roman", serif';
+export const SERIF = 'Georgia, "Times New Roman", serif';
 
-function Denomination({ x, y, value, fill, halo, size = 26 }) {
+export function Denomination({ x, y, value, fill, halo, size = 26 }) {
   return (
     <>
       <PlateText x={x} y={y} anchor="end" fontSize={size} fill={fill} font={SERIF} weight={700} tracking="0" halo={halo}>
@@ -281,7 +281,7 @@ function Cancellation({ uid, ink, seed }) {
   );
 }
 
-function placeSize(place) {
+export function placeSize(place) {
   const n = String(place || '').length;
   return n > 14 ? 8.5 : n > 10 ? 10.5 : 12.5;
 }

@@ -1,6 +1,7 @@
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { hashString, regionInk, stampRotation, stampCollection } from './palette.js';
 import PostageStamp, { MotifPaths } from './PostageStamp.jsx';
+import Magnifier from './Magnifier.jsx';
 
 // Souvenir stamps — every show hands out a keepsake, and the physical kind
 // follows the scope:
@@ -70,22 +71,36 @@ function fmtShort(value) {
 // --- City postage (perforated paper, album presentation) ----------------------
 
 function PostageSouvenir({ entry, s, art, showArt, onToggleArt, onGenerate, generating }) {
+  const [loupe, setLoupe] = useState(false);
   const rot = stampRotation(s.seed, 5);
+  const stamp = (
+    <PostageStamp
+      seed={s.seed}
+      place={s.place}
+      date={s.date || s.year}
+      value={s.value}
+      motif={s.motif}
+      art={art && showArt ? art : null}
+      cancelled
+      cancelInk={regionInk(entry.country, s.place)}
+      title={`${s.place} — city souvenir (${s.collection} postage)`}
+    />
+  );
   return (
     <div className="cohear-postage" style={{ '--rot': `${rot}deg` }}>
-      <PostageStamp
-        seed={s.seed}
-        place={s.place}
-        date={s.date || s.year}
-        value={s.value}
-        motif={s.motif}
-        art={art && showArt ? art : null}
-        cancelled
-        cancelInk={regionInk(entry.country, s.place)}
-        title={`${s.place} — city souvenir (${s.collection} postage)`}
-      />
+      <Magnifier active={loupe} content={stamp}>
+        {stamp}
+      </Magnifier>
       {onGenerate && (
         <div className="cohear-postage__tools">
+          <button
+            type="button"
+            className={loupe ? 'is-on' : ''}
+            onClick={() => setLoupe((v) => !v)}
+            title={loupe ? 'Put the loupe away' : 'Inspect with the loupe'}
+          >
+            🔍
+          </button>
           {art && (
             <button type="button" onClick={onToggleArt} title={showArt ? 'Show the printed stamp' : 'Show the art stamp'}>
               {showArt ? 'Plain' : '✨'}
