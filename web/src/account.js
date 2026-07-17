@@ -611,24 +611,52 @@ export function backfillStubs() {
   return made;
 }
 
-// Stamp every show in the record automatically. Anything you've viewed (and not
-// deleted with "I was never here") earns its visa, dated entry stamp and ticket
-// stub — no manual "stamp passport" button. Idempotent and dedup-safe, so
-// re-running on each Passport open never creates a second stamp or ticket.
+// The actions that mean you actually experienced the show — as opposed to
+// 'viewed', which is just tapping a card in Discover to read about it.
+const REAL_ATTENDANCE = ['joined_live', 'opened_replay', 'listened', 'stamp_claimed'];
+
+// Stamp every attended show in the record automatically — no manual "stamp
+// passport" button. Only shows you genuinely joined (live room, replay, or an
+// explicit claim) qualify; merely having looked at a concert in Discover never
+// earns a souvenir. Idempotent and dedup-safe, so re-running on each Passport
+// open never creates a second stamp or ticket.
 export function autoStampHistory() {
   let stamped = 0;
+  const have = new Set(readStubs().map((s) => s.id));
   for (const item of readHistory()) {
     if (!item.id || isOptedOut(item.id)) continue;
-    if (!isStampable(item)) continue; // not started yet → stays "visited", no souvenir
+    if (item.status !== 'attended') continue; // browsing Discover isn't attending
+    if (!isStampable(item)) continue; // not started yet → no souvenir
     issueVisa(item);
     addEntryStamp(item);
     issueTicketStub(item);
-    if (item.status !== 'attended') {
-      recordConcertAction(item, 'attended', { source: 'auto' });
-      stamped += 1;
-    }
+    if (!have.has(item.id)) stamped += 1;
   }
   return stamped;
+}
+
+// One-time repair for data the old autoStampHistory over-stamped: it promoted
+// shows you had only *looked at* in Discover to "attended" (tagged source
+// 'auto') and minted stubs/stamps for them — filling the passport with artists
+// you never saw. Demote those records and pull their souvenirs; anything with a
+// real attendance action, or marked attended manually, is untouched.
+export function pruneViewedOnlyStamps() {
+  const history = readHistory();
+  const junk = new Set();
+  const repaired = history.map((item) => {
+    if (item.status !== 'attended' || item.source !== 'auto') return item;
+    if (REAL_ATTENDANCE.some((k) => item.actions?.[k])) return item;
+    junk.add(item.id);
+    const { attendedAt, ...rest } = item;
+    return { ...rest, status: 'visited' };
+  });
+  if (!junk.size) return 0;
+  writeArray(HISTORY_KEY, repaired);
+  writeArray(STUBS_KEY, readStubs().filter((s) => !junk.has(s.id)));
+  writeArray(ENTRIES_KEY, readEntries().filter((e) => !junk.has(e.concertId)));
+  reconcileVisas();
+  emitHistoryChanged();
+  return junk.size;
 }
 
 // Aggregate "your live passport" stats for the Discover header.

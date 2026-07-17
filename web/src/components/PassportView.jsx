@@ -14,6 +14,7 @@ import {
   findDuplicateStubs,
   deduplicateStubs,
   pruneDuplicates,
+  pruneViewedOnlyStamps,
   readProfile,
   writeProfile,
   resyncTokens,
@@ -76,7 +77,8 @@ export default function PassportView({ onOpenCity }) {
     }
     window.addEventListener(HISTORY_EVENT, refresh);
     pruneDuplicates(); // silently collapse any duplicate stubs/stamps before showing them
-    autoStampHistory(); // every show in the record stamps itself — no manual button
+    pruneViewedOnlyStamps(); // undo old over-stamping of merely-browsed concerts
+    autoStampHistory(); // every attended show stamps itself — no manual button
     resyncTokens(); // re-attempt signing for anything still "pending"
     return () => window.removeEventListener(HISTORY_EVENT, refresh);
   }, []);
