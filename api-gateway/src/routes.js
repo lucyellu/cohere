@@ -366,6 +366,8 @@ router.get('/concerts', async (req, res) => {
   const artist = String(req.query.artist || '').trim();
   const source = String(req.query.source || '');
   const windowKey = String(req.query.window || 'week').trim(); // browse window when no artist
+  const customStart = String(req.query.customStart || '').slice(0, 10);
+  const customEnd = String(req.query.customEnd || '').slice(0, 10);
   const browse = !artist; // no artist -> DISCOVER everything happening
   const sources = { jambase: null, setlistfm: null };
   const collected = [];
@@ -379,8 +381,9 @@ router.get('/concerts', async (req, res) => {
       dateTo = addDaysIso(today, -1);
     } else {
       dateFrom = today;
-      if (windowKey === 'tonight') { dateFrom = addDaysIso(today, -1); dateTo = today; }
+      if (windowKey === 'tonight') { dateFrom = today; dateTo = addDaysIso(today, 1); }
       else if (windowKey === 'week') dateTo = addDaysIso(today, 7);
+      else if (windowKey === 'custom') { dateFrom = customStart || today; dateTo = customEnd || addDaysIso(today, 30); }
       else dateTo = addDaysIso(today, 60); // 'upcoming'
     }
   } else {

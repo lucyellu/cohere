@@ -14,9 +14,9 @@ if (!JB_KEY) {
   process.exit(1);
 }
 
-// Trial safety: stop syncing after July 15, 2026 (14-day trial period with new API key)
-if (new Date() > new Date('2026-07-15T23:59:59Z')) {
-  console.log('Trial safety: cron job disabled after 14-day trial period.');
+// Trial safety: extended to end of 2026
+if (new Date() > new Date('2026-12-31T23:59:59Z')) {
+  console.log('Trial safety: cron job disabled after extended period.');
   process.exit(0);
 }
 
@@ -50,36 +50,38 @@ async function run() {
   const maxPages = 15; // 15 pages * 100 = 1,500 events (drastically reduces API calls)
   const allEvents = [];
 
-  while (page <= maxPages) {
+  for (let step = 0; step < 15; step++) {
+    // Space queries out by 4 days to cover a ~60 day window with 15 requests
+    const d = new Date();
+    d.setDate(d.getDate() + (step * 4));
+    const targetDate = d.toISOString().slice(0, 10);
+
     try {
-      const url = `${JB_BASE}/events?eventDateFrom=${today}&perPage=100&page=${page}`;
+      const url = `${JB_BASE}/events?eventDateFrom=${targetDate}&eventDateTo=${targetDate}&perPage=100`;
       const r = await fetch(url, { headers: { Authorization: `Bearer ${JB_KEY}`, Accept: 'application/json' } });
       
       if (!r.ok) {
         if (r.status === 429) {
           console.warn('Rate limited! Waiting 5s...');
           await new Promise((res) => setTimeout(res, 5000));
-          continue; // retry
+          step--; // retry
+          continue;
         }
         throw new Error(`JamBase API HTTP ${r.status}`);
       }
 
       const data = await r.json();
       const events = data.events || [];
-      if (events.length === 0) break; // No more events
+      if (events.length > 0) {
+        allEvents.push(...events);
+        totalFetched += events.length;
+      }
+      console.log(`Fetched ${events.length} events for ${targetDate}...`);
       
-      allEvents.push(...events);
-      totalFetched += events.length;
-      console.log(`Fetched page ${page} (${events.length} events)...`);
-      
-      if (data.pagination && page >= data.pagination.totalPages) break;
-      
-      page++;
       // Sleep slightly to respect rate limits (e.g. 5 requests/sec)
       await new Promise((res) => setTimeout(res, 300));
     } catch (e) {
-      console.error(`Error on page ${page}:`, e.message);
-      break;
+      console.error(`Error on date ${targetDate}:`, e.message);
     }
   }
 

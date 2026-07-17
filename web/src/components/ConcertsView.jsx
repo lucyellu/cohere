@@ -14,10 +14,9 @@ const VIEW_MODES = [
 ];
 
 const WINDOWS = [
-  { id: 'tonight', label: 'Tonight' },
+  { id: 'tonight', label: 'Next 24 hours' },
   { id: 'week', label: 'Next 7 days' },
-  { id: 'upcoming', label: 'Upcoming' },
-  { id: 'past', label: 'Past 60 days' },
+  { id: 'custom', label: 'Custom' },
 ];
 
 const WHEN = [
@@ -59,7 +58,9 @@ function readDiscoverState() {
     showMyArtists: false,
     selectedId: null,
     minCapacity: 5000,
-    timeLimitHrs: 24,
+    timeLimitHrs: 0,
+    customStart: new Date().toISOString().slice(0, 10),
+    customEnd: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
   };
   try {
     const parsed = JSON.parse(sessionStorage.getItem(DISCOVER_STATE_KEY) || 'null');
@@ -107,7 +108,9 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
   const [hideEnded, setHideEnded] = useState(Boolean(initialState.hideEnded));
   const [selectedId, setSelectedId] = useState(initialState.selectedId);
   const [minCapacity, setMinCapacity] = useState(initialState.minCapacity ?? 5000);
-  const [timeLimitHrs, setTimeLimitHrs] = useState(initialState.timeLimitHrs ?? 24);
+  const [timeLimitHrs, setTimeLimitHrs] = useState(initialState.timeLimitHrs ?? 0);
+  const [customStart, setCustomStart] = useState(initialState.customStart);
+  const [customEnd, setCustomEnd] = useState(initialState.customEnd);
   const [spotify, setSpotify] = useState(null);
   const [saved, setSaved] = useState(() => new Set(JSON.parse(localStorage.getItem('cohear_saved_shows') || '[]')));
   const [calendared, setCalendared] = useState(() => new Set(readCalendar().map((e) => e.id)));
@@ -146,8 +149,8 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
   const userZone = settings?.timezone || fallbackUserZone;
   const preferredCurrency = settings?.currency || 'USD';
 
-  async function loadBrowse(win = windowKey, { force = false, reset = true } = {}) {
-    const cached = !force ? getCachedConcerts('', 'live', win) : null;
+  async function loadBrowse(win = windowKey, cs = customStart, ce = customEnd, { force = false, reset = true } = {}) {
+    const cached = !force ? getCachedConcerts('', 'live', win, cs, ce) : null;
     if (cached?.concerts?.length) {
       setArtist('');
       setWindowKey(win);
@@ -164,7 +167,7 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
     }
     setLoading(true);
     try {
-      const out = await fetchConcerts('', 'live', win, { force });
+      const out = await fetchConcerts('', 'live', win, { force, customStart: cs, customEnd: ce });
       setArtist('');
       setWindowKey(win);
       setConcerts(out.concerts);
@@ -215,13 +218,13 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
   }
 
   useEffect(() => {
-    if (!concerts.length) loadBrowse(windowKey);
+    if (!concerts.length) loadBrowse(windowKey, customStart, customEnd);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [windowKey, customStart, customEnd]);
 
   useEffect(() => {
-    writeDiscoverState({ query, artist, location, windowKey, mode, sortKey, dir, when, hideEnded, showMyArtists, selectedId, minCapacity, timeLimitHrs });
-  }, [artist, dir, hideEnded, location, mode, query, selectedId, showMyArtists, sortKey, when, windowKey, minCapacity, timeLimitHrs]);
+    writeDiscoverState({ query, artist, location, windowKey, mode, sortKey, dir, when, hideEnded, showMyArtists, selectedId, minCapacity, timeLimitHrs, customStart, customEnd });
+  }, [artist, dir, hideEnded, location, mode, query, selectedId, showMyArtists, sortKey, when, windowKey, minCapacity, timeLimitHrs, customStart, customEnd]);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30_000);
@@ -313,10 +316,7 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
     const base = browse ? concerts : filterWhen(concerts, when);
     const filtered = base.filter((c) => {
       if (minCapacity > 0 && (c.capacity == null || c.capacity < minCapacity)) return false;
-      if (timeLimitHrs > 0) {
-        const start = showStartMs(c);
-        if (!start || start - now > timeLimitHrs * 3600_000) return false;
-      }
+
       const st = showState(c, now);
       // Hide a show only once it's ended AND past the configured grace window.
       if (hideEnded && st.ended && st.end && now - st.end > graceMs) return false;
@@ -424,6 +424,11 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
         setUserZone={setUserZone}
         windowKey={windowKey}
         setWindowKey={loadBrowse}
+        customStart={customStart}
+        setCustomStart={setCustomStart}
+        customEnd={customEnd}
+        setCustomEnd={setCustomEnd}
+        loadBrowse={loadBrowse}
         mode={mode}
         setMode={setMode}
         sortKey={sortKey}
@@ -450,45 +455,49 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
 
       {loading ? (
         <EmptyState title="Finding concerts" body="Loading the current concert window from the gateway." />
-      ) : !visible.length ? (
-        <EmptyState
-          title="No matching concerts"
-          body={browse ? 'Try a wider time window, clear the location filter, or load an artist timeline.' : 'This artist has no matching shows in the current filter.'}
-          action={browse ? <button className="cohear-link" onClick={() => loadBrowse('upcoming')}>Show upcoming</button> : <button className="cohear-link" onClick={() => loadBrowse(windowKey)}>Back to Discover</button>}
-        />
       ) : (
         <div className="cohear-resizable-layout" style={{ '--cohear-inspector-width': `${inspectorWidth}px` }}>
           <main className="min-w-0">
-            {mode === 'list' && (
-              <div className="flex flex-col h-full">
-                <ConcertTable
-                  rows={paginatedVisible}
-                  selectedId={selected?.id}
-                  onSelect={setSelectedId}
-                  saved={saved}
-                  calendared={calendared}
-                  onAddCalendar={addCalendar}
-                  userZone={userZone}
-                  now={now}
-                  sortKey={sortKey}
-                  dir={dir}
-                  onSort={pickSort}
-                  onSyncLive={onSyncLive}
-                />
-                {visible.length > page * 100 && (
-                  <div className="flex justify-center p-4 border-t border-white/10 shrink-0">
-                    <button 
-                      className="cohear-secondary px-6 py-2" 
-                      onClick={() => setPage(p => p + 1)}
-                    >
-                      Load More (Showing {page * 100} of {visible.length})
-                    </button>
+            {!visible.length ? (
+              <EmptyState
+                title="No matching concerts"
+                body={browse ? 'Try a wider time window, clear the location filter, or load an artist timeline.' : 'This artist has no matching shows in the current filter.'}
+                action={browse ? <button className="cohear-link" onClick={() => loadBrowse('upcoming')}>Show upcoming</button> : <button className="cohear-link" onClick={() => loadBrowse(windowKey)}>Back to Discover</button>}
+              />
+            ) : (
+              <>
+                {mode === 'list' && (
+                  <div className="flex flex-col h-full">
+                    <ConcertTable
+                      rows={paginatedVisible}
+                      selectedId={selected?.id}
+                      onSelect={setSelectedId}
+                      saved={saved}
+                      calendared={calendared}
+                      onAddCalendar={addCalendar}
+                      userZone={userZone}
+                      now={now}
+                      sortKey={sortKey}
+                      dir={dir}
+                      onSort={pickSort}
+                      onSyncLive={onSyncLive}
+                    />
+                    {visible.length > page * 100 && (
+                      <div className="flex justify-center p-4 border-t border-white/10 shrink-0">
+                        <button 
+                          className="cohear-secondary px-6 py-2" 
+                          onClick={() => setPage(p => p + 1)}
+                        >
+                          Load More (Showing {page * 100} of {visible.length})
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
+                {mode === 'map' && <ConcertMap rows={visible} selectedId={selected?.id} onSelect={setSelectedId} />}
+                {mode === 'calendar' && <ConcertCalendar rows={visible} selectedId={selected?.id} onSelect={setSelectedId} calendared={calendared} />}
+              </>
             )}
-            {mode === 'map' && <ConcertMap rows={visible} selectedId={selected?.id} onSelect={setSelectedId} />}
-            {mode === 'calendar' && <ConcertCalendar rows={visible} selectedId={selected?.id} onSelect={setSelectedId} calendared={calendared} />}
           </main>
 
           <button
@@ -533,7 +542,7 @@ function DiscoverHeader({ artist, browse, biggest, loading, stats, spotify, user
           <div className="min-w-0">
             <p className="cohear-label">{browse ? 'Discover' : 'Artist timeline'}</p>
             <h2 className="mt-2 max-w-3xl text-4xl italic tracking-tight text-[var(--accent)] md:text-5xl">
-              {browse ? 'Concerts happening tonight.' : artist}
+              {browse ? 'Concerts happening in the next 24 hours.' : artist}
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-400">
               {browse
@@ -619,6 +628,7 @@ function ControlSurface(props) {
     mode, setMode, sortKey, pickSort, dir, setDir, when, setWhen, hideEnded, setHideEnded,
     showMyArtists, setShowMyArtists, hasMyArtists,
     loading, onArtistSearch, onClearSearch, onRefresh, onResetLayout,
+    customStart, setCustomStart, customEnd, setCustomEnd, loadBrowse,
   } = props;
 
   return (
@@ -666,7 +676,28 @@ function ControlSurface(props) {
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {browse ? (
-          <SegmentedControl value={windowKey} options={WINDOWS} onChange={setWindowKey} />
+          <>
+            <SegmentedControl value={windowKey} options={WINDOWS} onChange={setWindowKey} />
+            {windowKey === 'custom' && (
+              <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-black/20 px-1 py-0.5">
+                <input
+                  type="date"
+                  value={customStart}
+                  onChange={(e) => { setCustomStart(e.target.value); loadBrowse(windowKey, e.target.value, customEnd); }}
+                  className="bg-transparent px-2 py-1 text-xs text-zinc-100 outline-none hover:bg-white/5 rounded cursor-pointer"
+                  aria-label="Start date"
+                />
+                <span className="text-zinc-600 text-xs font-bold">→</span>
+                <input
+                  type="date"
+                  value={customEnd}
+                  onChange={(e) => { setCustomEnd(e.target.value); loadBrowse(windowKey, customStart, e.target.value); }}
+                  className="bg-transparent px-2 py-1 text-xs text-zinc-100 outline-none hover:bg-white/5 rounded cursor-pointer"
+                  aria-label="End date"
+                />
+              </div>
+            )}
+          </>
         ) : (
           <SegmentedControl value={when} options={WHEN} onChange={setWhen} />
         )}
@@ -1012,30 +1043,7 @@ function ConcertInspector({ concert, saved, calendared, sources, userZone, curre
               ))}
             </div>
           </div>
-          <div>
-            <label className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-400">Time Window</label>
-            <div className="mt-3 grid gap-2">
-              {[
-                { id: 0, label: 'Any Time' },
-                { id: 24, label: 'Next 24 Hours' },
-                { id: 48, label: 'Next 48 Hours' },
-                { id: 168, label: 'Next 7 Days' },
-              ].map((opt) => (
-                <button
-                  key={opt.id}
-                  onClick={() => setTimeLimitHrs(opt.id)}
-                  className={`flex items-center justify-between rounded-lg border p-3 text-left transition ${
-                    timeLimitHrs === opt.id
-                      ? 'border-cyan-300/50 bg-cyan-300/[0.1] text-cyan-100'
-                      : 'border-white/10 bg-black/20 text-zinc-400 hover:border-white/20 hover:text-zinc-200'
-                  }`}
-                >
-                  <span className="text-sm font-medium">{opt.label}</span>
-                  {timeLimitHrs === opt.id && <span className="h-2 w-2 rounded-full bg-cyan-400" />}
-                </button>
-              ))}
-            </div>
-          </div>
+
         </div>
       </aside>
     );
