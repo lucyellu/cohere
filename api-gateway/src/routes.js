@@ -901,9 +901,7 @@ router.get('/youtube/search', async (req, res) => {
     return `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=6&q=${encodeURIComponent(q)}&key=${key}`;
   });
   
-  if (!result.ok) {
-    result = await serveMock('youtube');
-  } else if (db) {
+  if (result.ok && db) {
     // 3. Save to Firebase cache
     try {
       const cacheRef = doc(db, 'youtube_cache', encodeURIComponent(q));
@@ -1082,7 +1080,16 @@ router.get('/spotify/track', async (req, res) => {
   if (!track) return res.status(400).json({ ok: false, error: 'track required' });
   if (isMock('spotify')) {
     record('spotify', { status: 200, latencyMs: 0, bytes: track.length, mode: 'mock', error: null });
-    return res.json({ ok: true, mode: 'mock', track: { name: track, popularity: 40 + hashNum(track, 55), art: null } });
+    return res.json({ 
+      ok: true, 
+      mode: 'mock', 
+      track: { 
+        name: track, 
+        popularity: 40 + hashNum(track, 55), 
+        art: null,
+        preview: 'https://p.scdn.co/mp3-preview/3eb16018c2a700240e9dfb8817b6f2d041f15eb1?cid=774b29d4f13844c495f206cafdad9c86'
+      } 
+    });
   }
   const q = artist ? `track:${track} artist:${artist}` : `track:${track}`;
   const r = await spotifyGet(`/search?q=${encodeURIComponent(q)}&type=track&limit=1`);

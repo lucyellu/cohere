@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Cohere Logo Sandbox</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      /* Default Colors */
+      --bg-color: #1a1a1c;
+      --card-bg: #2a2a2d;
+      
+      /* Dot Logo (Concept 1) */
+      --dot-grad-1: #d9351f;
+      --dot-grad-2: #fdc68a;
+      --dot-text: #ffffff;
+      
+      /* Avocado Double Circle Logo (Concept 2) */
+      --avo-light: #d7f08c;
+      --avo-mid: #8fb852;
+      --avo-dark: #4a6e22;
+      --avo-inner-light: #c8e078;
+      --avo-inner-dark: #5c7b30;
+      --avo-text: #ffffff;
+      
+      /* Glowing Variation (Concept 3) */
+      --glow-color: #00f0ff;
+      --glow-text: #ffffff;
+      
+      /* Heartbeat Variation (Concept 4) */
+      --heart-color: #f20d4e;
+      --heart-text: #ffffff;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: #fafaf7;
+      font-family: "Inter", system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px;
+      -webkit-font-smoothing: antialiased;
+      transition: background-color 0.3s;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    h1 {
+      font-size: 36px;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      margin-bottom: 8px;
+    }
+
+    p.subtitle {
+      color: #8a8780;
+      font-size: 15px;
+    }
+
+    .dashboard {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 30px;
+      width: 100%;
+      max-width: 1100px;
+    }
+
+    @media (max-width: 900px) {
+      .dashboard {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .controls-panel {
+      background: var(--card-bg);
+      padding: 24px;
+      border-radius: 20px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.05);
+      align-self: start;
+      transition: background-color 0.3s;
+    }
+
+    .control-group {
+      margin-bottom: 20px;
+    }
+    
+    .control-group h3 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #8a8780;
+      margin-bottom: 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      padding-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Concept Selector Tabs */
+    .concept-selector {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+    .concept-btn {
+      background: rgba(0,0,0,0.2);
+      border: 1px solid rgba(255,255,255,0.05);
+      color: #ccc;
+      padding: 10px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      text-align: left;
+      font-size: 13px;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    .concept-btn:hover {
+      background: rgba(0,0,0,0.4);
+    }
+    .concept-btn.active {
+      background: #444;
+      color: #fff;
+      border-color: rgba(255,255,255,0.2);
+    }
+
+    .swap-btn {
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #fff;
+      border-radius: 4px;
+      cursor: pointer;
+      padding: 2px 6px;
+      font-size: 10px;
+      transition: background 0.2s;
+    }
+    .swap-btn:hover {
+      background: rgba(255,255,255,0.1);
+    }
+
+    .color-picker-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .color-picker-wrap label {
+      font-size: 13px;
+      font-weight: 500;
+      color: #ccc;
+      cursor: pointer;
+    }
+    input[type="color"] {
+      -webkit-appearance: none;
+      border: none;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      cursor: pointer;
+      padding: 0;
+      background: transparent;
+      box-shadow: 0 0 0 2px rgba(255,255,255,0.1);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+    input[type="color"]::-webkit-color-swatch { border: none; border-radius: 50%; }
+    input[type="color"]:hover { transform: scale(1.1); box-shadow: 0 0 0 2px rgba(255,255,255,0.3); }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+    button.action-btn {
+      flex: 1;
+      padding: 12px 10px;
+      border: none;
+      border-radius: 8px;
+      background: #444;
+      color: #fff;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 12px;
+      transition: background 0.2s, transform 0.2s;
+    }
+    button.action-btn:hover { background: #555; transform: translateY(-2px); }
+
+    /* Conditional Control Groups */
+    .color-controls { display: none; }
+    .color-controls.active { display: block; }
+
+    /* Main Preview Area */
+    .preview-panel {
+      background: var(--card-bg);
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 400px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.05);
+      transition: background-color 0.3s;
+      position: relative;
+    }
+    .preview-label {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #8a8780;
+      font-weight: 600;
+    }
+
+    .logo-container { display: none; }
+    .logo-container.active { display: flex; }
+
+    /* ==========================================
+       LOGO STYLES 
+       ========================================== */
+    .logo-style {
+      align-items: center;
+      gap: 16px;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      font-size: 56px;
+      transition: color 0.3s;
+    }
+
+    /* 1: Dot */
+    #logo-1 { color: var(--dot-text); }
+    #logo-1 .logo-icon {
+      width: 56px; height: 56px; border-radius: 50%;
+      background: linear-gradient(180deg, var(--dot-grad-1), var(--dot-grad-2));
+      box-shadow: 0 8px 16px -4px rgba(220, 60, 30, 0.4), inset 0 2px 0 rgba(255, 255, 255, 0.4), inset 0 -4px 6px rgba(0, 0, 0, 0.3);
+      transition: background 0.3s;
+    }
+
+    /* 2: Avocado */
+    #logo-2 { color: var(--avo-text); }
+    #logo-2 .logo-icon {
+      width: 76px; height: 76px; border-radius: 50%; position: relative; overflow: hidden;
+      box-shadow: 0 10px 20px -4px rgba(0,0,0,0.5), inset 0 2px 0 rgba(255,255,255,0.3), inset 0 -3px 6px rgba(0,0,0,0.4);
+      background: radial-gradient(circle at 35% 35%, var(--avo-light) 0%, var(--avo-mid) 40%, var(--avo-dark) 100%);
+      flex-shrink: 0; transition: background 0.3s;
+    }
+    #logo-2 .logo-icon::before {
+      content: ""; position: absolute; inset: 0;
+      background: radial-gradient(circle at 70% 70%, transparent 30%, rgba(0,0,0,0.25) 60%, transparent 80%), radial-gradient(circle at 30% 80%, rgba(255,255,255,0.25), transparent 40%);
+    }
+    #logo-2 .logo-icon::after {
+      content: ""; position: absolute; width: 32%; height: 32%; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      background: radial-gradient(circle at 30% 30%, var(--avo-inner-light), var(--avo-inner-dark));
+      border-radius: 50%; box-shadow: 0 0 0 4px rgba(255,255,255,0.15), 0 4px 10px rgba(0,0,0,0.3); transition: background 0.3s;
+    }
+
+    /* 3: Neon */
+    #logo-3 { color: var(--glow-text); font-weight: 900; letter-spacing: -0.05em; }
+    #logo-3 .logo-icon {
+      width: 64px; height: 64px; border-radius: 50%; border: 4px solid var(--glow-color); position: relative;
+      box-shadow: 0 0 15px var(--glow-color), inset 0 0 15px var(--glow-color);
+      display: flex; align-items: center; justify-content: center; transition: border-color 0.3s, box-shadow 0.3s;
+    }
+    #logo-3 .logo-icon::after {
+      content: ""; width: 22px; height: 22px; background: var(--glow-color); border-radius: 50%;
+      box-shadow: 0 0 15px var(--glow-color); transition: background 0.3s, box-shadow 0.3s;
+    }
+
+    /* 4: Heartbeat */
+    #logo-4 { color: var(--heart-text); font-weight: 900; letter-spacing: -0.05em; }
+    #logo-4 .heart-svg { width: 76px; height: 76px; color: var(--heart-color); transition: color 0.3s; }
+    .pl__ring-inner, .pl__ring-outer { animation-duration: 2s; animation-iteration-count: infinite; }
+    .pl__ring-inner { animation-name: scale-in; animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1); }
+    .pl__ring-outer { animation-name: stroke-out-in; }
+    @keyframes scale-in { 0%, 15% { transform: scale(0); } 71.6666666667%, 100% { transform: scale(1); } }
+    @keyframes stroke-out-in {
+      0%, 51.6666666667%, 100% { animation-timing-function: cubic-bezier(0.33, 1, 0.68, 1); r: 45px; stroke-width: 10px; }
+      63.3333333333% { animation-timing-function: cubic-bezier(0.32, 0, 0.67, 0); r: 50px; stroke-width: 15px; }
+    }
+
+    /* Gallery Panel */
+    .gallery-panel {
+      margin-top: 30px;
+      width: 100%;
+      max-width: 1100px;
+      background: var(--card-bg);
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+    .gallery-panel h2 { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+    .gallery-item {
+      background: rgba(0,0,0,0.3);
+      padding: 16px;
+      border-radius: 12px;
+      cursor: pointer;
+      text-align: center;
+      transition: transform 0.2s, background 0.2s;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+    .gallery-item:hover { background: rgba(0,0,0,0.5); transform: translateY(-3px); }
+    .gallery-preview {
+      display: flex; justify-content: center; align-items: center;
+      height: 40px; margin-bottom: 8px;
+    }
+    .preview-shape {
+      border-radius: 50%;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Cohere Logo Sandbox</h1>
+    <p class="subtitle">Select a concept, experiment with colors, and save to gallery.</p>
+  </header>
+
+  <div class="dashboard">
+    <!-- Controls Panel -->
+    <div class="controls-panel">
+      
+      <div class="control-group">
+        <h3>Concept Selector</h3>
+        <div class="concept-selector">
+          <button class="concept-btn active" onclick="setConcept(1)">Concept 1: The Dot</button>
+          <button class="concept-btn" onclick="setConcept(2)">Concept 2: Double Circle (Avocado)</button>
+          <button class="concept-btn" onclick="setConcept(3)">Concept 3: Neon Ring</button>
+          <button class="concept-btn" onclick="setConcept(4)">Concept 4: Heartbeat Sync</button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <h3>Background <button class="swap-btn" onclick="swapColors('bgColor', 'cardBg')">⇄ SWAP</button></h3>
+        <div class="color-picker-wrap">
+          <label for="bgColor">App Background</label>
+          <input type="color" id="bgColor" value="#1a1a1c">
+        </div>
+        <div class="color-picker-wrap">
+          <label for="cardBg">Card Background</label>
+          <input type="color" id="cardBg" value="#2a2a2d">
+        </div>
+      </div>
+
+      <!-- Specific Color Controls -->
+      <div id="controls-1" class="color-controls active">
+        <div class="control-group">
+          <h3>Dot Colors <button class="swap-btn" onclick="swapColors('dotGrad1', 'dotGrad2')">⇄ SWAP</button></h3>
+          <div class="color-picker-wrap">
+            <label for="dotGrad1">Gradient Start</label>
+            <input type="color" id="dotGrad1" value="#d9351f">
+          </div>
+          <div class="color-picker-wrap">
+            <label for="dotGrad2">Gradient End</label>
+            <input type="color" id="dotGrad2" value="#fdc68a">
+          </div>
+          <div class="color-picker-wrap">
+            <label for="dotText">Text Color</label>
+            <input type="color" id="dotText" value="#ffffff">
+          </div>
+        </div>
+      </div>
+
+      <div id="controls-2" class="color-controls">
+        <div class="control-group">
+          <h3>Double Circle <button class="swap-btn" onclick="swapColors('avoInnerLight', 'avoInnerDark')">⇄ SWAP INNER</button></h3>
+          <div class="color-picker-wrap">
+            <label for="avoLight">Outer Highlight</label>
+            <input type="color" id="avoLight" value="#d7f08c">
+          </div>
+          <div class="color-picker-wrap">
+            <label for="avoMid">Outer Midtone</label>
+            <input type="color" id="avoMid" value="#8fb852">
+          </div>
+          <div class="color-picker-wrap">
+            <label for="avoDark">Outer Shadow</label>
+            <input type="color" id="avoDark" value="#4a6e22">
+          </div>
+          <div class="color-picker-wrap">
+            <label for="avoInnerLight">Inner Highlight</label>
+            <input type="color" id="avoInnerLight" value="#c8e078">
+          </div>
+          <div class="color-picker-wrap">
+            <label for="avoInnerDark">Inner Shadow</label>
+            <input type="color" id="avoInnerDark" value="#5c7b30">
+          </div>
+          <div class="color-picker-wrap">
+            <label for="avoText">Text Color</label>
+            <input type="color" id="avoText" value="#ffffff">
+          </div>
+        </div>
+      </div>
+
+      <div id="controls-3" class="color-controls">
+        <div class="control-group">
+          <h3>Neon Ring</h3>
+          <div class="color-picker-wrap">
+            <label for="glowColor">Glow Color</label>
+            <input type="color" id="glowColor" value="#00f0ff">
+          </div>
+          <div class="color-picker-wrap">
+            <label for="glowText">Text Color</label>
+            <input type="color" id="glowText" value="#ffffff">
+          </div>
+        </div>
+      </div>
+
+      <div id="controls-4" class="color-controls">
+        <div class="control-group">
+          <h3>Heartbeat Ring</h3>
+          <div class="color-picker-wrap">
+            <label for="heartColor">Ring Color</label>
+            <input type="color" id="heartColor" value="#f20d4e">
+          </div>
+          <div class="color-picker-wrap">
+            <label for="heartText">Text Color</label>
+            <input type="color" id="heartText" value="#ffffff">
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="action-btn" onclick="saveToGallery()">Save to Gallery</button>
+        <button class="action-btn" onclick="saveCurrentTxt()">Export Current</button>
+        <button class="action-btn" onclick="saveGalleryTxt()">Export Gallery</button>
+      </div>
+
+    </div>
+
+    <!-- Preview Panel -->
+    <div class="preview-panel">
+      <div class="preview-label" id="previewLabel">Concept 1: The Dot</div>
+      
+      <!-- Logo 1 -->
+      <div id="logo-1" class="logo-container logo-style active">
+        <span class="logo-icon"></span>
+        cohere
+      </div>
+
+      <!-- Logo 2 -->
+      <div id="logo-2" class="logo-container logo-style">
+        <span class="logo-icon"></span>
+        cohere
+      </div>
+      
+      <!-- Logo 3 -->
+      <div id="logo-3" class="logo-container logo-style">
+        <span class="logo-icon"></span>
+        cohere
+      </div>
+
+      <!-- Logo 4 -->
+      <div id="logo-4" class="logo-container logo-style">
+        <svg class="heart-svg" viewBox="0 0 120 120">
+          <g fill="none" stroke="currentcolor" stroke-width="10" transform="translate(60,60)">
+            <circle class="pl__ring-outer" r="45" />
+            <circle class="pl__ring-inner" r="45" />
+          </g>
+        </svg>
+        cohere
+      </div>
+    </div>
+  </div>
+
+  <!-- Gallery Panel -->
+  <div class="gallery-panel">
+    <h2>Saved Concepts & Palettes</h2>
+    <p class="subtitle">Click a saved item to load its concept and colors back into the preview area.</p>
+    <div class="gallery-grid" id="galleryGrid">
+      <!-- Gallery items will appear here -->
+    </div>
+  </div>
+
+  <script>
+    let currentConcept = 1;
+
+    // All controls configuration
+    const allControls = [
+      { id: 'bgColor', varName: '--bg-color' },
+      { id: 'cardBg', varName: '--card-bg' },
+      { id: 'dotGrad1', varName: '--dot-grad-1' },
+      { id: 'dotGrad2', varName: '--dot-grad-2' },
+      { id: 'dotText', varName: '--dot-text' },
+      { id: 'avoLight', varName: '--avo-light' },
+      { id: 'avoMid', varName: '--avo-mid' },
+      { id: 'avoDark', varName: '--avo-dark' },
+      { id: 'avoInnerLight', varName: '--avo-inner-light' },
+      { id: 'avoInnerDark', varName: '--avo-inner-dark' },
+      { id: 'avoText', varName: '--avo-text' },
+      { id: 'glowColor', varName: '--glow-color' },
+      { id: 'glowText', varName: '--glow-text' },
+      { id: 'heartColor', varName: '--heart-color' },
+      { id: 'heartText', varName: '--heart-text' }
+    ];
+
+    // Listen to changes and apply them to CSS roots
+    allControls.forEach(control => {
+      const input = document.getElementById(control.id);
+      if (input) {
+        input.addEventListener('input', (e) => {
+          document.documentElement.style.setProperty(control.varName, e.target.value);
+        });
+      }
+    });
+
+    function setConcept(id) {
+      currentConcept = id;
+      
+      // Update Buttons
+      document.querySelectorAll('.concept-btn').forEach((btn, index) => {
+        if (index + 1 === id) btn.classList.add('active');
+        else btn.classList.remove('active');
+      });
+
+      // Update Controls Visibility
+      document.querySelectorAll('.color-controls').forEach((panel, index) => {
+        if (index + 1 === id) panel.classList.add('active');
+        else panel.classList.remove('active');
+      });
+
+      // Update Logo Visibility
+      document.querySelectorAll('.logo-container').forEach((logo, index) => {
+        if (index + 1 === id) logo.classList.add('active');
+        else logo.classList.remove('active');
+      });
+
+      // Update Label
+      const labels = ["Concept 1: The Dot", "Concept 2: Double Circle", "Concept 3: Neon Ring", "Concept 4: Heartbeat Sync"];
+      document.getElementById('previewLabel').innerText = labels[id - 1];
+    }
+
+    function swapColors(id1, id2) {
+      const el1 = document.getElementById(id1);
+      const el2 = document.getElementById(id2);
+      if (el1 && el2) {
+        const temp = el1.value;
+        el1.value = el2.value;
+        el2.value = temp;
+        // Trigger updates manually
+        el1.dispatchEvent(new Event('input'));
+        el2.dispatchEvent(new Event('input'));
+      }
+    }
+
+    // LocalStorage for Gallery
+    let savedGallery = JSON.parse(localStorage.getItem('cohereGallery')) || [];
+    const galleryGrid = document.getElementById('galleryGrid');
+
+    function renderGallery() {
+      galleryGrid.innerHTML = '';
+      savedGallery.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = 'gallery-item';
+        
+        let previewHtml = '';
+        if (item.concept === 1) {
+          previewHtml = `<div class="preview-shape" style="width: 24px; height: 24px; background: linear-gradient(180deg, ${item.colors['--dot-grad-1']}, ${item.colors['--dot-grad-2']});"></div>`;
+        } else if (item.concept === 2) {
+          previewHtml = `<div class="preview-shape" style="width: 28px; height: 28px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, ${item.colors['--avo-light']} 0%, ${item.colors['--avo-mid']} 40%, ${item.colors['--avo-dark']} 100%); position: relative; overflow: hidden;"><div style="position: absolute; width: 35%; height: 35%; top: 50%; left: 50%; transform: translate(-50%, -50%); border-radius: 50%; background: radial-gradient(circle at 30% 30%, ${item.colors['--avo-inner-light']}, ${item.colors['--avo-inner-dark']}); box-shadow: 0 0 0 2px rgba(255,255,255,0.15), 0 2px 4px rgba(0,0,0,0.3);"></div></div>`;
+        } else if (item.concept === 3) {
+          previewHtml = `<div class="preview-shape" style="width: 24px; height: 24px; border: 2px solid ${item.colors['--glow-color']}; display: flex; align-items:center; justify-content:center;"><div style="width:8px; height:8px; border-radius:50%; background:${item.colors['--glow-color']}"></div></div>`;
+        } else if (item.concept === 4) {
+          previewHtml = `<svg viewBox="0 0 120 120" style="width:30px; height:30px; color:${item.colors['--heart-color']};"><circle cx="60" cy="60" r="45" fill="none" stroke="currentcolor" stroke-width="10"/></svg>`;
+        }
+        
+        div.innerHTML = `
+          <div class="gallery-preview">
+            ${previewHtml}
+          </div>
+          <strong>Concept ${item.concept}</strong><br>
+          <small style="color: #ccc; font-size: 11px;">Palette #${index + 1}</small>
+        `;
+        
+        div.onclick = () => {
+          setConcept(item.concept);
+          allControls.forEach(c => {
+            const el = document.getElementById(c.id);
+            if (el && item.colors[c.varName]) {
+              el.value = item.colors[c.varName];
+              document.documentElement.style.setProperty(c.varName, item.colors[c.varName]);
+            }
+          });
+        };
+        
+        galleryGrid.appendChild(div);
+      });
+    }
+
+    function saveToGallery() {
+      const currentValues = {};
+      allControls.forEach(c => {
+        const el = document.getElementById(c.id);
+        if (el) currentValues[c.varName] = el.value;
+      });
+      
+      savedGallery.push({
+        concept: currentConcept,
+        colors: currentValues
+      });
+      
+      localStorage.setItem('cohereGallery', JSON.stringify(savedGallery));
+      renderGallery();
+    }
+
+    function saveCurrentTxt() {
+      let cssText = "/* Current Unsaved Palette */\n:root {\n";
+      allControls.forEach(c => {
+        const el = document.getElementById(c.id);
+        if (el) cssText += `  ${c.varName}: ${el.value};\n`;
+      });
+      cssText += "}\n";
+      
+      const blob = new Blob([cssText], { type: 'text/plain' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `cohere-current-palette.txt`;
+      a.click();
+    }
+
+    function saveGalleryTxt() {
+      if (savedGallery.length === 0) {
+        alert("Gallery is empty! Save some palettes first.");
+        return;
+      }
+      
+      let cssText = "/* Cohere Logo Palettes */\n\n";
+      savedGallery.forEach((item, index) => {
+        cssText += `/* Palette #${index + 1} (Concept ${item.concept}) */\n`;
+        cssText += `.palette-${index + 1} {\n`;
+        for (const [key, value] of Object.entries(item.colors)) {
+          cssText += `  ${key}: ${value};\n`;
+        }
+        cssText += `}\n\n`;
+      });
+      
+      const blob = new Blob([cssText], { type: 'text/plain' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `cohere-gallery-palettes.txt`;
+      a.click();
+    }
+
+    // Initial render
+    renderGallery();
+  </script>
+</body>
+</html>

@@ -1,0 +1,650 @@
+<!-- Saved from https://codepen.io/jh3y/pen/OPJyVGb with CodePen Library Saver. -->
+<!DOCTYPE html>
+<html lang="en" >
+
+<head>
+  <meta name="generator" content="CodePen Library Saver">
+  <meta name="codepen:source" content="https://codepen.io/jh3y/pen/OPJyVGb">
+  <meta charset="UTF-8">
+  
+  
+  
+
+  <title>SVG Filter Sticker Effects (minus turbulence color-burn)</title>
+
+    <link rel="canonical" href="https://codepen.io/jh3y/pen/OPJyVGb">
+  
+  
+  
+  
+<style>
+@import url('https://unpkg.normalize.css') layer(normalize);
+
+@layer normalize, base, demo;
+
+@layer demo {
+  .sticker {
+    width: clamp(200px, 35vmin, 400px);
+    overflow: visible;
+    filter: url('#sticker');
+  }
+  
+  svg {
+    overflow: visible !important;
+  }
+  [data-pointer-lighting='true'] {
+    cursor: none;
+  }
+  feSpecularLighting {
+    opacity: 0.4;
+  }
+}
+
+@layer base {
+  :root {
+    --font-size-min: 16;
+    --font-size-max: 20;
+    --font-ratio-min: 1.2;
+    --font-ratio-max: 1.33;
+    --font-width-min: 375;
+    --font-width-max: 1500;
+  }
+
+  html {
+    color-scheme: light dark;
+  }
+
+  [data-theme='light'] {
+    color-scheme: light only;
+  }
+
+  [data-theme='dark'] {
+    color-scheme: dark only;
+  }
+
+  :where(.fluid) {
+    --fluid-min: calc(
+      var(--font-size-min) * pow(var(--font-ratio-min), var(--font-level, 0))
+    );
+    --fluid-max: calc(
+      var(--font-size-max) * pow(var(--font-ratio-max), var(--font-level, 0))
+    );
+    --fluid-preferred: calc(
+      (var(--fluid-max) - var(--fluid-min)) /
+        (var(--font-width-max) - var(--font-width-min))
+    );
+    --fluid-type: clamp(
+      (var(--fluid-min) / 16) * 1rem,
+      ((var(--fluid-min) / 16) * 1rem) -
+        (((var(--fluid-preferred) * var(--font-width-min)) / 16) * 1rem) +
+        (var(--fluid-preferred) * var(--variable-unit, 100vi)),
+      (var(--fluid-max) / 16) * 1rem
+    );
+    font-size: var(--fluid-type);
+  }
+
+  *,
+  *:after,
+  *:before {
+    box-sizing: border-box;
+  }
+
+  body {
+    background: light-dark(#fff, #000);
+    display: grid;
+    place-items: center;
+    min-height: 100vh;
+    font-family: 'SF Pro Text', 'SF Pro Icons', 'AOS Icons', 'Helvetica Neue',
+      Helvetica, Arial, sans-serif, system-ui;
+  }
+
+  body::before {
+    --size: 45px;
+    --line: color-mix(in hsl, canvasText, transparent 70%);
+    content: '';
+    height: 100vh;
+    width: 100vw;
+    position: fixed;
+    background: linear-gradient(
+          90deg,
+          var(--line) 1px,
+          transparent 1px var(--size)
+        )
+        50% 50% / var(--size) var(--size),
+      linear-gradient(var(--line) 1px, transparent 1px var(--size)) 50% 50% /
+        var(--size) var(--size);
+    -webkit-mask: linear-gradient(-20deg, transparent 50%, white);
+            mask: linear-gradient(-20deg, transparent 50%, white);
+    top: 0;
+    transform-style: flat;
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  .bear-link {
+    color: canvasText;
+    position: fixed;
+    top: 1rem;
+    left: 1rem;
+    width: 48px;
+    aspect-ratio: 1;
+    display: grid;
+    place-items: center;
+    opacity: 0.8;
+  }
+
+  :where(.x-link, .bear-link):is(:hover, :focus-visible) {
+    opacity: 1;
+  }
+
+  .bear-link svg {
+    width: 75%;
+  }
+
+  /* Utilities */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+}
+
+div.tp-dfwv {
+  width: 280px;
+  max-height: 100vh;
+  overflow: auto;
+}
+</style>
+
+  
+  
+  
+</head>
+
+<body>
+  <svg class="sr-only">
+      <filter id="sticker">
+        <feMorphology
+          in="SourceAlpha"
+          result="dilate"
+          operator="dilate"
+          radius="2"
+        ></feMorphology>
+        <feFlood flood-color="#fafafa" result="outlinecolor"></feFlood>
+        <feTurbulence
+          baseFrequency="0.03"
+          seed="1"
+          numOctaves="3"
+          type="turbulence"
+          result="turb"
+        ></feTurbulence>
+        <feComposite
+          in="turb"
+          in2="dilate"
+          operator="in"
+          result="outline"
+        ></feComposite>
+        <feComposite
+          in="outlinecolor"
+          in2="dilate"
+          operator="in"
+          result="outlineflat"
+        ></feComposite>
+        <feMerge result="merged">
+          <feMergeNode in="outlineflat"></feMergeNode>
+          <feMergeNode in="outline"></feMergeNode>
+          <feMergeNode in="SourceGraphic"></feMergeNode>
+        </feMerge>
+        <feGaussianBlur
+          in="SourceAlpha"
+          stdDeviation="3"
+          result="blur"
+        ></feGaussianBlur>
+        <feSpecularLighting
+          result="lighting"
+          in="blur"
+          surfaceScale="5"
+          specularConstant="0.5"
+          specularExponent="120"
+          lighting-color="#ffffff"
+        >
+          <fePointLight x="50" y="50" z="300"></fePointLight>
+        </feSpecularLighting>
+        <feComposite
+          in="lighting"
+          in2="SourceAlpha"
+          operator="in"
+          result="composite"
+        ></feComposite>
+        <feComposite
+          in="merged"
+          in2="composite"
+          operator="arithmetic"
+          k1="0"
+          k2="1"
+          k3="1"
+          k4="0"
+          result="litPaint"
+        ></feComposite>
+        <feDropShadow
+          dx="0"
+          dy="2"
+          stdDeviation="2"
+          flood-color="#000"
+          flood-opacity="0.5"
+        />
+      </filter>
+    </svg>
+    <div class="sticker">
+      <svg
+        viewBox="0 0 885 1059"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <rect
+          x="528"
+          y="962"
+          width="115"
+          height="52"
+          rx="26"
+          transform="rotate(-90 528 962)"
+          fill="#AF7128"
+          stroke="#000"
+          stroke-width="6"
+        />
+        <path d="M552 948a3 3 0 1 0-6 0h6Zm0 12v-12h-6v12h6Z" fill="#000" />
+        <path d="M564 948a3 3 0 1 0-6 0h6Zm0 12v-12h-6v12h6Z" fill="#000" />
+        <path
+          d="M506 673a37 37 0 1 1 66-7c13 4 26 11 36 21l14 14c10 11 18 23 21 36a37 37 0 1 1-7 67c-4 6-8 12-14 18l-47 47-77 77-6 7-15 25c-4 5-7 11-13 13-8 3-17 1-23-5l-13-12-8-7-9-9c-8-9-6-20-1-31l13-23-6-6-4-7-16 21c-6 9-20 10-29 2l-26-26c-8-9-15-21-5-37l47-60-2-8v-63a29 29 0 1 1 58 0v15l48-48c5-5 11-10 18-14Z"
+          fill="#AF7128"
+        />
+        <path
+          d="m575 869 47-47c6-6 10-12 14-18a37 37 0 1 0 7-67c-3-13-11-25-21-36l-14-14a85 85 0 0 0-36-21 37 37 0 1 0-66 7c-7 4-13 9-18 14l-48 48v-15a29 29 0 0 0-58 0v63l2 8-47 60c-10 16-3 28 5 37l26 26c9 8 23 7 29-2l16-21 4 7 6 6-13 23c-5 11-7 22 1 31l9 9 8 7 13 12c6 6 15 8 23 5 6-2 9-8 13-13l15-25 6-7 39-39"
+          stroke="#000"
+          stroke-width="6"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+        <path d="M412 705a3 3 0 0 0 6 0h-6Zm0-12v12h6v-12h-6Z" fill="#000" />
+        <path d="M400 705a3 3 0 0 0 6 0h-6Zm0-12v12h6v-12h-6Z" fill="#000" />
+        <path fill="#FF1E1E" d="m542 703 63 63-9 9-63-63z" />
+        <path
+          fill-rule="evenodd"
+          clip-rule="evenodd"
+          d="M650 753c3 23-6 46-21 61l-43-44c9-10 9-25 0-35l-14-13a25 25 0 0 0-35 0l-43-44c14-14 37-23 60-21 23 3 46 14 64 32s30 41 32 64Z"
+          fill="#000"
+        />
+        <circle
+          cx="582.1"
+          cy="803.3"
+          transform="rotate(45 582 803)"
+          fill="#000"
+          r="8.1"
+        />
+        <circle
+          cx="505.2"
+          cy="726.4"
+          transform="rotate(45 505 726)"
+          fill="#000"
+          r="8.1"
+        />
+        <path
+          d="M548 790c-6 6-19 5-27-3-8-7-8-21-2-27 5-5 15-1 23 6 8 8 12 18 6 24Z"
+          fill="#000"
+        />
+        <path
+          d="m430 956-8 8"
+          stroke="#000"
+          stroke-width="6"
+          stroke-linecap="round"
+        />
+        <path
+          d="m447 973-8 8"
+          stroke="#000"
+          stroke-width="6"
+          stroke-linecap="round"
+        />
+        <path
+          d="m357 883-8 8"
+          stroke="#000"
+          stroke-width="6"
+          stroke-linecap="round"
+        />
+        <path
+          d="m374 900-8 8"
+          stroke="#000"
+          stroke-width="6"
+          stroke-linecap="round"
+        />
+        <path
+          d="m427 822-5-376"
+          stroke="#000"
+          stroke-width="6"
+          stroke-linecap="round"
+        />
+        <circle
+          cx="421.5"
+          cy="273.5"
+          r="169"
+          fill="#D52828"
+          fill-opacity="1"
+          stroke="#000"
+          stroke-width="6"
+        />
+        <path
+          d="M406 445h31l10 20h-50l9-20Z"
+          fill="#F20000"
+          fill-opacity="1"
+          stroke="#000"
+          stroke-width="6"
+          stroke-linejoin="round"
+        />
+        <path
+          d="m380 757 62-42"
+          stroke="#000"
+          stroke-width="6"
+          stroke-linecap="round"
+        />
+        <path
+          d="M384 143a136 136 0 0 0-98 119"
+          stroke="#fff"
+          stroke-opacity=".5"
+          stroke-width="30"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+    </div>
+    <a
+      class="bear-link"
+      href="https://twitter.com/intent/follow?screen_name=jh3yy"
+      target="_blank"
+      rel="noreferrer noopener"
+    >
+      <svg
+        class="w-9"
+        viewBox="0 0 969 955"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <circle
+          cx="161.191"
+          cy="320.191"
+          r="133.191"
+          stroke="currentColor"
+          stroke-width="20"
+        ></circle>
+        <circle
+          cx="806.809"
+          cy="320.191"
+          r="133.191"
+          stroke="currentColor"
+          stroke-width="20"
+        ></circle>
+        <circle
+          cx="695.019"
+          cy="587.733"
+          r="31.4016"
+          fill="currentColor"
+        ></circle>
+        <circle
+          cx="272.981"
+          cy="587.733"
+          r="31.4016"
+          fill="currentColor"
+        ></circle>
+        <path
+          d="M564.388 712.083C564.388 743.994 526.035 779.911 483.372 779.911C440.709 779.911 402.356 743.994 402.356 712.083C402.356 680.173 440.709 664.353 483.372 664.353C526.035 664.353 564.388 680.173 564.388 712.083Z"
+          fill="currentColor"
+        ></path>
+        <rect
+          x="310.42"
+          y="448.31"
+          width="343.468"
+          height="51.4986"
+          fill="#FF1E1E"
+        ></rect>
+        <path
+          fill-rule="evenodd"
+          clip-rule="evenodd"
+          d="M745.643 288.24C815.368 344.185 854.539 432.623 854.539 511.741H614.938V454.652C614.938 433.113 597.477 415.652 575.938 415.652H388.37C366.831 415.652 349.37 433.113 349.37 454.652V511.741L110.949 511.741C110.949 432.623 150.12 344.185 219.845 288.24C289.57 232.295 384.138 200.865 482.744 200.865C581.35 200.865 675.918 232.295 745.643 288.24Z"
+          fill="currentColor"
+        ></path>
+      </svg>
+    </a>
+  
+    <script id="rendered-js" type="module">
+import { Pane } from 'https://esm.sh/tweakpane@4.0.4';
+
+const config = {
+  theme: 'light',
+  radius: 4,
+  outline: '#fff',
+  base: 0.4,
+  octaves: 4,
+  seed: 120,
+  type: 'turbulence',
+  deviation: 2,
+  surface: 8,
+  specular: 6,
+  exponent: 65,
+  light: 'hsla(0, 0%, 80%, 0.5)',
+  x: 50,
+  y: 50,
+  z: 65,
+  pointer: true,
+  dx: 1,
+  dy: 3,
+  shadow: 'hsl(0, 0%, 0%)',
+  shadowOpacity: 0.75,
+  shadowDev: 3 };
+
+
+const ctrl = new Pane({
+  title: 'Config',
+  expanded: true });
+
+const sticker = document.querySelector('.sticker');
+const feMorphology = document.querySelector('feMorphology');
+const feFlood = document.querySelector('feFlood');
+const feTurbulence = document.querySelector('feTurbulence');
+const feGaussianBlur = document.querySelector('feGaussianBlur');
+const feSpecularLighting = document.querySelector('feSpecularLighting');
+const fePointLight = document.querySelector('fePointLight');
+const feDropShadow = document.querySelector('feDropShadow');
+
+const syncLight = ({ x, y }) => {
+  const stickerBounds = sticker.getBoundingClientRect();
+  fePointLight.setAttribute('x', Math.floor(x - stickerBounds.x));
+  fePointLight.setAttribute('y', Math.floor(y - stickerBounds.y));
+};
+let monitoring = false;
+const update = () => {
+  document.documentElement.dataset.theme = config.theme;
+  feMorphology.setAttribute('radius', config.radius);
+  feFlood.setAttribute('flood-color', config.outline);
+  feTurbulence.setAttribute('seed', config.seed);
+  feTurbulence.setAttribute('type', config.type);
+  feTurbulence.setAttribute('numOctaves', config.octaves);
+  feTurbulence.setAttribute('baseFrequency', config.base);
+  feGaussianBlur.setAttribute('stdDeviation', config.deviation);
+  feSpecularLighting.setAttribute('surfaceScale', config.surface);
+  feSpecularLighting.setAttribute('specularConstant', config.specular);
+  feSpecularLighting.setAttribute('specularExponent', config.exponent);
+  feSpecularLighting.setAttribute('lighting-color', config.light);
+  fePointLight.setAttribute('x', config.x);
+  fePointLight.setAttribute('y', config.y);
+  fePointLight.setAttribute('z', config.z);
+
+  feDropShadow.setAttribute('dx', config.dx);
+  feDropShadow.setAttribute('dy', config.dy);
+  feDropShadow.setAttribute('flood-color', config.shadow);
+  feDropShadow.setAttribute('flood-opacity', config.shadowOpacity);
+  feDropShadow.setAttribute('stdDeviation', config.shadowDev);
+
+  if (config.pointer && !monitoring) {
+    monitoring = true;
+    sticker.dataset.pointerLighting = true;
+    window.addEventListener('pointermove', syncLight);
+  } else if (!config.pointer) {
+    monitoring = false;
+    sticker.dataset.pointerLighting = false;
+    window.removeEventListener('pointermove', syncLight);
+  }
+};
+
+const sync = event => {
+  if (
+  !document.startViewTransition ||
+  event.target.controller.view.labelElement.innerText !== 'Theme')
+
+  return update();
+  document.startViewTransition(() => update());
+};
+
+const morph = ctrl.addFolder({ title: 'feMorphology' });
+morph.addBinding(config, 'radius', {
+  min: 0,
+  max: 20,
+  step: 1,
+  label: 'radius' });
+
+const flood = ctrl.addFolder({ title: 'feFlood' });
+flood.addBinding(config, 'outline', {
+  label: 'color' });
+
+const turbulence = ctrl.addFolder({ title: 'feTurbulence' });
+turbulence.addBinding(config, 'base', {
+  label: 'baseFrequency',
+  min: 0,
+  max: 1,
+  step: 0.01 });
+
+turbulence.addBinding(config, 'octaves', {
+  label: 'numOctaves',
+  min: 0,
+  max: 10,
+  step: 1 });
+
+turbulence.addBinding(config, 'seed', {
+  label: 'seed',
+  min: 0,
+  max: 1000,
+  step: 1 });
+
+turbulence.addBinding(config, 'type', {
+  label: 'type',
+  options: {
+    fractalNoise: 'fractalNoise',
+    turbulence: 'turbulence' } });
+
+
+const blur = ctrl.addFolder({ title: 'feGaussianBlur' });
+blur.addBinding(config, 'deviation', {
+  label: 'stdDeviation',
+  min: 0,
+  max: 10,
+  step: 0.1 });
+
+const lighting = ctrl.addFolder({ title: 'feSpecularLighting' });
+// surfaceScale="5"
+// specularConstant="0.5"
+// specularExponent="120"
+// lighting-color="#ffffff"
+lighting.addBinding(config, 'light', {
+  label: 'color' });
+
+lighting.addBinding(config, 'surface', {
+  label: 'surfaceScale',
+  min: 0,
+  max: 50,
+  step: 0.1 });
+
+lighting.addBinding(config, 'specular', {
+  label: 'constant',
+  min: 0,
+  max: 25,
+  step: 0.1 });
+
+lighting.addBinding(config, 'exponent', {
+  label: 'exponent',
+  min: 0,
+  max: 200,
+  step: 0.1 });
+
+
+const point = ctrl.addFolder({ title: 'fePointLight' });
+point.addBinding(config, 'x', {
+  label: 'x',
+  min: -500,
+  max: 500,
+  step: 1 });
+
+point.addBinding(config, 'y', {
+  label: 'y',
+  min: -500,
+  max: 500,
+  step: 1 });
+
+point.addBinding(config, 'z', {
+  label: 'z',
+  min: 0,
+  max: 500,
+  step: 1 });
+
+point.addBinding(config, 'pointer', {
+  label: 'pointer' });
+
+
+const shadow = ctrl.addFolder({ title: 'feDropShadow' });
+shadow.addBinding(config, 'dx', {
+  min: -10,
+  max: 10,
+  step: 1,
+  label: 'dx' });
+
+shadow.addBinding(config, 'dy', {
+  min: -10,
+  max: 10,
+  step: 1,
+  label: 'dy' });
+
+shadow.addBinding(config, 'shadow', {
+  label: 'flood-color' });
+
+shadow.addBinding(config, 'shadowOpacity', {
+  label: 'flood-opacity',
+  min: 0,
+  max: 1,
+  step: 0.01 });
+
+shadow.addBinding(config, 'shadowDev', {
+  label: 'stdDeviation',
+  min: 0,
+  max: 20,
+  step: 0.1 });
+
+
+ctrl.addBinding(config, 'theme', {
+  label: 'Theme',
+  options: {
+    System: 'system',
+    Light: 'light',
+    Dark: 'dark' } });
+
+
+
+ctrl.on('change', sync);
+update();
+  </script>
+
+  
+</body>
+
+</html>

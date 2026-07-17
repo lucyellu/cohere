@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getEvent, getWeather } from './liveApi.js';
+import { itunesTrack } from '../api.js';
 import { syncClock, syncedNow, nowPlaying, fmtClock, setWarpTo, clearWarp } from './clock.js';
 import { usePresence } from './presence.js';
 import { roomUrl } from './roomShare.js';
@@ -101,7 +102,7 @@ export default function LiveRoom({ event: initial, onBack }) {
   function resetPanels() {
     localStorage.removeItem('cohear_live_panel_order');
     sizeStore.clear();
-    setPanelOrder(['chat', 'transcription', 'video', 'lyrics', 'setlist', 'map', 'social']);
+    setPanelOrder(['video', 'setlist', 'lyrics', 'map', 'social', 'chat', 'transcription']);
     setResetNonce((n) => n + 1); // re-applies default size to every panel
   }
 
@@ -242,7 +243,7 @@ export default function LiveRoom({ event: initial, onBack }) {
 }
 
 function readPanelOrder() {
-  const fallback = ['chat', 'transcription', 'video', 'lyrics', 'setlist', 'map', 'social'];
+  const fallback = ['video', 'setlist', 'lyrics', 'map', 'social', 'chat', 'transcription'];
   try {
     const parsed = JSON.parse(localStorage.getItem('cohear_live_panel_order') || 'null');
     if (Array.isArray(parsed) && parsed.includes('chat')) {
@@ -391,15 +392,35 @@ function LiveVideoPanel({ event, np }) {
   const player = usePlayer();
   const track = player?.track;
   const canPlayCurrent = Boolean(np?.song);
+  const [itunesAudio, setItunesAudio] = useState(null);
 
   function playCurrent() {
+    setItunesAudio(null);
     if (canPlayCurrent) player?.playSong(event.artist, np.song);
+  }
+
+  async function playAudioOnly() {
+    if (!canPlayCurrent) return;
+    const track = await itunesTrack(np.song, event.artist);
+    if (track?.previewUrl) {
+      setItunesAudio(track.previewUrl);
+    } else {
+      setItunesAudio('none');
+    }
   }
 
   return (
     <div className="overflow-hidden rounded-xl border border-white/10 bg-black">
       <div className="aspect-video w-full">
-        {track?.videoId ? (
+        {itunesAudio && itunesAudio !== 'none' ? (
+          <div className="flex h-full flex-col items-center justify-center gap-4 bg-[var(--paper-2)] p-6 text-center">
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-500">Audio Preview</div>
+            <audio controls src={itunesAudio} className="w-full max-w-sm" autoPlay />
+            <button className="cohear-secondary min-h-9 px-3 text-xs" onClick={() => setItunesAudio(null)}>
+              Back to video
+            </button>
+          </div>
+        ) : track?.videoId && !itunesAudio ? (
           <iframe
             key={track.videoId}
             className="h-full w-full"
@@ -415,9 +436,17 @@ function LiveVideoPanel({ event, np }) {
               {canPlayCurrent ? `Play the current song to load the shared video here.` : 'The video panel will load once the show reaches a song.'}
             </div>
             {canPlayCurrent && (
-              <button className="cohear-primary min-h-9 px-3 text-xs" onClick={playCurrent}>
-                Play current song
-              </button>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <button className="cohear-primary min-h-9 px-3 text-xs" onClick={playCurrent}>
+                  Play video (uses quota)
+                </button>
+                <button className="cohear-secondary min-h-9 px-3 text-xs" onClick={playAudioOnly}>
+                  Listen to song (Audio Only)
+                </button>
+              </div>
+            )}
+            {itunesAudio === 'none' && (
+              <div className="mt-2 text-xs font-semibold text-amber-500">No audio preview available for this track.</div>
             )}
           </div>
         )}

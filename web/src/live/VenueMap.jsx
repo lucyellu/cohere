@@ -7,9 +7,26 @@ import { loadGoogleMaps, hasMapsKey } from './maps.js';
 
 export default function VenueMap({ venue, city, lat, lng, live, viewers }) {
   const mapRef = useRef(null);
-  const panoRef = useRef(null);
   const [err, setErr] = useState(null);
-  const [streetView, setStreetView] = useState(false);
+  const [viewMode, setViewMode] = useState('hybrid'); // 'hybrid' | 'roadmap' | 'street'
+  const [mapObj, setMapObj] = useState(null);
+
+  useEffect(() => {
+    if (!mapObj) return;
+    if (viewMode === 'hybrid' || viewMode === 'roadmap') {
+      mapObj.setMapTypeId(viewMode);
+      mapObj.getStreetView().setVisible(false);
+    } else if (viewMode === 'street') {
+      const pano = mapObj.getStreetView();
+      pano.setOptions({
+        position: mapObj.getCenter(),
+        pov: { heading: 165, pitch: 0 },
+        zoom: 0,
+        disableDefaultUI: true,
+      });
+      pano.setVisible(true);
+    }
+  }, [viewMode, mapObj]);
 
   useEffect(() => {
     if (!hasMapsKey()) {
@@ -45,6 +62,7 @@ export default function VenueMap({ venue, city, lat, lng, live, viewers }) {
           gestureHandling: 'greedy',
           tilt: 0,
         });
+        setMapObj(map);
         new maps.Marker({
           position: center,
           map,
@@ -71,16 +89,6 @@ export default function VenueMap({ venue, city, lat, lng, live, viewers }) {
             ring.setOptions({ fillOpacity: 0.22 - (r - 80) / 1800 });
           }, 90);
           map.__ringTimer = timer;
-        }
-        // Street View peek (toggled).
-        if (panoRef.current) {
-          new maps.StreetViewPanorama(panoRef.current, {
-            position: center,
-            pov: { heading: 165, pitch: 0 },
-            zoom: 0,
-            disableDefaultUI: true,
-            visible: false,
-          });
         }
       })
       .catch((e) => !cancelled && setErr(e.message));
@@ -115,8 +123,7 @@ export default function VenueMap({ venue, city, lat, lng, live, viewers }) {
 
   return (
     <div className="relative h-full w-full overflow-hidden">
-      <div ref={mapRef} className={`h-full w-full ${streetView ? 'hidden' : ''}`} />
-      <div ref={panoRef} className={`h-full w-full ${streetView ? '' : 'hidden'}`} />
+      <div ref={mapRef} className="h-full w-full" />
 
       {/* Live + viewers overlay */}
       <div className="pointer-events-none absolute left-3 top-3 flex flex-col gap-1.5">
@@ -138,12 +145,20 @@ export default function VenueMap({ venue, city, lat, lng, live, viewers }) {
           <p className="text-sm font-semibold text-zinc-100">{venue}</p>
           <p className="text-[11px] text-zinc-400">{city}</p>
         </div>
-        <button
-          onClick={() => setStreetView((v) => !v)}
-          className="pointer-events-auto rounded-lg bg-black/70 px-3 py-1.5 text-[11px] font-medium text-zinc-200 backdrop-blur hover:bg-black/90"
-        >
-          {streetView ? '🛰️ Satellite' : '🚶 Street View'}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setViewMode((v) => (v === 'roadmap' ? 'hybrid' : 'roadmap'))}
+            className="pointer-events-auto rounded-lg bg-black/70 px-3 py-1.5 text-[11px] font-medium text-zinc-200 backdrop-blur hover:bg-black/90"
+          >
+            {viewMode === 'roadmap' ? '🗺️ Map' : '🛰️ Satellite'}
+          </button>
+          <button
+            onClick={() => setViewMode((v) => (v === 'street' ? 'hybrid' : 'street'))}
+            className="pointer-events-auto rounded-lg bg-black/70 px-3 py-1.5 text-[11px] font-medium text-zinc-200 backdrop-blur hover:bg-black/90"
+          >
+            🚶 Street View
+          </button>
+        </div>
       </div>
     </div>
   );

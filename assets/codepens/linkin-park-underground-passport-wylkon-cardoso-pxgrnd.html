@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Linkin Park Underground Passport</title>
+  <meta name="generator" content="CodePen Library Saver">
+  <meta name="codepen:source" content="https://codepen.io/Wylkon/pen/PXGRNd">
+  <style>
+    html, body {
+      min-height: 100%;
+    }
+  </style>
+  <style>
+  .main * {
+    box-sizing: border-box;
+    margin: 0;
+    outline: none;
+    padding: 0;
+  }
+  .main ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .main {
+    background: url(https://lpunderground.com/assets/7-27ff6960.jpeg) center center;
+    background-size: cover;
+    height: 100vh;
+    width: 100vw;
+  }
+  .main > a {
+    display: block;
+    height: 100%;
+    margin: 0 auto;
+    position: relative;
+    width: 100%;
+  }
+
+  .book {
+    border-radius: 0 30px 30px 0;
+    box-shadow: 0 0 10px #000;
+    background: #fff6d3;
+    height: 492px;
+    perspective: 1000px;
+    position: absolute;
+    right: 25%;
+    top: 100px;
+    transform-style: preserve-3d;
+    width: 320px;
+  }
+
+  .hardcover-front,
+  .hardcover-front li,
+  .book-spine li {
+    height: 100%;
+    left: 0;
+    position: absolute;
+    top: 0;
+    transform-style: preserve-3d;
+    width: 100%;
+  }
+
+  .hardcover-front {
+    border-radius: 0 30px 30px 0;
+    transform: rotateY(-5deg) translateZ(10px) translateX(-4px);
+    transform-origin: 0% 100%;
+    transition: all 0.8s ease, z-index 0.6s;
+    z-index: 100;
+  }
+  .hardcover-front li {
+    border-radius: 30px 0 0 30px;
+  }
+  .hardcover-front li:first-child {
+    -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+    cursor: default;
+    transform: translateZ(2px);
+    -webkit-user-select: none;
+       -moz-user-select: none;
+        -ms-user-select: none;
+            user-select: none;
+  }
+  .hardcover-front li:first-child::after, .hardcover-front li:first-child::before {
+    height: 100%;
+    left: 0;
+    position: absolute;
+    top: 0;
+    width: 4px;
+  }
+  .hardcover-front li:first-child::after {
+    transform: rotateY(90deg) translateZ(-2px) translateX(2px);
+  }
+  .hardcover-front li:first-child::before {
+    transform: rotateY(90deg) translateZ(158px) translateX(2px);
+  }
+  .hardcover-front li:last-child {
+    background: #fff6d3;
+    transform: rotateY(180deg) translateZ(2px);
+  }
+  .hardcover-front li:last-child::after, .hardcover-front li:last-child::before {
+    height: 160px;
+    left: 0;
+    position: absolute;
+    top: 0;
+    width: 4px;
+  }
+  .hardcover-front li:last-child::after {
+    transform: rotateX(90deg) rotateZ(90deg) translateZ(80px) translateX(-2px) translateY(-78px);
+  }
+  .hardcover-front li:last-child::before {
+    box-shadow: 0 0 30px 5px #333;
+    transform: rotateX(90deg) rotateZ(90deg) translateZ(-140px) translateX(-2px) translateY(-78px);
+  }
+
+  .cover-design {
+    -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+    background: url("https://lpunderground.com/assets/cover-t1-f14bb8a4.png") center;
+    background-size: 200% 108%;
+    border-radius: 0 30px 30px 0;
+    bottom: 0;
+    left: 0;
+    overflow: hidden;
+    position: absolute;
+    right: 0;
+    top: 0;
+    z-index: 1;
+  }
+  .cover-design::after {
+    bottom: 0;
+    content: "";
+    left: 0;
+    position: absolute;
+    right: 0;
+    top: 0;
+  }
+
+  .book-spine {
+    transform: rotateY(60deg) translateX(-5px) translateZ(-12px);
+    width: 16px;
+    z-index: 0;
+  }
+  .book-spine li {
+    border-radius: 4px 0 0 4px;
+  }
+  .book-spine li:first-child {
+    background: #7ce7d5;
+    transform: translateZ(2px);
+  }
+  .book-spine li:first-child::after, .book-spine li:first-child::before {
+    height: 100%;
+    left: 0;
+    position: absolute;
+    top: 0;
+    width: 4px;
+  }
+  .book-spine li:first-child::after {
+    transform: rotateY(90deg) translateZ(-2px) translateX(2px);
+  }
+  .book-spine li:first-child::before {
+    transform: rotateY(-90deg) translateZ(-12px);
+  }
+  .book-spine:last-child {
+    background: #a7efe3;
+    transform: translateZ(-2px);
+  }
+  .book-spine:last-child::after, .book-spine:last-child::before {
+    height: 16px;
+    left: 0;
+    position: absolute;
+    top: 0;
+    width: 4px;
+  }
+  .book-spine:last-child::after {
+    transform: rotateX(90deg) rotateZ(90deg) translateZ(8px) translateX(2px) translateY(-6px);
+  }
+  .book-spine:last-child::before {
+    box-shadow: 5px -1px 100px 40px rgba(0, 0, 0, 0.2);
+    transform: rotateX(90deg) rotateZ(90deg) translateZ(-210px) translateX(2px) translateY(-6px);
+  }
+
+  .page {
+    height: 98%;
+    left: 0;
+    position: absolute;
+    top: 1%;
+    transform-style: preserve-3d;
+    width: 99%;
+    z-index: 10;
+  }
+  .page li {
+    background: url(https://lpunderground.com/assets/book-f7a470a9.png) 5% center;
+    background-size: 210% 110%;
+    border-radius: 0 30px 30px 0;
+    box-shadow: inset 0 -1px 2px rgba(0, 0, 0, 0.2), inset -20px 0 40px 0 rgba(0, 0, 0, 0.1), inset 11px 1px 14px -6px rgba(0, 0, 0, 0.3), inset 80px 0 60px -6px rgba(0, 0, 0, 0.2);
+    height: 100%;
+    left: 0;
+    position: absolute;
+    top: 0;
+    transform: rotateY(0) translateX(0) translateZ(1px);
+    transform-origin: left center;
+    transform-style: preserve-3d;
+    transition: transform 0.8s ease, z-index 0.6s, background-color 2s ease;
+    transition-property: transform;
+    transition-timing-function: ease;
+    width: 99%;
+  }
+  .page li.last-but-one-page, .page li.last-one-page {
+    box-shadow: inset 0 -1px 2px rgba(0, 0, 0, 0.2), inset -20px 0 40px 0 rgba(0, 0, 0, 0.1), inset 14px 1px 8px -6px rgba(0, 0, 0, 0.3);
+  }
+
+  .book.active > .hardcover-front,
+  .book:hover > .hardcover-front {
+    box-shadow: 0 0 10px #000;
+    transform: rotateY(-180deg) translateZ(0);
+    transition: all 2s ease, z-index 2s;
+    z-index: 0;
+  }
+  .book.active > .page li,
+  .book:hover > .page li {
+    background-color: #fffbec;
+    transform: rotateY(-180deg) translateX(0) translateZ(-3px);
+    transition: transform 2s ease, z-index 2s, background-color 0.7s ease;
+    transition-delay: 0.2s;
+  }
+  .book.active > .page li:nth-child(2),
+  .book:hover > .page li:nth-child(2) {
+    transition-delay: 0.2s;
+  }
+  .book.active > .page li:nth-child(3),
+  .book:hover > .page li:nth-child(3) {
+    transition-delay: 0.4s;
+  }
+  .book.active > .page li:nth-child(4),
+  .book:hover > .page li:nth-child(4) {
+    transition-delay: 0.6s;
+  }
+  .book.active > .page li:nth-child(5),
+  .book:hover > .page li:nth-child(5) {
+    transition: all 2.5s ease, z-index 2s, background-color 0.3s ease;
+    transition-delay: 0.7s;
+  }
+  .book.active > .page li:nth-child(6),
+  .book:hover > .page li:nth-child(6) {
+    transition: all 3s ease, z-index 2s, background-color 0.3s ease;
+    transition-delay: 0.8s;
+  }
+  .book.active > .page li:nth-child(7),
+  .book:hover > .page li:nth-child(7) {
+    transition: transform 4s ease, z-index 2s, background-color 0.3s ease;
+    transition-delay: 1s;
+  }
+  .book.active > .page li:nth-child(8),
+  .book:hover > .page li:nth-child(8) {
+    transform: rotateY(0) translateX(0) translateZ(1px);
+  }
+  .book.active > .book-spine,
+  .book:hover > .book-spine {
+    transform: translateZ(-9px);
+    transition: transform 0.8s cubic-bezier(0.4, 0.2, 0, 1);
+  }
+
+  .page-container {
+    transform: rotateY(-180deg) translateX(0) translateZ(3px);
+    padding: 40px 30px;
+    height: 100%;
+  }
+  </style>
+</head>
+<body>
+<div class="main">
+  <figure class='book'>
+    <ul class='hardcover-front'>
+      <li>
+        <div class="cover-design"></div>
+      </li>
+      <li></li>
+    </ul>
+
+    <!-- Pages -->
+
+    <ul class='page'>
+      <li class="first-page"></li>
+      <li class="second-page"></li>
+      <li></li>
+      <li></li>
+      <li></li>
+      <li></li>
+      <li class="last-but-one-page">
+        <div class="page-container">Lorem ipsum dolor sit amet consectetur adipisicing elit. Officia aliquid ratione magnam soluta minima numquam iste nihil dolorem officiis corrupti consequuntur exercitationem, quaerat cupiditate dolor atque quidem, hic laboriosam eaque?</div>
+      </li>
+      <li class="last-one-page"></li>
+    </ul>
+
+    <!-- Back -->
+    <ul class='book-spine'>
+      <li></li>
+      <li></li>
+    </ul>
+  </figure>
+</div>
+
+</body>
+</html>

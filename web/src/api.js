@@ -100,6 +100,14 @@ export async function getLyrics(track, artist) {
   return res.json();
 }
 
+export async function itunesTrack(track, artist) {
+  const q = encodeURIComponent(`${artist} ${track}`);
+  const url = `https://itunes.apple.com/search?term=${q}&entity=song&limit=1`;
+  const res = await fetch(url).catch(() => null);
+  const data = await res?.json().catch(() => null);
+  return data?.results?.[0] || null;
+}
+
 // Extract a style-seed image + description from a public Pinterest/image URL.
 export async function extractPin(url) {
   const res = await fetch(`/api/pinterest/extract?url=${encodeURIComponent(url)}`);

@@ -1,0 +1,171 @@
+<!-- Saved from https://codepen.io/Alhassan-ojoe-Koroma/pen/LYveKdq with CodePen Library Saver. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" href="style.css">
+<style>
+body{
+    background-image: url(https://img.freepik.com/premium-photo/dark-background-with-rows-numbers-words-code-it_771335-51699.jpg);
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    background-size: 100% 100%;
+    backdrop-filter: blur(15px);
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 18px;
+}
+
+.continer {
+    border-radius: 70px;
+    width: 650px;
+    height: 970px;
+    margin-top: 100px;
+    margin-left: 200px;
+    border: 20px solid rgba(236, 98, 238, 0.553);
+    background-image: url(https://media.istockphoto.com/id/1193530988/vector/orange-red-yellow-watermark-design-line-art-zigzag-pattern-waving-subtle-curves-vector.jpg?s=612x612&w=0&k=20&c=sBHJW7-dbbRcFi0eFJg36VVEhrdhKoEGPthGdmiOEac=);
+    position: relative;
+}
+
+.persional_info {
+    position: absolute;
+    margin-top: 400px;
+    margin-left: 50px;
+}
+
+.persional_info .qr_code{
+    width: 110px;
+    margin-left: 20px;
+}
+
+.persional_info .sieral_num{
+    position: absolute;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    margin-left: 140px;
+    letter-spacing: 2px;
+    font-weight: bold;
+}
+
+.Passport_details {
+    margin-top: 150px;
+    margin-left: 300px;
+
+}
+.image{
+    width: 200px;
+    display: flex;
+    position: absolute;
+    margin-left: 50px;
+    margin-top: 150px;
+    border-radius: 10px;
+
+}
+
+.line_1 {
+    background-color: gray;
+    height: 2px;
+    width: 130px;
+    position: absolute;
+    margin-left: 410px;
+    margin-top: 70px;
+}
+.line_2 {
+    background-color: gray;
+    height: 2px;
+    width: 50px;
+    position: absolute;
+    margin-left: 165px;
+    margin-top: 70px;
+}
+
+.line_3 {
+    background-color: gray;
+    height: 3px;
+    width: 300px;
+    position: absolute;
+}
+
+.top_heade {
+    position: absolute;
+    margin-left: 50px;
+    margin-top: 60px;
+    font-weight: bold;
+}
+
+.top_heade2 {
+    position: absolute;
+    margin-left: 240px;
+    margin-top: 50px;
+    font-size: 35px;
+}
+
+.icon{
+    position: absolute;
+    width: 60px;
+    margin-left: 550px;
+    margin-top: 40px;
+}
+
+.Signature{
+    width: 200px;
+}
+
+.p_can {
+    word-spacing: 75px;
+}
+.down_code{
+    font-size: 25px;
+    font-weight: light;
+    margin-left: 50px;
+    font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+}
+</style>
+</head>
+<body>
+    <div>
+        <div class="continer">
+            <p class="top_heade">PASSPORT</p>
+            <div class="line_1"></div>
+                 <h2 class="top_heade2">CANADA</h2>
+            <div class="line_2"></div>
+            <img class="icon" src="https://cdn.icon-icons.com/icons2/2677/PNG/512/biometric_passport_icon_161566.png">
+            <div>
+                <img class="image" src="https://res.cloudinary.com/dgvnuwspr/image/upload/v1710239613/r7vkjxyxtbsvcbtwq0gr.png">
+            </div>
+            <div class="persional_info">
+                <p>Given names</p>
+                <h2>MITCH</h2>
+                <p>Nationality</p>
+                <h2>CANADIAN</h2>
+                <P>Date of issue</P>
+                <h2>17 Jan 24</h2>
+                <p class="sieral_num">EQG55555</p>
+                <img class="qr_code" src="https://upload.wikimedia.org/wikipedia/commons/5/5e/QR_Code_example.png">
+            </div>
+            <div class="Passport_details">
+                <p>Passport No.</p>
+                <h2>CA555555</h2>
+                <Pre class="type_spacing">Type      Issuing Country</Pre>
+                <h2 class="p_can">P CAN</h2>
+                <P>surname</P>
+                <h2>HERRIS</h2>
+                <P>Date of birth</P>
+                <h2>07 JUNE 85</h2>
+                <P>Issuing Authorithy</P>
+                <h2>OTTAWA</h2>
+                <P>Date of expiry</P>
+                <h2>17 JUN 34</h2>
+                <img class="Signature" src="https://upload.wikimedia.org/wikipedia/commons/3/3a/Jon_Kirsch%27s_Signature.png">
+                <div class="line_3"></div>
+                <p>Signature of bearer</p>
+            </div>
+            <div>
+                <p class="down_code"> P&lt;CANHERRIS&lt;&lt;MITCH&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;
+                    CA555555 &lt;CAN8506070M3401170&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;06</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

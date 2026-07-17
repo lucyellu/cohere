@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { youtubeSearch, getLyrics, synthesizeScene, enrichPrompt, getTopTracks, getSetlist } from '../api.js';
+import { youtubeSearch, getLyrics, synthesizeScene, enrichPrompt, getTopTracks, getSetlist, spotifyTrack } from '../api.js';
 import { fmtDate, fmtCapacity } from '../tour.js';
 
 // The Show: relive one concert. Per setlist song we pull real fan clips
@@ -18,7 +18,9 @@ export default function ShowView({ show, onBack, onOpenByoc }) {
   const [synth, setSynth] = useState({}); // song -> { loading, image, mode, error }
   const [synthView, setSynthView] = useState(false); // show AI scene instead of video
   const [loading, setLoading] = useState(false);
-  const cache = useRef({ clips: {}, lyrics: {} });
+  const [audioOnly, setAudioOnly] = useState(false);
+  const [itunesAudio, setItunesAudio] = useState({}); // song -> url | 'none'
+  const cache = useRef({ clips: {}, lyrics: {}, itunes: {} });
 
   async function synthesize(song, { enrich = false } = {}) {
     setSynth((s) => ({ ...s, [song]: { loading: true, enriching: enrich } }));
@@ -47,6 +49,7 @@ export default function ShowView({ show, onBack, onOpenByoc }) {
     if (cache.current.clips[song] !== undefined) {
       setClips((c) => ({ ...c, [song]: cache.current.clips[song] }));
       setLyrics((l) => ({ ...l, [song]: cache.current.lyrics[song] }));
+      setItunesAudio((s) => ({ ...s, [song]: cache.current.itunes[song] }));
       return;
     }
     setLoading(true);
@@ -54,17 +57,24 @@ export default function ShowView({ show, onBack, onOpenByoc }) {
     // venue-specific footage yet, and the BYOC premise is crowd footage of the
     // song from anywhere. youtubeSearch returns { items, error } so a quota/API
     // failure is distinct from "nobody filmed this".
-    const [yt, lyr] = await Promise.all([
-      youtubeSearch(`${show.artist} ${song} live`),
+    const [yt, lyr, track] = await Promise.all([
+      audioOnly ? Promise.resolve({ items: [] }) : youtubeSearch(`${show.artist} ${song} live`),
       getLyrics(song, show.artist).catch(() => null),
+      itunesTrack(song, show.artist).catch(() => null),
     ]);
     const clipVal = yt.items.length ? yt.items.slice(0, 4) : 'none';
-    const body = parseLyrics(lyr);
+    const body = lyr;
+    const audioUrl = track?.previewUrl || 'none';
     cache.current.clips[song] = clipVal;
     cache.current.lyrics[song] = body || 'none';
-    setClips((c) => ({ ...c, [song]: clipVal }));
-    setYtErr((e) => ({ ...e, [song]: yt.error || null }));
-    setLyrics((l) => ({ ...l, [song]: body || 'none' }));
+    cache.current.itunes[song] = audioUrl;
+
+    if (activeSong === song) {
+      setClips((c) => ({ ...c, [song]: clipVal }));
+      setYtErr((e) => ({ ...e, [song]: yt.error || null }));
+      setLyrics((l) => ({ ...l, [song]: body || 'none' }));
+      setItunesAudio((s) => ({ ...s, [song]: audioUrl }));
+    }
     setLoading(false);
   }
 
@@ -136,9 +146,20 @@ export default function ShowView({ show, onBack, onOpenByoc }) {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
         {/* Setlist */}
         <aside className="lg:col-span-2">
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-            {songsKind === 'toptracks' ? 'Popular songs' : songsKind === 'recent' ? 'Recent setlist' : 'Setlist'}
-          </h3>
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+              {songsKind === 'toptracks' ? 'Popular songs' : songsKind === 'recent' ? 'Recent setlist' : 'Setlist'}
+            </h3>
+            <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-zinc-400 hover:text-zinc-200">
+              <input
+                type="checkbox"
+                checked={audioOnly}
+                onChange={(e) => setAudioOnly(e.target.checked)}
+                className="rounded border-white/20 bg-black/20 text-emerald-500"
+              />
+              Audio only (saves quota)
+            </label>
+          </div>
           {songsKind === 'recent' && (
             <p className="mb-2 text-[11px] text-zinc-600">
               What they've been playing — from their {setlistSrc?.date || 'last'} show
@@ -244,6 +265,14 @@ export default function ShowView({ show, onBack, onOpenByoc }) {
               >
                 ✨ AI scene
               </button>
+            </div>
+          )}
+
+          {/* Audio Fallback */}
+          {itunesAudio[activeSong] && itunesAudio[activeSong] !== 'none' && (
+            <div className="mt-4 rounded-lg bg-white/5 p-3">
+              <p className="mb-2 text-xs font-semibold text-emerald-400">Audio Preview</p>
+              <audio controls src={itunesAudio[activeSong]} className="h-8 w-full" autoPlay={audioOnly} />
             </div>
           )}
 

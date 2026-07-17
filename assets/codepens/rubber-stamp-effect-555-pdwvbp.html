@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rubber stamp effect</title>
+  <meta name="generator" content="CodePen Library Saver">
+  <meta name="codepen:source" content="https://codepen.io/555/pen/pdwvBP">
+  <style>
+    html, body {
+      min-height: 100%;
+    }
+  </style>
+  <style>
+  body, html {
+    margin: 0px;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    flex-direction: row;
+    background: url("https://s3-us-west-2.amazonaws.com/s.cdpn.io/8399/mf.jpeg") scroll no-repeat center/cover;
+  }
+
+  .stamp {
+    transform: rotate(12deg);
+    color: #555;
+    font-size: 3rem;
+    font-weight: 700;
+    border: 0.25rem solid #555;
+    display: inline-block;
+    padding: 0.25rem 1rem;
+    text-transform: uppercase;
+    border-radius: 1rem;
+    font-family: "Courier";
+    -webkit-mask-image: url("https://s3-us-west-2.amazonaws.com/s.cdpn.io/8399/grunge.png");
+    -webkit-mask-size: 944px 604px;
+    mix-blend-mode: multiply;
+  }
+
+  .is-nope {
+    color: #D23;
+    border: 0.5rem double #D23;
+    transform: rotate(3deg);
+    -webkit-mask-position: 2rem 3rem;
+    font-size: 2rem;
+  }
+
+  .is-approved {
+    color: #0A9928;
+    border: 0.5rem solid #0A9928;
+    -webkit-mask-position: 13rem 6rem;
+    transform: rotate(-14deg);
+    border-radius: 0;
+  }
+
+  .is-draft {
+    color: #C4C4C4;
+    border: 1rem double #C4C4C4;
+    transform: rotate(-5deg);
+    font-size: 6rem;
+    font-family: "Open sans", Helvetica, Arial, sans-serif;
+    border-radius: 0;
+    padding: 0.5rem;
+  }
+  </style>
+</head>
+<body>
+<span class="stamp">proposal</span>
+<span class="stamp is-nope">Declined</span>
+<span class="stamp is-approved">Approved</span>
+<span class="stamp is-draft">Draft</span>
+
+</body>
+</html>
