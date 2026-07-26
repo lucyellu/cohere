@@ -23,8 +23,8 @@ powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter 'name=''no
 rem Free the ports too, in case something else parked on them.
 for %%P in (%WEB% %API%) do for /f "tokens=5" %%K in ('netstat -ano ^| findstr ":%%P " ^| findstr LISTENING') do taskkill /PID %%K /F >nul 2>&1
 
-echo Starting Cohear dev stack ^(gateway :%API% + web :%WEB%^)...
-start /min "" cmd /c "cd /d %DIR% && npm run dev"
+echo Starting Cohear production stack ^(gateway :%API% + web :%WEB%^)...
+start /min "" cmd /c "cd /d %DIR% && npm start"
 
 rem --- Wait until the web server actually accepts connections (no fixed sleep) -
 echo Waiting for the web server to come up...
@@ -37,12 +37,12 @@ if !tries! geq 60 (
     echo Timed out after !tries!s waiting for port %WEB%. Opening anyway...
     goto ready
 )
-timeout /t 1 /nobreak >nul
+ping 127.0.0.1 -n 2 >nul
 goto waitloop
 
 :ready
 rem Small grace so Vite finishes its first compile before the page loads.
-timeout /t 1 /nobreak >nul
+ping 127.0.0.1 -n 2 >nul
 
 :open
 rem --- Open in Chrome app-mode if available, else the default browser --------
@@ -56,7 +56,7 @@ for %%P in (
 )
 
 if defined CHROME (
-    start "" !CHROME! --app="http://localhost:%WEB%/"
+    start "" !CHROME! "http://localhost:%WEB%/"
 ) else (
     start "" "http://localhost:%WEB%/"
 )

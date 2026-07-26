@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",
+    "cohear": "file:..",
     "firebase": "^12.15.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",

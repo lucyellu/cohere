@@ -993,12 +993,16 @@ export function snapshotLocal() {
 // Overwrite local storage with a reconciled state and notify the UI. Does not
 // re-trigger a push (the caller owns the cloud write for this state).
 export function writeLocalState(state = {}) {
-  if (state.profile) localStorage.setItem(PROFILE_KEY, JSON.stringify(state.profile));
-  if (state.visas) writeArray(VISAS_KEY, state.visas);
-  if (state.entries) writeArray(ENTRIES_KEY, state.entries);
-  if (state.stubs) writeArray(STUBS_KEY, state.stubs);
-  if (state.history) writeArray(HISTORY_KEY, state.history);
-  if (state.optout) writeArray(OPTOUT_KEY, state.optout);
+  try {
+    if (state.profile) localStorage.setItem(PROFILE_KEY, JSON.stringify(state.profile));
+    if (state.visas) writeArray(VISAS_KEY, state.visas);
+    if (state.entries) writeArray(ENTRIES_KEY, state.entries);
+    if (state.stubs) writeArray(STUBS_KEY, state.stubs);
+    if (state.history) writeArray(HISTORY_KEY, state.history);
+    if (state.optout) writeArray(OPTOUT_KEY, state.optout);
+  } catch (err) {
+    console.error('Failed to write passport state (quota exceeded?):', err);
+  }
   window.dispatchEvent(new Event(HISTORY_EVENT)); // refresh UI, no cloud push
 }
 
@@ -1066,7 +1070,12 @@ function readArray(key) {
 }
 
 function writeArray(key, value) {
-  localStorage.setItem(key, JSON.stringify(value.slice(0, 500)));
+  try {
+    localStorage.setItem(key, JSON.stringify(value.slice(0, 500)));
+  } catch (err) {
+    console.warn(`Failed to write ${key} to localStorage:`, err);
+    // If quota exceeded, we could try to slice it smaller or just drop it.
+  }
 }
 
 function normalizeDate(value) {

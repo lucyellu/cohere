@@ -19,12 +19,6 @@ export const INVERT_KEY = 'cohere_theme_invert';
 // touch so the generated page reads as a calm monochrome rather than neon.
 export const SEED_SWATCHES = [
   { label: 'Slate', hex: '#5f6b78' },
-  { label: 'Teal', hex: '#1f9b9b' },
-  { label: 'Emerald', hex: '#2f9e6b' },
-  { label: 'Amber', hex: '#d68a1e' },
-  { label: 'Terracotta', hex: '#e0662f' },
-  { label: 'Rose', hex: '#d8456a' },
-  { label: 'Violet', hex: '#8a5bd6' },
 ];
 
 // Every Tailwind colour family the app uses inline. All of them collapse onto
@@ -58,13 +52,19 @@ export function randomSeed() {
   return hslHex(h, s, l);
 }
 
+// The swapShade function is no longer needed since swap is a boolean state
+export function swapShade(hex) {
+  // kept for backward compatibility if SettingsDrawer still references it momentarily
+  return hex;
+}
+
 export function isValidHex(hex) {
   return /^#[0-9a-f]{6}$/i.test(String(hex || ''));
 }
 
 // Paint the entire palette onto :root. `seed` is the vivid accent; everything
-// else is derived from its hue. `invert` produces the light skin.
-export function applyTheme(seed) {
+// else is derived from its hue. `invert` produces the light skin. `swap` flips accent and main.
+export function applyTheme(seed, invert = false, swap = false) {
   if (!isValidHex(seed)) seed = '#71717a';
   const root = document.documentElement;
   const set = (k, v) => root.style.setProperty(k, v);
@@ -73,30 +73,41 @@ export function applyTheme(seed) {
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const sat = s / 100; // 0..1
 
-  root.style.colorScheme = 'dark';
-  root.setAttribute('data-skin', 'night');
+  root.style.colorScheme = invert ? 'light' : 'dark';
+  root.setAttribute('data-skin', invert ? 'paper' : 'night');
 
-  // Accent stays vivid
   const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
   const seedL = hexToHsl(seed).l / 100;
   const accentDim = hslHex(h, clamp(sat * 0.94, 0, 1) * 100, clamp(seedL - 0.13, 0.04, 1) * 100);
-  set('--accent', seed);
-  set('--accent-r', String(r));
-  set('--accent-g', String(g));
-  set('--accent-b', String(b));
-  set('--accent-text', lum > 0.6 ? '#1a1206' : '#fff6ef');
-  set('--accent-dim', accentDim);
 
-  // Dark skin: very dark page, cream ink. Tinted by the seed's hue.
   const pageSat = clamp(sat * 0.55, 0, 0.5);
   const cardSat = clamp(sat * 0.5, 0, 0.44);
   const inkSat = clamp(sat * 0.4, 0, 0.3);
 
-  const L = { paper: 0.066, paper2: 0.04, card: 0.105, ink: 0.93, ink2: 0.69, ink3: 0.5 };
+  const L = invert
+    ? { paper: 0.96, paper2: 0.93, card: 0.89, ink: 0.08, ink2: 0.25, ink3: 0.45 }
+    : { paper: 0.066, paper2: 0.04, card: 0.105, ink: 0.93, ink2: 0.69, ink3: 0.5 };
 
-  const paper = hslHex(h, pageSat * 100, L.paper * 100);
-  const paper2 = hslHex(h, pageSat * 100, L.paper2 * 100);
-  const card = hslHex(h, cardSat * 100, L.card * 100);
+  const basePaper = hslHex(h, pageSat * 100, L.paper * 100);
+  const basePaper2 = hslHex(h, pageSat * 100, L.paper2 * 100);
+  const baseCard = hslHex(h, cardSat * 100, L.card * 100);
+  
+  const paper = swap ? seed : basePaper;
+  const paper2 = swap ? seed : basePaper2;
+  const card = swap ? accentDim : baseCard;
+  
+  const actualAccent = swap ? basePaper2 : seed;
+  const actualAccentDim = swap ? basePaper : accentDim;
+  const [ar, ag, ab] = hexRgb(actualAccent);
+  const accentLum = (0.299 * ar + 0.587 * ag + 0.114 * ab) / 255;
+
+  set('--accent', actualAccent);
+  set('--accent-r', String(ar));
+  set('--accent-g', String(ag));
+  set('--accent-b', String(ab));
+  set('--accent-text', accentLum > 0.6 ? '#1a1206' : '#fff6ef');
+  set('--accent-dim', actualAccentDim);
+
   const ink = hslHex(h, inkSat * 100, L.ink * 100);
   const ink2 = hslHex(h, clamp(inkSat * 0.8, 0, 1) * 100, L.ink2 * 100);
   const ink3 = hslHex(h, clamp(inkSat * 0.65, 0, 1) * 100, L.ink3 * 100);
