@@ -8,8 +8,18 @@ const CACHE_TTL_MS = 8 * 60 * 60 * 1000;
 const memoryCache = new Map();
 const pending = new Map();
 
+// The browse windows ('tonight', 'week') are anchored to the VIEWER's calendar
+// day, not the server's. The gateway runs in UTC, so past ~5 PM Pacific its
+// idea of "today" is already tomorrow and tonight's shows vanish — hence we
+// send the local date along and key the cache on it (so crossing local
+// midnight invalidates the entry instead of serving yesterday's window).
+function localToday() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function cacheKey(artist, source, window, customStart, customEnd) {
-  return `cohear_concerts_v8:${artist || 'browse'}:${source || 'default'}:${window || 'default'}:${customStart || ''}:${customEnd || ''}`;
+  return `cohear_concerts_v8:${localToday()}:${artist || 'browse'}:${source || 'default'}:${window || 'default'}:${customStart || ''}:${customEnd || ''}`;
 }
 
 function readCached(key) {
@@ -45,6 +55,7 @@ function writeCached(key, value) {
 // An artist => that artist's past (setlist.fm) + upcoming (JamBase).
 export async function fetchConcerts(artist, source = 'live', window = 'week', { force = false, customStart, customEnd } = {}) {
   const p = new URLSearchParams();
+  p.set('localDate', localToday());
   if (artist) p.set('artist', artist);
   if (source) p.set('source', source);
   if (!artist && window) p.set('window', window);

@@ -292,11 +292,11 @@ function normSetlistfm(setlists) {
   });
 }
 
-function mergeConcerts(list) {
+function mergeConcerts(list, clientTodayIso) {
   const byKey = new Map();
   for (const c of list) {
     if (!c.date) continue;
-    const key = `${c.date}|${(c.venue || '').toLowerCase().trim()}`;
+    const key = `${c.date}|${(c.venue || '').toLowerCase().trim()}|${(c.artist || '').toLowerCase().trim()}`;
     const prev = byKey.get(key);
     if (!prev) { byKey.set(key, c); continue; }
     byKey.set(key, {
@@ -314,7 +314,7 @@ function mergeConcerts(list) {
     });
   }
   const nowMs = Date.now();
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = clientTodayIso || new Date().toISOString().slice(0, 10);
   return [...byKey.values()].map((c) => {
     // Determine upcoming/past using the actual start time when available,
     // not just the UTC calendar date (which misclassifies evening shows in
@@ -368,6 +368,10 @@ router.get('/concerts', async (req, res) => {
   const windowKey = String(req.query.window || 'week').trim(); // browse window when no artist
   const customStart = String(req.query.customStart || '').slice(0, 10);
   const customEnd = String(req.query.customEnd || '').slice(0, 10);
+  const localDateStr = String(req.query.localDate || '').slice(0, 10);
+  const fallbackToday = new Date().toISOString().slice(0, 10);
+  const today = /^\d{4}-\d{2}-\d{2}$/.test(localDateStr) ? localDateStr : fallbackToday;
+
   const browse = !artist; // no artist -> DISCOVER everything happening
   const sources = { jambase: null, setlistfm: null };
   const collected = [];
@@ -375,7 +379,6 @@ router.get('/concerts', async (req, res) => {
   // Browse mode: date-filter JamBase to "what's on" (tonight / this week / upcoming).
   let dateFrom, dateTo;
   if (browse) {
-    const today = new Date().toISOString().slice(0, 10);
     if (windowKey === 'past') {
       dateFrom = addDaysIso(today, -60);
       dateTo = addDaysIso(today, -1);
@@ -388,7 +391,6 @@ router.get('/concerts', async (req, res) => {
     }
   } else {
     // Artist search: limit to next 60 days so the timeline isn't completely overwhelming
-    const today = new Date().toISOString().slice(0, 10);
     dateFrom = today;
     dateTo = addDaysIso(today, 60);
   }
@@ -451,7 +453,7 @@ router.get('/concerts', async (req, res) => {
   }
 
   // Browse defaults to biggest-first (the discovery framing); artist view to recency.
-  const merged = mergeConcerts(collected).filter((c) => !(browse && windowKey === 'past') || c.when === 'past');
+  const merged = mergeConcerts(collected, today).filter((c) => !(browse && windowKey === 'past') || c.when === 'past');
   const concerts = browse
     ? (windowKey === 'past'
       ? merged.sort((a, b) => b.date.localeCompare(a.date))
