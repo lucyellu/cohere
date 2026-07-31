@@ -39,8 +39,8 @@ export default function App() {
   const [onboarding, setOnboarding] = useState(() => shouldOnboard() && !currentRoomCode());
 
   useEffect(() => {
-    applyTheme(settings.themeAccent || '#71717a');
-  }, [settings.themeAccent]);
+    applyTheme(settings.themeAccent || '#71717a', settings.themeInvert || false, settings.themeSwap || false);
+  }, [settings.themeAccent, settings.themeInvert, settings.themeSwap]);
 
   // Interaction sounds — bound once, on by default, toggled from the header.
   const [sfxOn, setSfxOn] = useState(() => sfxEnabled());

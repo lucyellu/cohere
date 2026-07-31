@@ -274,8 +274,18 @@ export default function SettingsDrawer({ open, settings, onChange, onClose }) {
 // shade strip, or use the native picker; the Dark/Light toggle flips the ramp.
 function ThemeSection({ settings, update }) {
   const seed = settings.themeAccent || '#2f86d6';
+  const customShades = settings.customShades || [];
+  const invert = settings.themeInvert || false;
+  const swap = settings.themeSwap || false;
   const shades = monoShades(seed, 3);
   const activeShade = nearestShadeIndex(shades, seed);
+
+  function saveShade() {
+    // Only save if it's not already in the list
+    if (customShades.includes(seed)) return;
+    const next = [seed, ...customShades].slice(0, 3);
+    update({ customShades: next });
+  }
 
   return (
     <section className="cohear-settings-section">
@@ -300,14 +310,19 @@ function ThemeSection({ settings, update }) {
             />
           );
         })}
-        <button
-          onClick={() => update({ themeAccent: randomSeed() })}
-          title="Shuffle a random hue"
-          aria-label="Shuffle theme colour"
-          className="grid h-7 w-7 place-items-center rounded-md border border-white/10 text-zinc-400 transition hover:border-white/40 hover:text-white"
-        >
-          <ShuffleIcon />
-        </button>
+        {customShades.map((hex, i) => {
+          const active = seed.toLowerCase() === hex.toLowerCase();
+          return (
+            <button
+              key={hex + i}
+              onClick={() => update({ themeAccent: hex })}
+              title={`Custom shade ${i + 1}`}
+              aria-label="Custom shade"
+              className={`h-7 w-7 rounded-full border-2 transition-transform ${active ? 'scale-110 border-white' : 'border-transparent hover:border-white/50'}`}
+              style={{ background: hex }}
+            />
+          );
+        })}
         <label className="grid h-8 w-8 cursor-pointer place-items-center" title="Pick a custom colour">
           <input
             type="color"
@@ -316,9 +331,36 @@ function ThemeSection({ settings, update }) {
             className="cohear-color-picker"
           />
         </label>
+        <button
+          onClick={saveShade}
+          className="ml-2 rounded-md border border-white/10 px-3 py-1 text-xs font-medium text-zinc-300 hover:bg-white/5 hover:text-white"
+        >
+          Save
+        </button>
       </div>
 
-      <div>
+      <div className="mt-4 flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-medium text-zinc-300">Invert to Light Mode</div>
+          <button
+            onClick={() => update({ themeInvert: !invert })}
+            className={`relative h-6 w-11 rounded-full transition-colors ${invert ? 'bg-cyan-500' : 'bg-zinc-700'}`}
+          >
+            <span className={`absolute top-1 left-1 h-4 w-4 transform rounded-full bg-white transition-transform ${invert ? 'translate-x-5' : ''}`} />
+          </button>
+        </div>
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-medium text-zinc-300">Swap Accent & Main Colour</div>
+          <button
+            onClick={() => update({ themeSwap: !swap })}
+            className={`relative h-6 w-11 rounded-full transition-colors ${swap ? 'bg-cyan-500' : 'bg-zinc-700'}`}
+          >
+            <span className={`absolute top-1 left-1 h-4 w-4 transform rounded-full bg-white transition-transform ${swap ? 'translate-x-5' : ''}`} />
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-4">
         <div className="cohear-label mb-2">Shade ramp</div>
         <div className="flex h-9 overflow-hidden rounded-lg border border-white/10">
           {shades.map((hex, i) => (
