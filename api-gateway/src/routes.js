@@ -438,13 +438,43 @@ router.get('/concerts', async (req, res) => {
       }
     }
   } else {
-    // Real-time lookup for a specific artist
-    try {
-      const jb = await fetchJambaseEvents({ artist, source, dateFrom, dateTo, perPage: 25 });
-      collected.push(...normJambase(jb.events));
-      sources.jambase = jb.mode;
-    } catch (e) {
-      sources.jambase = 'error';
+    // Artist search: try the cache FIRST. This is the path that scales with
+    // users — every search used to cost two JamBase calls (name -> id, then
+    // events), so a handful of people searching would outrun the 1,000/month
+    // free tier on its own. The cache already holds every worldwide show in
+    // the near-term window, so most searches never leave the database.
+    // TRADE-OFF: past that window the cache is a sampled tail, so a tour
+    // stretching months out returns the sampled dates rather than every one.
+    // Full fidelity there needs a per-artist cache table with its own TTL;
+    // until then this trades far-future detail for not burning the quota.
+    let served = false;
+    if (source !== 'mock' && SB_URL && SB_KEY) {
+      try {
+        const q = encodeURIComponent(`%${artist}%`);
+        const res = await sbFetch(
+          `jambase_global_cache?artist=ilike.${q}&date=gte.${dateFrom}&date=lte.${dateTo}&order=date.asc&limit=200`
+        );
+        if (res.ok) {
+          const hits = await res.json();
+          if (hits.length) {
+            collected.push(...normJambase(hits.map((c) => c.jambase_payload)));
+            sources.jambase = 'live'; // served from the daily cache
+            served = true;
+          }
+        }
+      } catch (e) {
+        console.error('Artist cache lookup failed:', e.message);
+      }
+    }
+    // Miss (unknown artist, or dates outside the cached window) -> go live.
+    if (!served) {
+      try {
+        const jb = await fetchJambaseEvents({ artist, source, dateFrom, dateTo, perPage: 25 });
+        collected.push(...normJambase(jb.events));
+        sources.jambase = jb.mode;
+      } catch (e) {
+        sources.jambase = 'error';
+      }
     }
   }
 
