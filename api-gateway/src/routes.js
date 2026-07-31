@@ -384,7 +384,9 @@ router.get('/concerts', async (req, res) => {
       dateTo = addDaysIso(today, -1);
     } else {
       dateFrom = today;
-      if (windowKey === 'tonight') { dateFrom = today; dateTo = addDaysIso(today, 1); }
+      // "Tonight" is today's calendar date — stretching it to tomorrow let the
+      // (capacity-sorted) next-day stadium shows bury the ones happening now.
+      if (windowKey === 'tonight') { dateFrom = today; dateTo = today; }
       else if (windowKey === 'week') dateTo = addDaysIso(today, 7);
       else if (windowKey === 'custom') { dateFrom = customStart || today; dateTo = customEnd || addDaysIso(today, 30); }
       else dateTo = addDaysIso(today, 60); // 'upcoming'
@@ -408,6 +410,22 @@ router.get('/concerts', async (req, res) => {
       const jbEvents = cached.map((c) => c.jambase_payload);
       collected.push(...normJambase(jbEvents));
       sources.jambase = 'live'; // Effectively live via cache
+
+      // The nightly cron only samples every 4th day, so the cache is sparse: a
+      // multi-day window can "hit" it while holding nothing at all for the day
+      // the user actually cares about. Top up the leading edge in real time —
+      // mergeConcerts dedupes, so an overlap with cached rows is harmless.
+      if (!cached.some((c) => c.date === dateFrom)) {
+        const capTo = addDaysIso(dateFrom, 1);
+        const jb = await fetchJambaseEvents({
+          artist: '',
+          source,
+          dateFrom,
+          dateTo: dateTo < capTo ? dateTo : capTo,
+          perPage: 100,
+        });
+        collected.push(...normJambase(jb.events));
+      }
     } catch (e) {
       console.error('Supabase cache error:', e.message);
       // Fallback to real-time if cache isn't ready
