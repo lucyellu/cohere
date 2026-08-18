@@ -6,6 +6,8 @@ import { loadGoogleMaps, hasMapsKey } from '../live/maps.js';
 import { GOOGLE_PAPER_MAP } from '../live/mapStyle.js';
 import { claimStamp, optOutConcert, recordConcertAction, personalStats, backfillStubs, pruneDuplicates, HISTORY_EVENT } from '../account.js';
 import { readCalendar, addToCalendar, scheduleReminders } from '../calendar.js';
+import ConcertInviteModal from './ConcertInviteModal.jsx';
+
 
 const VIEW_MODES = [
   { id: 'list', label: 'List' },
@@ -120,6 +122,7 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
   const [inspectorWidth, setInspectorWidth] = useState(() => readInspectorWidth());
   const [me, setMe] = useState(() => personalStats());
   const [showMyArtists, setShowMyArtists] = useState(Boolean(initialState.showMyArtists));
+  const [inviteConcert, setInviteConcert] = useState(null);
   const resizeRef = useRef(null);
 
   // Build a set of artist names the user has attended (stubs + history)
@@ -475,6 +478,7 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
                       saved={saved}
                       calendared={calendared}
                       onAddCalendar={addCalendar}
+                      onInvite={setInviteConcert}
                       userZone={userZone}
                       now={now}
                       sortKey={sortKey}
@@ -520,6 +524,7 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
             now={now}
             onSave={() => selected && toggleSave(selected.id)}
             onAddCalendar={() => selected && addCalendar(selected)}
+            onInvite={() => selected && setInviteConcert(selected)}
             onEnterShow={onEnterShow}
             onSyncLive={onSyncLive}
             minCapacity={minCapacity}
@@ -530,6 +535,16 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
           />
         </div>
       )}
+
+      {/* Wedding-Style Concert Invitation Modal */}
+      <ConcertInviteModal
+        concert={inviteConcert}
+        open={Boolean(inviteConcert)}
+        onClose={() => setInviteConcert(null)}
+        onEnterShow={onSyncLive}
+        onAddCalendar={addCalendar}
+        userZone={userZone}
+      />
     </div>
   );
 }
@@ -787,7 +802,7 @@ function colsTemplate(c) {
   return `56px minmax(150px, ${c.artist}fr) minmax(130px, ${c.venue}fr) minmax(160px, ${c.city}fr) minmax(150px, ${c.time}fr) 88px 140px`;
 }
 
-function ConcertTable({ rows, selectedId, onSelect, saved, calendared, onAddCalendar, userZone, now, sortKey, dir, onSort, onSyncLive }) {
+function ConcertTable({ rows, selectedId, onSelect, saved, calendared, onAddCalendar, onInvite, userZone, now, sortKey, dir, onSort, onSyncLive }) {
   const [syncingId, setSyncingId] = useState(null);
   const [cols, setCols] = useState(() => readCols());
   const headerRef = useRef(null);
@@ -917,11 +932,26 @@ function ConcertTable({ rows, selectedId, onSelect, saved, calendared, onAddCale
                   </button>
                 )}
                 <button
-                  className="cohear-primary min-h-9 justify-center px-3 text-xs"
+                  type="button"
+                  className="cohear-icon-button h-9 w-9 shrink-0 text-amber-300 hover:text-amber-200"
+                  onClick={() => onInvite?.(c)}
+                  title="Invite friends (Wedding-style concert invitation)"
+                  aria-label="Invite friends"
+                >
+                  <InvitePlusIcon />
+                </button>
+                <button
+                  className="cohear-primary min-h-9 h-9 w-9 p-0 inline-flex items-center justify-center rounded-full text-xs shadow-md"
                   onClick={() => join(c)}
                   disabled={syncingId === c.id}
+                  title={c.when === 'past' ? 'Watch concert replay' : 'Join live room'}
+                  aria-label={c.when === 'past' ? 'Watch replay' : 'Join live room'}
                 >
-                  {syncingId === c.id ? 'Opening' : 'Join'}
+                  {syncingId === c.id ? (
+                    <span className="animate-spin text-[10px]">◌</span>
+                  ) : (
+                    <PlayIcon className="h-3.5 w-3.5 fill-current ml-0.5" />
+                  )}
                 </button>
               </span>
             </li>
@@ -949,7 +979,7 @@ function SortHeader({ id, label, sortKey, dir, onSort, align = 'left' }) {
   );
 }
 
-function ConcertInspector({ concert, saved, calendared, sources, userZone, currency, now, onSave, onAddCalendar, onEnterShow, onSyncLive, minCapacity, setMinCapacity, timeLimitHrs, setTimeLimitHrs, visibleCount }) {
+function ConcertInspector({ concert, saved, calendared, sources, userZone, currency, now, onSave, onAddCalendar, onInvite, onEnterShow, onSyncLive, minCapacity, setMinCapacity, timeLimitHrs, setTimeLimitHrs, visibleCount }) {
   const [syncing, setSyncing] = useState(false);
   const [ticket, setTicket] = useState(null);
   const [sgTicket, setSgTicket] = useState(null);
@@ -1069,10 +1099,24 @@ function ConcertInspector({ concert, saved, calendared, sources, userZone, curre
             <StatusPill when={concert.when} />
             <div className="flex items-center gap-2">
               {onSyncLive && (
-                <button className="cohear-primary min-h-9 px-3 text-xs" onClick={sync} disabled={syncing}>
-                  {syncing ? 'Opening' : 'Join live'}
+                <button
+                  className="cohear-primary min-h-9 px-3 text-xs inline-flex items-center gap-1.5 font-bold shadow-md"
+                  onClick={sync}
+                  disabled={syncing}
+                  title={concert.when === 'past' ? 'Watch concert replay' : 'Join live room'}
+                >
+                  <PlayIcon className="h-3.5 w-3.5 fill-current" />
+                  <span>{syncing ? 'Opening…' : (concert.when === 'past' ? 'Replay' : 'Join live')}</span>
                 </button>
               )}
+              <button
+                className="cohear-icon-button text-amber-300 hover:text-amber-200"
+                onClick={onInvite}
+                title="Invite friends (Wedding-style concert invitation)"
+                aria-label="Invite friends"
+              >
+                <InvitePlusIcon />
+              </button>
               {concert.when !== 'past' && onAddCalendar && (
                 <button
                   className={`cohear-icon-button ${calendared ? 'text-cyan-300' : ''}`}
@@ -2163,4 +2207,24 @@ function RefreshIcon({ spinning }) {
     </svg>
   );
 }
+
+function PlayIcon({ className = 'h-4 w-4' }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
+      <polygon points="6 4 20 12 6 20 6 4" />
+    </svg>
+  );
+}
+
+function InvitePlusIcon({ className = 'h-4 w-4' }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <line x1="19" y1="8" x2="19" y2="14" />
+      <line x1="16" y1="11" x2="22" y2="11" />
+    </svg>
+  );
+}
+
 
