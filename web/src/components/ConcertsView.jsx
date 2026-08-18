@@ -536,7 +536,7 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
         </div>
       )}
 
-      {/* Wedding-Style Concert Invitation Modal */}
+      {/* Concert Invitation Modal */}
       <ConcertInviteModal
         concert={inviteConcert}
         open={Boolean(inviteConcert)}
@@ -935,22 +935,22 @@ function ConcertTable({ rows, selectedId, onSelect, saved, calendared, onAddCale
                   type="button"
                   className="cohear-icon-button h-9 w-9 shrink-0 text-amber-300 hover:text-amber-200"
                   onClick={() => onInvite?.(c)}
-                  title="Invite friends (Wedding-style concert invitation)"
+                  title="Invite friends to this concert"
                   aria-label="Invite friends"
                 >
                   <InvitePlusIcon />
                 </button>
                 <button
-                  className="cohear-primary min-h-9 h-9 w-9 p-0 inline-flex items-center justify-center rounded-full text-xs shadow-md"
+                  className="cohear-play-btn"
                   onClick={() => join(c)}
                   disabled={syncingId === c.id}
                   title={c.when === 'past' ? 'Watch concert replay' : 'Join live room'}
                   aria-label={c.when === 'past' ? 'Watch replay' : 'Join live room'}
                 >
                   {syncingId === c.id ? (
-                    <span className="animate-spin text-[10px]">◌</span>
+                    <span className="animate-spin text-[10px] text-white">◌</span>
                   ) : (
-                    <PlayIcon className="h-3.5 w-3.5 fill-current ml-0.5" />
+                    <PlayIcon className="h-3.5 w-3.5 fill-white ml-0.5" />
                   )}
                 </button>
               </span>
@@ -1100,19 +1100,19 @@ function ConcertInspector({ concert, saved, calendared, sources, userZone, curre
             <div className="flex items-center gap-2">
               {onSyncLive && (
                 <button
-                  className="cohear-primary min-h-9 px-3 text-xs inline-flex items-center gap-1.5 font-bold shadow-md"
+                  className="cohear-attend-btn"
                   onClick={sync}
                   disabled={syncing}
                   title={concert.when === 'past' ? 'Watch concert replay' : 'Join live room'}
                 >
-                  <PlayIcon className="h-3.5 w-3.5 fill-current" />
+                  <PlayIcon className="h-3.5 w-3.5 fill-white" />
                   <span>{syncing ? 'Opening…' : (concert.when === 'past' ? 'Replay' : 'Join live')}</span>
                 </button>
               )}
               <button
                 className="cohear-icon-button text-amber-300 hover:text-amber-200"
                 onClick={onInvite}
-                title="Invite friends (Wedding-style concert invitation)"
+                title="Invite friends to this concert"
                 aria-label="Invite friends"
               >
                 <InvitePlusIcon />

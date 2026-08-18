@@ -151,7 +151,7 @@ export default function ConcertInviteModal({ concert, open, onClose, onEnterShow
           </svg>
         </button>
 
-        {/* ── THE FORMAL WEDDING-STYLE CONCERT INVITATION CARD ── */}
+        {/* ── OFFICIAL CONCERT INVITATION CARD ── */}
         <div
           ref={cardRef}
           className="relative rounded-3xl p-7 sm:p-10 shadow-2xl overflow-hidden text-[#141416] select-none"
@@ -311,12 +311,10 @@ export default function ConcertInviteModal({ concert, open, onClose, onEnterShow
           <div className="mt-5 pt-4 border-t border-[#c8ab7e]/30 flex flex-wrap gap-2.5 justify-center sm:justify-between items-center">
             <button
               onClick={handleAttendNow}
-              className="inline-flex items-center gap-2 bg-[#d9351f] hover:bg-[#b82a17] text-white px-5 py-2.5 rounded-full text-xs font-bold shadow-md hover:shadow-lg transition-all cursor-pointer"
+              className="cohear-attend-btn"
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                <polygon points="5 3 19 12 5 21 5 3" />
-              </svg>
-              Attend Now / Join Room
+              <PlayIcon className="h-3.5 w-3.5 fill-white" />
+              <span>Attend Now / Join Room</span>
             </button>
 
             <div className="flex items-center gap-2 flex-wrap justify-center">
@@ -349,6 +347,14 @@ export default function ConcertInviteModal({ concert, open, onClose, onEnterShow
         </div>
       </div>
     </div>
+  );
+}
+
+function PlayIcon({ className = 'h-4 w-4' }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
+      <polygon points="6 4 20 12 6 20 6 4" />
+    </svg>
   );
 }
 
@@ -385,3 +391,4 @@ function formatConcertTime(concert, userZone) {
   }
   return '';
 }
+

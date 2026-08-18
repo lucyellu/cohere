@@ -2673,6 +2673,67 @@ button:disabled { cursor: not-allowed; }
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
+/* ── High-Contrast Play & Attend Action Buttons ── */
+.cohear-play-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 2.25rem !important;
+  height: 2.25rem !important;
+  min-height: 2.25rem !important;
+  border-radius: 999px !important;
+  background: linear-gradient(180deg, #d9351f, #e85a2b) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  box-shadow: 0 4px 12px rgba(217, 53, 31, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
+  cursor: pointer !important;
+  transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+  flex-shrink: 0 !important;
+}
+
+.cohear-play-btn:hover {
+  transform: scale(1.08) !important;
+  box-shadow: 0 6px 16px rgba(217, 53, 31, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.45) !important;
+}
+
+.cohear-play-btn:disabled {
+  opacity: 0.5 !important;
+  transform: none !important;
+}
+
+.cohear-attend-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.5rem !important;
+  padding: 0 1.25rem !important;
+  height: 2.25rem !important;
+  min-height: 2.25rem !important;
+  border-radius: 999px !important;
+  background: linear-gradient(180deg, #d9351f, #e85a2b) !important;
+  color: #ffffff !important;
+  font-family: var(--ff-sans) !important;
+  font-weight: 700 !important;
+  font-size: 0.8rem !important;
+  letter-spacing: 0.02em !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  box-shadow: 0 4px 12px rgba(217, 53, 31, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
+  cursor: pointer !important;
+  transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+  flex-shrink: 0 !important;
+}
+
+.cohear-attend-btn:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 6px 16px rgba(217, 53, 31, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.45) !important;
+}
+
+.cohear-attend-btn:disabled {
+  opacity: 0.5 !important;
+  transform: none !important;
+}
+
+
 
 
 
