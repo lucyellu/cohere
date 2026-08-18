@@ -8,8 +8,10 @@ export default function ConcertInviteModal({ concert, open, onClose, onEnterShow
   const [hostName, setHostName] = useState(() => profile.name || 'A Friend');
   const [customNote, setCustomNote] = useState('');
   const [copied, setCopied] = useState(false);
+  const [copiedLinkOnly, setCopiedLinkOnly] = useState(false);
+  const [showFullUrl, setShowFullUrl] = useState(false);
   const [savingImg, setSavingImg] = useState(false);
-  const [rsvpState, setRsvpState] = useState(null); // 'accepted' | null
+  const [rsvpState, setRsvpState] = useState(null);
   const cardRef = useRef(null);
 
   useEffect(() => {
@@ -25,19 +27,77 @@ export default function ConcertInviteModal({ concert, open, onClose, onEnterShow
 
   const url = roomUrl(concert);
   const formattedDate = formatConcertDate(concert.startDate || concert.date);
+  const timeStr = formatConcertTime(concert, userZone);
   const locationStr = [concert.venue, concert.city, concert.country].filter(Boolean).join(', ');
+
+  // Clean title for embedding
+  const cleanLinkTitle = `${concert.artist || 'Concert'} - Live at ${concert.venue || 'Concert Arena'} - ${formattedDate}${timeStr ? ` (${timeStr})` : ''}`;
 
   const defaultNote = `Hey! I'm attending ${concert.artist || 'this concert'} at ${concert.venue || 'the venue'} and would love for you to join me. Check out the details, RSVP, or join the live room with me!`;
   const noteToUse = customNote || defaultNote;
 
+  // Copy full rich invitation (Plain text + Rich HTML for Mail/Slack/Notion)
   async function copyInviteText() {
-    const fullText = `💌 CONCERT INVITATION\n\n${hostName} cordially invites you to experience:\n🎵 ${concert.artist || 'Concert'}\n📅 ${formattedDate}\n📍 ${locationStr}\n\n"${noteToUse}"\n\n👉 Join the live room & RSVP here:\n${url}`;
+    const plainText = `💌 CONCERT INVITATION\n═════════════════════════════════════════\n${hostName} cordially invites you to experience:\n\n🎵 ${concert.artist || 'Live Music'}\n📍 ${locationStr}\n📅 ${formattedDate}${timeStr ? ` · ${timeStr}` : ''}\n\n"${noteToUse}"\n\n👉 Attend: ${cleanLinkTitle}\n${url}\n\n(Direct link: ${url})`;
+
+    const htmlText = `<div style="font-family: sans-serif; max-width: 500px; padding: 20px; border: 2px solid #c8ab7e; border-radius: 16px; background: #fdfbf7; color: #141416;">
+      <p style="font-size: 11px; text-transform: uppercase; color: #8f6834; font-weight: bold; letter-spacing: 2px;">✦ Official Concert Invitation ✦</p>
+      <p style="font-size: 13px; font-style: italic; color: #7a6d59;"><strong>${hostName}</strong> cordially invites you to experience:</p>
+      <h2 style="font-size: 26px; margin: 8px 0; color: #141416;">${concert.artist || 'Live Concert'}</h2>
+      <p style="font-size: 13px; margin: 4px 0;">📅 <strong>Date:</strong> ${formattedDate}${timeStr ? ` · ${timeStr}` : ''}</p>
+      <p style="font-size: 13px; margin: 4px 0;">📍 <strong>Venue:</strong> ${locationStr}</p>
+      <p style="font-size: 13px; margin: 16px 0; padding: 10px; background: #f4ece1; border-radius: 8px; font-style: italic;">"${noteToUse}"</p>
+      <div style="margin-top: 18px;">
+        <a href="${url}" style="display: inline-block; background: #d9351f; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 999px; font-weight: bold; font-size: 14px;">🎟️ Attend: ${concert.artist || 'Concert'} Live</a>
+      </div>
+      <p style="margin-top: 20px; font-size: 11px; color: #888;">Direct URL fallback: <a href="${url}" style="color: #666;">${url}</a></p>
+    </div>`;
+
     try {
-      await navigator.clipboard.writeText(fullText);
+      if (navigator.clipboard && window.ClipboardItem) {
+        const textBlob = new Blob([plainText], { type: 'text/plain' });
+        const htmlBlob = new Blob([htmlText], { type: 'text/html' });
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            'text/plain': textBlob,
+            'text/html': htmlBlob,
+          }),
+        ]);
+      } else {
+        await navigator.clipboard.writeText(plainText);
+      }
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     } catch {
-      /* clipboard fallback */
+      await navigator.clipboard.writeText(plainText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    }
+  }
+
+  // Copy just the clean embedded link
+  async function copyCleanLinkOnly() {
+    const plain = `[Attend: ${cleanLinkTitle}](${url})`;
+    const html = `<a href="${url}">🎟️ Attend: ${cleanLinkTitle}</a>`;
+    try {
+      if (navigator.clipboard && window.ClipboardItem) {
+        const textBlob = new Blob([plain], { type: 'text/plain' });
+        const htmlBlob = new Blob([html], { type: 'text/html' });
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            'text/plain': textBlob,
+            'text/html': htmlBlob,
+          }),
+        ]);
+      } else {
+        await navigator.clipboard.writeText(plain);
+      }
+      setCopiedLinkOnly(true);
+      setTimeout(() => setCopiedLinkOnly(false), 2500);
+    } catch {
+      await navigator.clipboard.writeText(plain);
+      setCopiedLinkOnly(true);
+      setTimeout(() => setCopiedLinkOnly(false), 2500);
     }
   }
 
@@ -146,12 +206,12 @@ export default function ConcertInviteModal({ concert, open, onClose, onEnterShow
           </div>
 
           {/* Event Details Grid */}
-          <div className="rounded-2xl bg-white/70 backdrop-blur-sm border border-[#c8ab7e]/30 p-4 sm:p-5 shadow-sm text-xs leading-relaxed space-y-2.5">
+          <div className="rounded-2xl bg-white/75 backdrop-blur-sm border border-[#c8ab7e]/30 p-4 sm:p-5 shadow-sm text-xs leading-relaxed space-y-2.5">
             <div className="flex items-start gap-3">
               <span className="text-base shrink-0">📅</span>
               <div>
                 <span className="font-bold text-[#141416]">Date & Time: </span>
-                <span className="text-[#3b352b]">{formattedDate}</span>
+                <span className="text-[#3b352b]">{formattedDate}{timeStr ? ` · ${timeStr}` : ''}</span>
               </div>
             </div>
 
@@ -196,7 +256,51 @@ export default function ConcertInviteModal({ concert, open, onClose, onEnterShow
             />
           </div>
 
-          {/* RSVP Status Banner (if RSVP'd) */}
+          {/* ── CLEAN EMBEDDED ATTEND LINK PREVIEW ── */}
+          <div className="mt-4 p-3.5 rounded-2xl bg-[#efe5d3]/60 border border-[#c8ab7e]/40 flex flex-col gap-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-[#7a6d59]">
+                Clean Embedded Invite Link:
+              </span>
+              <button
+                type="button"
+                onClick={copyCleanLinkOnly}
+                className="text-[11px] font-semibold text-[#d9351f] hover:underline cursor-pointer"
+              >
+                {copiedLinkOnly ? '✓ Link Copied!' : 'Copy Clean Link'}
+              </button>
+            </div>
+
+            <a
+              href={url}
+              onClick={(e) => { e.preventDefault(); handleAttendNow(); }}
+              className="inline-flex items-center gap-2 p-2.5 rounded-xl bg-white border border-[#c8ab7e]/50 text-xs font-semibold text-[#141416] hover:border-[#d9351f] transition-colors shadow-xs group"
+              title="Click to open or copy this clean attendee link"
+            >
+              <span className="text-sm">🎟️</span>
+              <span className="truncate group-hover:text-[#d9351f]">
+                Attend: {cleanLinkTitle}
+              </span>
+            </a>
+
+            {/* Direct fallback link toggle */}
+            <div className="mt-1">
+              <button
+                type="button"
+                onClick={() => setShowFullUrl(!showFullUrl)}
+                className="text-[10px] text-[#8c806d] hover:text-[#141416] transition underline cursor-pointer"
+              >
+                {showFullUrl ? 'Hide direct raw URL' : 'Direct URL fallback (in case clean link does not work)'}
+              </button>
+              {showFullUrl && (
+                <div className="mt-1.5 p-2 rounded-lg bg-white/80 border border-[#dad2bf] text-[10px] font-mono break-all select-all text-zinc-600">
+                  {url}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* RSVP Status Banner */}
           {rsvpState === 'accepted' && (
             <div className="mt-4 p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-800 text-center text-xs font-bold animate-pulse">
               ✓ RSVP Confirmed! Show added to your calendar & stamped in your passport.
@@ -204,7 +308,7 @@ export default function ConcertInviteModal({ concert, open, onClose, onEnterShow
           )}
 
           {/* ── CARD CALL-TO-ACTIONS ── */}
-          <div className="mt-6 pt-5 border-t border-[#c8ab7e]/30 flex flex-wrap gap-2.5 justify-center sm:justify-between items-center">
+          <div className="mt-5 pt-4 border-t border-[#c8ab7e]/30 flex flex-wrap gap-2.5 justify-center sm:justify-between items-center">
             <button
               onClick={handleAttendNow}
               className="inline-flex items-center gap-2 bg-[#d9351f] hover:bg-[#b82a17] text-white px-5 py-2.5 rounded-full text-xs font-bold shadow-md hover:shadow-lg transition-all cursor-pointer"
@@ -226,16 +330,16 @@ export default function ConcertInviteModal({ concert, open, onClose, onEnterShow
 
               <button
                 onClick={copyInviteText}
-                className="inline-flex items-center gap-1.5 bg-white/90 hover:bg-white text-[#141416] border border-[#c8ab7e]/60 px-3.5 py-2.5 rounded-full text-xs font-semibold shadow-sm transition cursor-pointer"
-                title="Copy shareable invite link & message"
+                className="inline-flex items-center gap-1.5 bg-white hover:bg-zinc-50 text-[#141416] border border-[#c8ab7e]/60 px-3.5 py-2.5 rounded-full text-xs font-semibold shadow-sm transition cursor-pointer"
+                title="Copy formatted invitation message & clean link"
               >
-                <span>{copied ? '✓ Copied!' : '📋 Copy Link'}</span>
+                <span>{copied ? '✓ Copied Invite!' : '📋 Copy Invite'}</span>
               </button>
 
               <button
                 onClick={downloadCardImage}
                 disabled={savingImg}
-                className="inline-flex items-center gap-1.5 bg-white/90 hover:bg-white text-[#141416] border border-[#c8ab7e]/60 px-3 py-2.5 rounded-full text-xs font-semibold shadow-sm transition cursor-pointer"
+                className="inline-flex items-center gap-1.5 bg-white hover:bg-zinc-50 text-[#141416] border border-[#c8ab7e]/60 px-3 py-2.5 rounded-full text-xs font-semibold shadow-sm transition cursor-pointer"
                 title="Download this invite card as an image"
               >
                 <span>{savingImg ? 'Saving…' : '🖼️ Save Card'}</span>
@@ -262,4 +366,22 @@ function formatConcertDate(dateStr) {
   } catch {
     return dateStr;
   }
+}
+
+function formatConcertTime(concert, userZone) {
+  if (concert.time) return concert.time;
+  if (concert.startDate) {
+    try {
+      const d = new Date(concert.startDate);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          timeZoneName: 'short',
+          timeZone: userZone || undefined,
+        });
+      }
+    } catch {}
+  }
+  return '';
 }
