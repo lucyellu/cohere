@@ -22,6 +22,28 @@ if (new Date() > new Date('2026-12-31T23:59:59Z')) {
 
 const JB_BASE = 'https://api.data.jambase.com/v3';
 
+// Shared with the live gateway routes (jambaseBudget.js / routes.js) — a
+// Postgres-backed counter in this same Supabase project, so the cron ingest
+// and any live fallback calls draw from ONE monthly cap instead of two
+// uncoordinated budgets that could each stay "under budget" while together
+// blowing past JamBase's 1,000/month free tier.
+const JAMBASE_MONTHLY_CAP = envIntEarly('JAMBASE_MONTHLY_CAP', 900);
+function envIntEarly(name, fallback) {
+  return Number.isFinite(+process.env[name]) ? +process.env[name] : fallback;
+}
+async function consumeQuota() {
+  const res = await sbFetch('rpc/bump_api_quota', {
+    method: 'POST',
+    body: JSON.stringify({ p_service: 'jambase', p_cap_fallback: JAMBASE_MONTHLY_CAP }),
+  });
+  if (!res.ok) {
+    console.warn(`  quota RPC failed (HTTP ${res.status}) — treating as exhausted (fail-closed).`);
+    return { allowed: false, calls: null, cap: JAMBASE_MONTHLY_CAP };
+  }
+  const rows = await res.json();
+  return rows?.[0] || { allowed: false, calls: null, cap: JAMBASE_MONTHLY_CAP };
+}
+
 // Fetch options for Supabase
 function sbFetch(path, opts = {}) {
   return fetch(`${SB_URL}/rest/v1/${path}`, {
@@ -69,7 +91,16 @@ const isoIn = (days) => {
   return d.toISOString().slice(0, 10);
 };
 
+class QuotaExhaustedError extends Error {}
+
 async function jbGet(params, label) {
+  // Consume from the SHARED monthly budget before spending a real JamBase
+  // call — this is the hard stop, independent of (and in addition to) the
+  // NEAR_MAX_CALLS/FAR_DAYS sizing above, which only bounds a single run.
+  const budget = await consumeQuota();
+  if (!budget.allowed) {
+    throw new QuotaExhaustedError(`jambase monthly quota exhausted (${budget.calls}/${budget.cap}) on ${label}`);
+  }
   const url = `${JB_BASE}/events?${params}`;
   for (let attempt = 0; attempt < 3; attempt++) {
     const r = await fetch(url, { headers: { Authorization: `Bearer ${JB_KEY}`, Accept: 'application/json' } });
@@ -103,11 +134,22 @@ async function run() {
 
   let page = 1;
   let totalPages = 1;
+  let quotaExhausted = false;
   while (page <= totalPages && page <= NEAR_MAX_CALLS) {
-    const data = await jbGet(
-      `eventDateFrom=${nearFrom}&eventDateTo=${nearTo}&perPage=100&page=${page}`,
-      `near p${page}`
-    );
+    let data;
+    try {
+      data = await jbGet(
+        `eventDateFrom=${nearFrom}&eventDateTo=${nearTo}&perPage=100&page=${page}`,
+        `near p${page}`
+      );
+    } catch (e) {
+      if (e instanceof QuotaExhaustedError) {
+        console.warn(`  ⚠️  ${e.message} — stopping this run early and writing what was fetched so far.`);
+        quotaExhausted = true;
+        break;
+      }
+      throw e;
+    }
     calls++;
     const events = data.events || [];
     allEvents.push(...events);
@@ -127,7 +169,7 @@ async function run() {
   // Contiguous coverage to day 60 would cost ~570 calls — over half the
   // monthly budget for a range nobody browses hour-by-hour. Sample it instead
   // and let the capacity ranking below keep the big ones.
-  for (let offset = NEAR_DAYS + 1; offset <= FAR_DAYS; offset += FAR_STEP) {
+  for (let offset = NEAR_DAYS + 1; !quotaExhausted && offset <= FAR_DAYS; offset += FAR_STEP) {
     const day = isoIn(offset);
     try {
       const data = await jbGet(`eventDateFrom=${day}&eventDateTo=${day}&perPage=100`, day);
@@ -135,6 +177,11 @@ async function run() {
       allEvents.push(...(data.events || []));
       await new Promise((res) => setTimeout(res, PAGE_DELAY_MS));
     } catch (e) {
+      if (e instanceof QuotaExhaustedError) {
+        console.warn(`  ⚠️  ${e.message} — stopping far-term sampling early.`);
+        quotaExhausted = true;
+        break;
+      }
       console.error(`  error on ${day}:`, e.message);
     }
   }

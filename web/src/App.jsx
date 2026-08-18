@@ -135,16 +135,25 @@ export default function App() {
         <div className="mx-auto flex min-h-screen w-full max-w-[1480px] flex-col px-4 py-5 pb-28 sm:px-6 lg:px-8">
           <header className="cohear-topbar flex-wrap justify-between gap-y-3">
             <div className="flex items-center gap-3 w-full lg:w-auto lg:flex-none justify-between">
-              <button className="flex min-w-0 items-center gap-3 text-left" onClick={() => setView('discover')} aria-label="Open Discover">
-                <img src="/cohere-logo.png" alt="Cohere" className="h-10 w-10 shrink-0 rounded-lg" />
+              <button className="flex min-w-0 items-center gap-2.5 text-left group" onClick={() => setView('discover')} aria-label="Open Discover">
+                <span className="cohear-logo-dot shrink-0 transition-transform duration-300 group-hover:scale-110" />
                 <span className="min-w-0">
-                  <span className="block text-lg font-semibold tracking-tight text-white">Cohere</span>
-                  <span className="block truncate text-xs text-zinc-500">Find the biggest concerts happening now.</span>
+                  <span className="block text-xl font-bold tracking-tight text-white leading-none font-sans">Cohere</span>
+                  <span className="block truncate text-[11px] text-zinc-500 mt-1">Discover concerts. Collect memories.</span>
                 </span>
               </button>
 
               {/* Mobile actions (hidden on desktop) */}
               <div className="flex items-center gap-2 lg:hidden shrink-0">
+                <button
+                  className="cohear-icon-button"
+                  data-cuelume-toggle
+                  onClick={() => updateSettings({ themeInvert: !settings.themeInvert, themeAccent: settings.themeAccent || '#e85a2b' })}
+                  aria-label={settings.themeInvert ? 'Switch to dark mode' : 'Switch to landing page light mode'}
+                  title={settings.themeInvert ? 'Light mode (active)' : 'Dark mode (active)'}
+                >
+                  <SunMoonIcon isLight={settings.themeInvert} />
+                </button>
                 <AccountButton />
                 <button className="cohear-icon-button" data-cuelume-toggle onClick={toggleSfx} aria-label={sfxOn ? 'Mute sound effects' : 'Unmute sound effects'} title={sfxOn ? 'Sound effects on' : 'Sound effects off'}>
                   <SoundIcon muted={!sfxOn} />
@@ -167,6 +176,15 @@ export default function App() {
             <div className="hidden items-center gap-2 lg:flex">
               <button className="cohear-primary" onClick={() => setView('discover')}>
                 Browse concerts
+              </button>
+              <button
+                className="cohear-icon-button"
+                data-cuelume-toggle
+                onClick={() => updateSettings({ themeInvert: !settings.themeInvert, themeAccent: settings.themeAccent || '#e85a2b' })}
+                aria-label={settings.themeInvert ? 'Switch to dark mode' : 'Switch to landing page light mode'}
+                title={settings.themeInvert ? 'Light mode active — click for dark' : 'Dark mode active — click for light'}
+              >
+                <SunMoonIcon isLight={settings.themeInvert} />
               </button>
               <AccountButton />
               <button className="cohear-icon-button" data-cuelume-toggle onClick={toggleSfx} aria-label={sfxOn ? 'Mute sound effects' : 'Unmute sound effects'} title={sfxOn ? 'Sound effects on' : 'Sound effects off'}>
@@ -272,6 +290,22 @@ function GearIcon() {
     <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />
       <path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.04.04a2.1 2.1 0 0 1-2.98 2.98l-.04-.04a1.8 1.8 0 0 0-1.98-.36 1.8 1.8 0 0 0-1.08 1.65V21a2.1 2.1 0 0 1-4.2 0v-.06a1.8 1.8 0 0 0-1.18-1.65 1.8 1.8 0 0 0-1.98.36l-.04.04a2.1 2.1 0 0 1-2.98-2.98l.04-.04A1.8 1.8 0 0 0 4 14.8a1.8 1.8 0 0 0-1.65-1.08H2.3a2.1 2.1 0 0 1 0-4.2h.06A1.8 1.8 0 0 0 4 8.34a1.8 1.8 0 0 0-.36-1.98l-.04-.04a2.1 2.1 0 0 1 2.98-2.98l.04.04A1.8 1.8 0 0 0 8.6 4a1.8 1.8 0 0 0 1.08-1.65V2.3a2.1 2.1 0 0 1 4.2 0v.06A1.8 1.8 0 0 0 15.06 4a1.8 1.8 0 0 0 1.98-.36l.04-.04a2.1 2.1 0 0 1 2.98 2.98l-.04.04A1.8 1.8 0 0 0 19.4 8.6a1.8 1.8 0 0 0 1.65 1.08h.06a2.1 2.1 0 0 1 0 4.2h-.06A1.8 1.8 0 0 0 19.4 15Z" />
+    </svg>
+  );
+}
+
+function SunMoonIcon({ isLight }) {
+  if (isLight) {
+    return (
+      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
     </svg>
   );
 }

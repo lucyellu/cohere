@@ -6,11 +6,13 @@ export default function ControlRoom() {
   const [services, setServices] = useState([]);
   const [connected, setConnected] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [jambaseQuota, setJambaseQuota] = useState(null);
 
   const refresh = useCallback(async () => {
     try {
       const data = await getHealth();
       setServices(data.services);
+      setJambaseQuota(data.jambaseQuota || null);
       setConnected(true);
     } catch {
       setConnected(false);
@@ -69,6 +71,8 @@ export default function ControlRoom() {
         </div>
       </div>
 
+      {jambaseQuota && <JambaseQuotaBar quota={jambaseQuota} />}
+
       {connected === false && (
         <div className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
           Can't reach the gateway on <code>:5001</code>. Is it running? Try <code>npm run dev</code> from the project root.
@@ -84,6 +88,32 @@ export default function ControlRoom() {
       <p className="mt-8 text-center text-xs text-zinc-600">
         Keys are server-side in the gateway. Services without a key are locked to mock data.
       </p>
+    </div>
+  );
+}
+
+// JamBase's free tier is 1,000 calls/month; the gateway hard-blocks any live
+// JamBase call once the shared budget (api-gateway/src/jambaseBudget.js) hits
+// its cap, regardless of the calling route or the cron ingest — this bar is
+// just visibility into that same counter, not a separate limit.
+function JambaseQuotaBar({ quota }) {
+  const { calls, cap, month } = quota;
+  const pct = cap ? Math.min(100, Math.round((calls / cap) * 100)) : 0;
+  const color = pct >= 100 ? 'bg-red-500' : pct >= 80 ? 'bg-amber-400' : 'bg-emerald-400';
+  const textColor = pct >= 100 ? 'text-red-300' : pct >= 80 ? 'text-amber-300' : 'text-zinc-300';
+  return (
+    <div className="mb-4 rounded-xl border border-white/10 bg-white/5 p-3">
+      <div className={`mb-1.5 flex items-center justify-between text-xs ${textColor}`}>
+        <span>
+          JamBase quota (this UTC month{month ? ` · ${month}` : ''}):{' '}
+          <span className="font-bold tabular-nums">{calls}</span> / {cap} calls
+          {pct >= 100 && ' — blocked until next month'}
+        </span>
+        <span className="tabular-nums">{pct}%</span>
+      </div>
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
+      </div>
     </div>
   );
 }

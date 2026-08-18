@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>About Cohere</title>
+  <style>
+    :root {
+      --bg: #f5efe2;
+      --bg-2: #ede6d6;
+      --ink: #141416;
+      --ink-soft: #2b2b30;
+      --mute: #8b847a;
+      --line: #dad2bf;
+      --orange-1: #d9351f;
+      --orange-4: #fdc68a;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "DM Sans", system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      background: radial-gradient(120% 70% at 50% 0%, #f8f3e7 0%, #f2ead6 60%, #e9dec3 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .nav {
+      padding: 28px 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      font-size: 16px;
+      text-decoration: none;
+      color: var(--ink);
+    }
+    .logo-dot {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: linear-gradient(180deg, var(--orange-1), var(--orange-4));
+      box-shadow: 0 4px 8px -2px rgba(220, 60, 30, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -2px 3px rgba(120, 20, 0, 0.3);
+    }
+    .nav-links { list-style: none; display: flex; gap: 30px; }
+    .nav-links a {
+      color: var(--ink-soft);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: color 0.3s;
+    }
+    .nav-links a:hover { color: var(--ink); }
+    .content-area {
+      flex: 1;
+      padding: 100px 48px 48px;
+      max-width: 800px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+    h1 {
+      font-size: 48px;
+      margin-bottom: 24px;
+      letter-spacing: -0.03em;
+    }
+    h2 {
+      font-size: 24px;
+      margin-top: 40px;
+      margin-bottom: 16px;
+    }
+    p {
+      margin-bottom: 16px;
+      font-size: 16px;
+      color: var(--ink-soft);
+    }
+    ul.instructions-list {
+      margin-left: 24px;
+      margin-bottom: 24px;
+      color: var(--ink-soft);
+    }
+    ul.instructions-list li {
+      margin-bottom: 8px;
+    }
+  </style>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..900;1,9..40,400..900&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <nav class="nav">
+    <a href="cohere_landing_page.html" class="logo">
+      <span class="logo-dot"></span>
+      Cohere
+    </a>
+    <ul class="nav-links">
+      <li><a href="https://cohere-main.netlify.app/discover">Discover</a></li>
+      <li><a href="https://cohere-main.netlify.app/live-rooms">Live Rooms</a></li>
+      <li><a href="https://cohere-main.netlify.app/passport">Passport</a></li>
+      <li><a href="about.html">About</a></li>
+    </ul>
+  </nav>
+
+  <div class="content-area">
+    <h1>About Cohere</h1>
+    <p>Welcome to Cohere, the ultimate platform for discovering concerts and collecting memories. Whether you're here to find your next unforgettable live music experience or to curate your personal Music Passport, you're in the right place.</p>
+    
+    <h2>Instructions</h2>
+    <ul class="instructions-list">
+      <li><strong>Discover:</strong> Browse through upcoming concerts and find live events based on your favorite artists, genres, and location.</li>
+      <li><strong>Live Rooms:</strong> Join interactive sessions and connect with other fans in real-time before, during, and after a show.</li>
+      <li><strong>Music Passport:</strong> Claim your digital stamps for concerts you've attended. Build your personal history of live music experiences and showcase your unique fan journey.</li>
+      <li><strong>Get Started:</strong> Click on the "Get Started" button in the menu or go to the Login page to create your account and begin your Cohere adventure.</li>
+    </ul>
+    
+    <p>Ready to start? Head over to the <a href="https://cohere-main.netlify.app/login" style="color: var(--orange-1); font-weight: bold; text-decoration: none;">Login Page</a> to join the community.</p>
+  </div>
+</body>
+</html>

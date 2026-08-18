@@ -65,7 +65,7 @@ function readDiscoverState() {
   try {
     const parsed = JSON.parse(sessionStorage.getItem(DISCOVER_STATE_KEY) || 'null');
     if (!parsed) return fallback;
-    return { ...fallback, ...parsed, hideEnded: parsed.hideEnded ?? true };
+    return { ...fallback, ...parsed, hideEnded: parsed.hideEnded ?? true, minCapacity: parsed.minCapacity ?? 5000 };
   } catch {
     return fallback;
   }

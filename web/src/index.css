@@ -125,10 +125,23 @@
   /* translucent frosted surfaces (TimeGrid-style glass) */
   --surface: rgba(243, 232, 221, 0.05);
   --surface-2: rgba(243, 232, 221, 0.09);
-  /* One typeface everywhere — Helvetica. */
-  --ff-serif: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --ff-sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --ff-mono: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  /* One typeface everywhere — DM Sans */
+  --ff-serif: "DM Sans", system-ui, -apple-system, sans-serif;
+  --ff-sans: "DM Sans", system-ui, -apple-system, sans-serif;
+  --ff-mono: "DM Sans", system-ui, -apple-system, sans-serif;
+
+  /* Landing page color tokens */
+  --orange-1: #d9351f;
+  --orange-2: #e85a2b;
+  --orange-3: #f58b4e;
+  --orange-4: #fdc68a;
+  --landing-bg: #f5efe2;
+  --landing-bg-2: #ede6d6;
+  --landing-ink: #141416;
+  --landing-ink-soft: #2b2b30;
+  --landing-mute: #8b847a;
+  --landing-line: #dad2bf;
+  --landing-ghost: #c5bfae;
 
   /* ── Time semantics — the ONLY colours that escape the monochrome ──────────
      Shows about to start / live use shades of GREEN; shows started / ended use
@@ -2416,4 +2429,143 @@ button:disabled { cursor: not-allowed; }
   border: 1px solid rgba(255, 255, 255, 0.08);
   letter-spacing: 0.04em;
 }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   COHERE LANDING PAGE BRANDING & LIGHT MODE SUITE
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* 3D Glowing Gradient Logo Dot (from landing page) */
+.cohear-logo-dot {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, var(--orange-1, #d9351f), var(--orange-4, #fdc68a));
+  box-shadow:
+    0 4px 10px -2px rgba(220, 60, 30, 0.45),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -2px 4px rgba(120, 20, 0, 0.35);
+  flex-shrink: 0;
+}
+
+/* Light mode (Landing page "Paper" skin) */
+[data-skin="paper"] {
+  color-scheme: light;
+}
+
+[data-skin="paper"] body,
+[data-skin="paper"] .bg-cohear {
+  background: radial-gradient(
+    120% 70% at 50% 0%,
+    #f8f3e7 0%,
+    #f2ead6 60%,
+    #e9dec3 100%
+  ) !important;
+}
+
+[data-skin="paper"] body::after {
+  opacity: 0.055;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.1  0 0 0 0 0.1  0 0 0 0 0.1  0 0 0 0 0.6 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+[data-skin="paper"] .cohear-topbar {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--line);
+  box-shadow:
+    0 18px 40px -12px rgba(140, 80, 20, 0.12),
+    0 4px 12px -2px rgba(140, 80, 20, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+[data-skin="paper"] .cohear-panel {
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid var(--line);
+  box-shadow:
+    0 16px 36px -12px rgba(140, 80, 20, 0.1),
+    0 4px 10px -2px rgba(140, 80, 20, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+[data-skin="paper"] .cohear-nav,
+[data-skin="paper"] .cohear-tabs {
+  background: rgba(245, 239, 226, 0.9);
+  border: 1px solid var(--line);
+}
+
+[data-skin="paper"] .cohear-nav button {
+  color: var(--ink-2);
+}
+
+[data-skin="paper"] .cohear-nav button.active,
+[data-skin="paper"] .cohear-tabs button.active {
+  background: linear-gradient(180deg, var(--orange-1, #d9351f), var(--orange-2, #e85a2b));
+  color: #ffffff;
+  box-shadow:
+    0 8px 18px -4px rgba(217, 53, 31, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+[data-skin="paper"] .cohear-primary {
+  background: linear-gradient(180deg, var(--orange-1, #d9351f), var(--orange-2, #e85a2b));
+  border: 1px solid var(--orange-1, #d9351f);
+  color: #ffffff;
+  box-shadow:
+    0 10px 22px -6px rgba(217, 53, 31, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+[data-skin="paper"] .cohear-secondary,
+[data-skin="paper"] .cohear-icon-button {
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  box-shadow: 0 2px 6px rgba(120, 80, 40, 0.05);
+}
+
+[data-skin="paper"] .cohear-secondary:hover,
+[data-skin="paper"] .cohear-icon-button:hover {
+  background: #ffffff;
+  border-color: var(--orange-2, #e85a2b);
+  color: var(--ink);
+}
+
+[data-skin="paper"] .cohear-input,
+[data-skin="paper"] .cohear-select,
+[data-skin="paper"] .cohear-field {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+[data-skin="paper"] .cohear-input:focus,
+[data-skin="paper"] .cohear-select:focus,
+[data-skin="paper"] .cohear-field:focus-within {
+  border-color: var(--orange-2, #e85a2b);
+  box-shadow: 0 0 0 3px rgba(232, 90, 43, 0.15);
+}
+
+[data-skin="paper"] .cohear-settings-section {
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--line);
+}
+
+[data-skin="paper"] .cohear-detail-hero {
+  border-bottom: 1px solid var(--line);
+  background:
+    radial-gradient(circle at 68% 32%, rgba(232, 90, 43, 0.16), transparent 50%),
+    linear-gradient(135deg, #ede6d6, #f8f3e7);
+}
+
+[data-skin="paper"] aside {
+  background: #f8f3e7 !important;
+  border-left-color: var(--line) !important;
+  box-shadow: -10px 0 40px rgba(120, 80, 40, 0.15) !important;
+}
+
+[data-skin="paper"] .cohear-mesh-blob {
+  opacity: 0.06 !important;
+}
+
 

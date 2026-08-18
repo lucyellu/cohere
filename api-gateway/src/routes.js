@@ -14,6 +14,7 @@ import * as rapid from './rapid.js';
 import * as passport from './passport.js';
 import { db } from './firebase.js';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { tryConsumeJambaseCall } from './jambaseBudget.js';
 
 const SB_URL = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
 const SB_KEY = process.env.SUPABASE_SECRET_KEY || '';
@@ -65,8 +66,26 @@ router.get('/passport/verify', async (req, res) => {
   }
 });
 
+// Read-only peek at the shared JamBase monthly quota row (does NOT consume a
+// slot — that only happens via tryConsumeJambaseCall in jambaseBudget.js).
+// Lets the monitor panel show "312/900 calls used this month" instead of the
+// cap being invisible until it's already blocking requests.
+async function getJambaseQuotaStatus() {
+  if (!SB_URL || !SB_KEY) return null;
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/api_quota?service=eq.jambase&select=calls,cap,month,updated_at`, {
+      headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+    });
+    if (!res.ok) return null;
+    const rows = await res.json();
+    return rows?.[0] || null;
+  } catch {
+    return null;
+  }
+}
+
 // --- Health: config + live usage snapshot for the monitor panel ---------
-router.get('/health', (_req, res) => {
+router.get('/health', async (_req, res) => {
   const usage = snapshot();
   const services = SERVICE_IDS.map((id) => {
     const mock = isMock(id);
@@ -85,7 +104,8 @@ router.get('/health', (_req, res) => {
       usage: usage[id],
     };
   });
-  res.json({ ok: true, uptime: process.uptime(), services });
+  const jambaseQuota = await getJambaseQuotaStatus();
+  res.json({ ok: true, uptime: process.uptime(), services, jambaseQuota });
 });
 
 // Public, non-secret client config. The Google Maps JS key is a client-side key
@@ -162,6 +182,19 @@ const jbAuth = () => ({
   headers: { Authorization: `Bearer ${process.env.JAMBASE_API_KEY}`, Accept: 'application/json' },
 });
 
+// Every live JamBase request MUST go through here, not callLive() directly —
+// this is what enforces the shared monthly cap (see jambaseBudget.js) across
+// both this file's fallback routes and the weekly cron ingest. If the budget
+// is exhausted this returns a synthetic "quota" response instead of ever
+// reaching JamBase, so a hot cache-miss loop can't run up real usage.
+async function jbCallLive(url) {
+  const budget = await tryConsumeJambaseCall();
+  if (!budget.allowed) {
+    return { ok: false, status: 429, mode: 'quota', data: { error: 'jambase monthly quota exhausted', budget } };
+  }
+  return callLive('jambase', url, jbAuth());
+}
+
 router.get('/jambase/events', async (req, res) => {
   const { artist, geoStateIso, source } = req.query;
 
@@ -173,7 +206,7 @@ router.get('/jambase/events', async (req, res) => {
   // Step 1: resolve artist name -> identifier (prefer an exact, case-insensitive match).
   let artistId = null;
   if (artist) {
-    const lookup = await callLive('jambase', `${JB_BASE}/artists?artistName=${encodeURIComponent(artist)}&perPage=10`, jbAuth());
+    const lookup = await jbCallLive(`${JB_BASE}/artists?artistName=${encodeURIComponent(artist)}&perPage=10`);
     const arts = lookup.data?.artists || [];
     const exact = arts.find((a) => a.name?.toLowerCase() === artist.toLowerCase());
     artistId = (exact || arts[0])?.identifier || null;
@@ -185,7 +218,7 @@ router.get('/jambase/events', async (req, res) => {
   else if (artist) params.set('artistName', artist);
   if (geoStateIso) params.set('geoStateIso', geoStateIso);
 
-  const result = await callLive('jambase', `${JB_BASE}/events?${params.toString()}`, jbAuth());
+  const result = await jbCallLive(`${JB_BASE}/events?${params.toString()}`);
   res.status(result.ok ? 200 : 502).json(result);
 });
 
@@ -205,7 +238,7 @@ async function fetchJambaseEvents({ artist, source, dateFrom, dateTo, perPage = 
   }
   let artistId = null;
   if (artist) {
-    const lookup = await callLive('jambase', `${JB_BASE}/artists?artistName=${encodeURIComponent(artist)}&perPage=10`, jbAuth());
+    const lookup = await jbCallLive(`${JB_BASE}/artists?artistName=${encodeURIComponent(artist)}&perPage=10`);
     const arts = lookup.data?.artists || [];
     const exact = arts.find((a) => a.name?.toLowerCase() === artist.toLowerCase());
     artistId = (exact || arts[0])?.identifier || null;
@@ -216,8 +249,8 @@ async function fetchJambaseEvents({ artist, source, dateFrom, dateTo, perPage = 
   // Date window — drives query-less BROWSE (e.g. "everything tonight").
   if (dateFrom) params.set('eventDateFrom', dateFrom);
   if (dateTo) params.set('eventDateTo', dateTo);
-  const result = await callLive('jambase', `${JB_BASE}/events?${params.toString()}`, jbAuth());
-  return { events: result.data?.events || [], mode: result.ok ? 'live' : 'error' };
+  const result = await jbCallLive(`${JB_BASE}/events?${params.toString()}`);
+  return { events: result.data?.events || [], mode: result.ok ? 'live' : (result.mode === 'quota' ? 'quota' : 'error') };
 }
 
 function addDaysIso(iso, days) {

@@ -1,0 +1,1098 @@
+<!-- Saved from https://codepen.io/hexagoncircle/pen/pRjgwM with CodePen Library Saver. -->
+<!DOCTYPE html>
+<html lang="en" >
+
+<head>
+  <meta name="generator" content="CodePen Library Saver">
+  <meta name="codepen:source" content="https://codepen.io/hexagoncircle/pen/pRjgwM">
+  <meta charset="UTF-8">
+  
+  
+  
+
+  <title>Codepenhagen</title>
+
+    <link rel="canonical" href="https://codepen.io/hexagoncircle/pen/pRjgwM">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://public.codepenassets.com/css/reset-2.0.min.css">
+
+  
+  
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  overflow: hidden;
+  background-color: #F5483A;
+}
+
+.stamp {
+  position: relative;
+  width: 380px;
+  height: 380px;
+  transform: translate3d(0, 0, 0);
+}
+.stamp:before, .stamp:after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  content: "";
+  display: block;
+  background: radial-gradient(#F5483A 42%, transparent 43%), radial-gradient(#F5483A 42%, transparent 43%), #FFFFFF;
+  background-size: 11% 11%;
+}
+.stamp:before {
+  width: 380px;
+  height: 350px;
+  border-top: 15px solid #FFFFFF;
+  border-bottom: 15px solid #FFFFFF;
+  background-repeat: repeat-y;
+  background-position: -7% 0, 107% 0;
+}
+.stamp:after {
+  width: 350px;
+  height: 380px;
+  background-repeat: repeat-x;
+  background-position: 0 -7%, 0 107%;
+}
+
+.scene {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  position: relative;
+  width: 320px;
+  height: 320px;
+  overflow: hidden;
+  background-color: #8CD5FE;
+  background: linear-gradient(to bottom, #8CD5FE, #ddf3ff 25%, #ddf3ff);
+  z-index: 1;
+}
+
+.moon {
+  position: absolute;
+  top: 30px;
+  left: 30px;
+  width: 30px;
+  height: 30px;
+  background-color: #FFFFFF;
+  border-radius: 100%;
+}
+
+.canal {
+  position: absolute;
+  bottom: 0;
+  left: -50%;
+  width: 200%;
+  height: 80px;
+  border-top: #1F2A48 solid 25px;
+  background: linear-gradient(to bottom, #8CD5FE, #ddf3ff);
+}
+.canal:after {
+  content: "";
+  position: absolute;
+  top: 99%;
+  left: 0;
+  width: 100%;
+  height: 150%;
+  background-color: #ddf3ff;
+}
+
+.boat {
+  position: absolute;
+  bottom: 29px;
+  right: 100%;
+  width: 63px;
+  height: 12px;
+  background-color: #26A158;
+  transform: translateX(-20px);
+  -webkit-animation: sailing 8s linear infinite;
+          animation: sailing 8s linear infinite;
+  z-index: 99;
+}
+.boat:before, .boat:after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  margin: auto;
+  width: 6px;
+  height: 100%;
+  background-color: inherit;
+  border-radius: 0 0 100px 100px;
+}
+.boat:before {
+  left: -3px;
+  transform: skewX(20deg);
+}
+.boat:after {
+  right: -3px;
+  transform: skewX(-20deg);
+}
+
+.mast {
+  position: absolute;
+  bottom: 100%;
+  left: 20px;
+  width: 4px;
+  height: 14px;
+  background-color: #F5483A;
+}
+.mast:before, .mast:after {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  border-style: solid;
+}
+.mast:before {
+  right: 100%;
+  border-width: 0 0 25px 25px;
+  border-color: transparent transparent #F5483A transparent;
+}
+.mast:after {
+  left: 0;
+  border-width: 65px 0 0 45px;
+  border-color: transparent transparent transparent #FEBB34;
+}
+
+.houses {
+  display: flex;
+  align-items: flex-end;
+  position: absolute;
+  left: -116px;
+  bottom: 80px;
+}
+
+.house {
+  position: relative;
+  vertical-align: bottom;
+  width: 48px;
+  height: auto;
+  transform: translate3d(0, 0, 0);
+}
+.house:before {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 100%;
+  width: 40px;
+  height: 100%;
+  background-color: #1F2A48;
+}
+.house .roof {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  padding: 0 8px;
+  width: 100%;
+  height: 40px;
+}
+.house .roof:before, .house .roof:after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  height: 40px;
+  transform-origin: 100% 100%;
+}
+.house .roof:before {
+  right: -40px;
+  background-color: #1F2A48;
+  transform: skewX(26.6deg);
+}
+.house .roof:after {
+  left: 0;
+  background-color: #FD6E34;
+  transform: skewX(-26.6deg);
+}
+.house .roof-extension {
+  display: none;
+  position: absolute;
+  bottom: calc(100% - 1px);
+  left: 0;
+  right: 0;
+  margin: auto;
+}
+.house .roof-extension:before, .house .roof-extension:after {
+  content: "";
+  position: absolute;
+  top: 0;
+}
+.house .roof-window {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  margin: auto;
+}
+.house .chimney {
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  left: 50%;
+  margin: auto;
+  width: 4px;
+  height: 8px;
+}
+.house .facade,
+.house .entry {
+  padding: 8px 8px 0;
+}
+.house .facade:after,
+.house .entry:after {
+  content: "";
+  display: table;
+  clear: both;
+}
+.house .window,
+.house .door {
+  float: left;
+  display: block;
+  margin: 0 8px 8px 0;
+  width: 12px;
+  height: 20px;
+}
+.house .door {
+  height: 30px;
+  margin-bottom: 0;
+}
+.house .door:before {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  right: 100%;
+  width: 4px;
+  height: 5px;
+}
+.house.col--1 {
+  width: 28px;
+}
+.house.col--1 .facade,
+.house.col--1 .entry {
+  display: flex;
+  flex-wrap: wrap;
+}
+.house.col--1 .facade > *:nth-child(1n),
+.house.col--1 .entry > *:nth-child(1n) {
+  margin-right: 0;
+}
+.house.col--1 .facade > *:nth-last-child(-n+1),
+.house.col--1 .entry > *:nth-last-child(-n+1) {
+  margin-bottom: 0;
+}
+.house.col--2 {
+  width: 48px;
+}
+.house.col--2 .facade,
+.house.col--2 .entry {
+  display: flex;
+  flex-wrap: wrap;
+}
+.house.col--2 .facade > *:nth-child(2n),
+.house.col--2 .entry > *:nth-child(2n) {
+  margin-right: 0;
+}
+.house.col--2 .facade > *:nth-last-child(-n+2),
+.house.col--2 .entry > *:nth-last-child(-n+2) {
+  margin-bottom: 0;
+}
+.house.col--3 {
+  width: 68px;
+}
+.house.col--3 .facade,
+.house.col--3 .entry {
+  display: flex;
+  flex-wrap: wrap;
+}
+.house.col--3 .facade > *:nth-child(3n),
+.house.col--3 .entry > *:nth-child(3n) {
+  margin-right: 0;
+}
+.house.col--3 .facade > *:nth-last-child(-n+3),
+.house.col--3 .entry > *:nth-last-child(-n+3) {
+  margin-bottom: 0;
+}
+
+.house--1 {
+  background-color: #F9C068;
+}
+.house--1 .roof-extension {
+  position: relative;
+  background-color: #F9C068;
+  transform: translate3d(0, 0, 0);
+}
+.house--1 .roof-extension:before {
+  background-color: #F9C068;
+  border-color: transparent transparent #F9C068 transparent;
+}
+.house--1 .roof-window {
+  background-color: #f1960a;
+  overflow: hidden;
+  box-shadow: inset 4px -4px 0 #1F2A48;
+}
+.house--1 .chimney {
+  background-color: #F9C068;
+  box-shadow: 4px 0 0 #1F2A48;
+}
+.house--1 .window,
+.house--1 .door {
+  position: relative;
+  background-color: #f1960a;
+  box-shadow: inset 4px -4px 0 #1F2A48;
+}
+.house--1 .door {
+  box-shadow: 0 2px 0 #1F2A48, inset 4px -4px 0 #1F2A48;
+}
+.house--1 .door:before {
+  background-color: #1F2A48;
+}
+.house--1 .door:before {
+  background-color: #1F2A48;
+}
+
+.house--2,
+.house--7 {
+  background-color: #F5483A;
+}
+.house--2 .roof-extension,
+.house--7 .roof-extension {
+  position: relative;
+  background-color: #F5483A;
+  transform: translate3d(0, 0, 0);
+}
+.house--2 .roof-extension:before,
+.house--7 .roof-extension:before {
+  background-color: #F5483A;
+  border-color: transparent transparent #F5483A transparent;
+}
+.house--2 .roof-window,
+.house--7 .roof-window {
+  background-color: #bf170a;
+  overflow: hidden;
+  box-shadow: inset 4px -4px 0 #1F2A48;
+}
+.house--2 .chimney,
+.house--7 .chimney {
+  background-color: #F5483A;
+  box-shadow: 4px 0 0 #1F2A48;
+}
+.house--2 .window,
+.house--2 .door,
+.house--7 .window,
+.house--7 .door {
+  position: relative;
+  background-color: #bf170a;
+  box-shadow: inset 4px -4px 0 #1F2A48;
+}
+.house--2 .door,
+.house--7 .door {
+  box-shadow: 0 2px 0 #1F2A48, inset 4px -4px 0 #1F2A48;
+}
+.house--2 .door:before,
+.house--7 .door:before {
+  background-color: #1F2A48;
+}
+.house--2 .door:before,
+.house--7 .door:before {
+  background-color: #1F2A48;
+}
+.house--2 .entry,
+.house--7 .entry {
+  background-color: white;
+}
+.house--2 .entry .window,
+.house--7 .entry .window {
+  height: 34px;
+}
+.house--2 .entry .door,
+.house--7 .entry .door {
+  height: 44px;
+}
+.house--2 .entry .door:after,
+.house--7 .entry .door:after {
+  content: "";
+  position: absolute;
+  top: 8px;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background-color: #1F2A48;
+}
+
+.house--3 {
+  background-color: #FEBB34;
+}
+.house--3 .roof-extension {
+  position: relative;
+  background-color: #FEBB34;
+  transform: translate3d(0, 0, 0);
+}
+.house--3 .roof-extension:before {
+  background-color: #FEBB34;
+  border-color: transparent transparent #FEBB34 transparent;
+}
+.house--3 .roof-window {
+  background-color: #cb8801;
+  overflow: hidden;
+  box-shadow: inset 4px -4px 0 #1F2A48;
+}
+.house--3 .chimney {
+  background-color: #FEBB34;
+  box-shadow: 4px 0 0 #1F2A48;
+}
+.house--3 .window,
+.house--3 .door {
+  position: relative;
+  background-color: #cb8801;
+  box-shadow: inset 4px -4px 0 #1F2A48;
+}
+.house--3 .door {
+  box-shadow: 0 2px 0 #1F2A48, inset 4px -4px 0 #1F2A48;
+}
+.house--3 .door:before {
+  background-color: #1F2A48;
+}
+.house--3 .door:before {
+  background-color: #1F2A48;
+}
+.house--3 .entry {
+  flex-direction: row-reverse;
+}
+.house--3 .entry .window:nth-child(2) {
+  flex: 2;
+}
+.house--3 .entry .window:nth-child(3) {
+  display: none;
+}
+.house--3 .entry .door {
+  margin-right: 0;
+  border-radius: 60px 60px 0 0;
+}
+.house--3 .roof-extension {
+  display: block;
+  position: absolute;
+  width: 20px;
+  height: 16px;
+  border-radius: 60px 60px 0 0;
+  z-index: 1;
+}
+.house--3 .roof-extension:before {
+  width: 100%;
+  height: 16px;
+  border-radius: 60px 60px 0 0;
+  z-index: 2;
+}
+.house--3 .roof-extension:after {
+  left: 4px;
+  width: 100%;
+  height: 100%;
+  background-color: #1F2A48;
+  transform: skewX(-27deg);
+  z-index: 1;
+}
+.house--3 .roof-window {
+  width: 12px;
+  height: 12px;
+  border-radius: 100%;
+  z-index: 3;
+  box-shadow: none;
+}
+.house--3 .roof-window:after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 55%;
+  height: 100%;
+  background-color: #1F2A48;
+}
+
+.house--4 {
+  background-color: #8CD5FE;
+}
+.house--4 .roof-extension {
+  position: relative;
+  background-color: #8CD5FE;
+  transform: translate3d(0, 0, 0);
+}
+.house--4 .roof-extension:before {
+  background-color: #8CD5FE;
+  border-color: transparent transparent #8CD5FE transparent;
+}
+.house--4 .roof-window {
+  background-color: #27b0fd;
+  overflow: hidden;
+  box-shadow: inset 4px -4px 0 #1F2A48;
+}
+.house--4 .chimney {
+  background-color: #8CD5FE;
+  box-shadow: 4px 0 0 #1F2A48;
+}
+.house--4 .window,
+.house--4 .door {
+  position: relative;
+  background-color: #27b0fd;
+  box-shadow: inset 4px -4px 0 #1F2A48;
+}
+.house--4 .door {
+  box-shadow: 0 2px 0 #1F2A48, inset 4px -4px 0 #1F2A48;
+}
+.house--4 .door:before {
+  background-color: #1F2A48;
+}
+.house--4 .door:before {
+  background-color: #1F2A48;
+}
+.house--4 .entry {
+  background-color: white;
+}
+
+.house--5 {
+  background-color: #26A158;
+}
+.house--5 .roof-extension {
+  position: relative;
+  background-color: #26A158;
+  transform: translate3d(0, 0, 0);
+}
+.house--5 .roof-extension:before {
+  background-color: #26A158;
+  border-color: transparent transparent #26A158 transparent;
+}
+.house--5 .roof-window {
+  background-color: #134e2b;
+  overflow: hidden;
+  box-shadow: inset 4px -4px 0 #1F2A48;
+}
+.house--5 .chimney {
+  background-color: #26A158;
+  box-shadow: 4px 0 0 #1F2A48;
+}
+.house--5 .window,
+.house--5 .door {
+  position: relative;
+  background-color: #134e2b;
+  box-shadow: inset 4px -4px 0 #1F2A48;
+}
+.house--5 .door {
+  box-shadow: 0 2px 0 #1F2A48, inset 4px -4px 0 #1F2A48;
+}
+.house--5 .door:before {
+  background-color: #1F2A48;
+}
+.house--5 .door:before {
+  background-color: #1F2A48;
+}
+.house--5 .roof-extension {
+  display: block;
+  position: absolute;
+  background-color: transparent;
+  width: 100%;
+  height: 20px;
+}
+.house--5 .roof-extension:before {
+  background-color: transparent;
+  border-style: solid;
+  border-width: 0 34px 20px 34px;
+  z-index: 2;
+}
+.house--5 .roof-extension:after {
+  left: 30px;
+  width: 50px;
+  height: 20px;
+  background-color: #1F2A48;
+  transform: skewX(-27deg);
+  z-index: 1;
+}
+.house--5 .roof-window {
+  display: block;
+  top: 6px;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  z-index: 3;
+}
+
+.house--6 {
+  background-color: #F5483A;
+}
+.house--6 .roof-extension {
+  position: relative;
+  background-color: #F5483A;
+  transform: translate3d(0, 0, 0);
+}
+.house--6 .roof-extension:before {
+  background-color: #F5483A;
+  border-color: transparent transparent #F5483A transparent;
+}
+.house--6 .roof-window {
+  background-color: #bf170a;
+  overflow: hidden;
+  box-shadow: inset 4px -4px 0 #1F2A48;
+}
+.house--6 .chimney {
+  background-color: #F5483A;
+  box-shadow: 4px 0 0 #1F2A48;
+}
+.house--6 .window,
+.house--6 .door {
+  position: relative;
+  background-color: #bf170a;
+  box-shadow: inset 4px -4px 0 #1F2A48;
+}
+.house--6 .door {
+  box-shadow: 0 2px 0 #1F2A48, inset 4px -4px 0 #1F2A48;
+}
+.house--6 .door:before {
+  background-color: #1F2A48;
+}
+.house--6 .door:before {
+  background-color: #1F2A48;
+}
+
+.house--7 {
+  background-color: #8CD5FE;
+}
+.house--7 .roof-extension {
+  position: relative;
+  background-color: #8CD5FE;
+  transform: translate3d(0, 0, 0);
+}
+.house--7 .roof-extension:before {
+  background-color: #8CD5FE;
+  border-color: transparent transparent #8CD5FE transparent;
+}
+.house--7 .roof-window {
+  background-color: #27b0fd;
+  overflow: hidden;
+  box-shadow: inset 4px -4px 0 #1F2A48;
+}
+.house--7 .chimney {
+  background-color: #8CD5FE;
+  box-shadow: 4px 0 0 #1F2A48;
+}
+.house--7 .window,
+.house--7 .door {
+  position: relative;
+  background-color: #27b0fd;
+  box-shadow: inset 4px -4px 0 #1F2A48;
+}
+.house--7 .door {
+  box-shadow: 0 2px 0 #1F2A48, inset 4px -4px 0 #1F2A48;
+}
+.house--7 .door:before {
+  background-color: #1F2A48;
+}
+.house--7 .door:before {
+  background-color: #1F2A48;
+}
+
+.house--8 {
+  background-color: #F5483A;
+}
+.house--8 .roof-extension {
+  position: relative;
+  background-color: #F5483A;
+  transform: translate3d(0, 0, 0);
+}
+.house--8 .roof-extension:before {
+  background-color: #F5483A;
+  border-color: transparent transparent #F5483A transparent;
+}
+.house--8 .roof-window {
+  background-color: #bf170a;
+  overflow: hidden;
+  box-shadow: inset 4px -4px 0 #1F2A48;
+}
+.house--8 .chimney {
+  background-color: #F5483A;
+  box-shadow: 4px 0 0 #1F2A48;
+}
+.house--8 .window,
+.house--8 .door {
+  position: relative;
+  background-color: #bf170a;
+  box-shadow: inset 4px -4px 0 #1F2A48;
+}
+.house--8 .door {
+  box-shadow: 0 2px 0 #1F2A48, inset 4px -4px 0 #1F2A48;
+}
+.house--8 .door:before {
+  background-color: #1F2A48;
+}
+.house--8 .door:before {
+  background-color: #1F2A48;
+}
+
+.house--9 {
+  background-color: #F9C068;
+}
+.house--9 .roof-extension {
+  position: relative;
+  background-color: #F9C068;
+  transform: translate3d(0, 0, 0);
+}
+.house--9 .roof-extension:before {
+  background-color: #F9C068;
+  border-color: transparent transparent #F9C068 transparent;
+}
+.house--9 .roof-window {
+  background-color: #f1960a;
+  overflow: hidden;
+  box-shadow: inset 4px -4px 0 #1F2A48;
+}
+.house--9 .chimney {
+  background-color: #F9C068;
+  box-shadow: 4px 0 0 #1F2A48;
+}
+.house--9 .window,
+.house--9 .door {
+  position: relative;
+  background-color: #f1960a;
+  box-shadow: inset 4px -4px 0 #1F2A48;
+}
+.house--9 .door {
+  box-shadow: 0 2px 0 #1F2A48, inset 4px -4px 0 #1F2A48;
+}
+.house--9 .door:before {
+  background-color: #1F2A48;
+}
+.house--9 .door:before {
+  background-color: #1F2A48;
+}
+.house--9 .entry .door {
+  height: 36px;
+  border-radius: 60px 60px 0 0;
+}
+
+.scene-wrapper,
+.boat-wrapper {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  margin: auto;
+  transform: translate3d(0, 0, 0);
+}
+
+.text {
+  position: absolute;
+  top: 24px;
+  right: 0;
+  left: 0;
+  margin: auto;
+  text-align: center;
+  font-family: "Helevetica", sans-serif;
+  font-size: 11px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.6);
+  opacity: 0;
+  transform: translateY(-12px);
+  -webkit-animation: fadeIn 1s 1s ease-out forwards;
+          animation: fadeIn 1s 1s ease-out forwards;
+}
+.text a {
+  color: rgba(255, 255, 255, 0.8);
+}
+.text a:hover {
+  color: #FFFFFF;
+}
+
+.stamp,
+.scene-wrapper,
+.boat-wrapper,
+.moon {
+  transition: transform 2.4s ease;
+}
+
+.stamp:hover {
+  transition: transform 0.8s ease;
+}
+.stamp:hover .scene-wrapper,
+.stamp:hover .boat-wrapper,
+.stamp:hover .moon {
+  transition: transform 0.8s ease;
+}
+
+.stamp:hover {
+  transform: scale(1.3);
+}
+.stamp:hover .moon {
+  transform: scale(1.1) translate(-6px, -8px);
+}
+.stamp:hover .boat-wrapper {
+  transform: scale(0.8) translateY(18px);
+}
+.stamp:hover .scene-wrapper {
+  transform: scale(0.65);
+}
+
+@-webkit-keyframes sailing {
+  from {
+    transform: translateX(-211.1111111111px);
+  }
+  to {
+    transform: translateX(570px);
+  }
+}
+
+@keyframes sailing {
+  from {
+    transform: translateX(-211.1111111111px);
+  }
+  to {
+    transform: translateX(570px);
+  }
+}
+@-webkit-keyframes fadeIn {
+  25% {
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes fadeIn {
+  25% {
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+</style>
+
+  
+  
+  
+</head>
+
+<body>
+  <div class="text"> 
+  <p>Hover over the stamp to expand.</p>
+  <p>Based on <a target="_blank" href="https://dribbble.com/shots/3201701-Copenhagen">this Dribbble shot</a>&nbsp;by Glenn Catteeuw.</p>
+</div>
+<div class="stamp">
+  <div class="scene">
+    <div class="scene-wrapper">
+      <div class="moon"></div>
+      <div class="canal"></div>
+      <div class="houses">
+        <div class="house house--8 col--2">
+          <div class="roof">
+            <div class="chimney"></div>
+          </div>
+          <div class="roof-extension">
+            <div class="roof-window"></div>
+          </div>
+          <div class="facade">
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+          </div>
+          <div class="entry">
+            <div class="door"></div>
+            <div class="window"></div>
+          </div>
+        </div>
+        <div class="house house--7 col--3">
+          <div class="roof">
+            <div class="chimney"></div>
+          </div>
+          <div class="roof-extension">
+            <div class="roof-window"></div>
+          </div>
+          <div class="facade">
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+          </div>
+          <div class="entry">
+            <div class="door"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+          </div>
+        </div>
+        <div class="house house--1 col--3">
+          <div class="roof">
+            <div class="chimney"></div>
+          </div>
+          <div class="roof-extension">
+            <div class="roof-window"></div>
+          </div>
+          <div class="facade">
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+          </div>
+          <div class="entry">
+            <div class="door"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+          </div>
+        </div>
+        <div class="house house--2 col--2">
+          <div class="roof">
+            <div class="chimney"></div>
+          </div>
+          <div class="roof-extension">
+            <div class="roof-window"></div>
+          </div>
+          <div class="facade">
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+          </div>
+          <div class="entry">
+            <div class="door"></div>
+            <div class="window"></div>
+          </div>
+        </div>
+        <div class="house house--3 col--3">
+          <div class="roof">
+            <div class="chimney"></div>
+          </div>
+          <div class="roof-extension">
+            <div class="roof-window"></div>
+          </div>
+          <div class="facade">
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+          </div>
+          <div class="entry">
+            <div class="door"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+          </div>
+        </div>
+        <div class="house house--4 col--3">
+          <div class="roof">
+            <div class="chimney"></div>
+          </div>
+          <div class="roof-extension">
+            <div class="roof-window"></div>
+          </div>
+          <div class="facade">
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+          </div>
+          <div class="entry">
+            <div class="door"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+          </div>
+        </div>
+        <div class="house house--5 col--3">
+          <div class="roof">
+            <div class="chimney"></div>
+          </div>
+          <div class="roof-extension">
+            <div class="roof-window"></div>
+          </div>
+          <div class="facade">
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+          </div>
+          <div class="entry">
+            <div class="door"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+          </div>
+        </div>
+        <div class="house house--9 col--2">
+          <div class="roof">
+            <div class="chimney"></div>
+          </div>
+          <div class="roof-extension">
+            <div class="roof-window"></div>
+          </div>
+          <div class="facade">
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+          </div>
+          <div class="entry">
+            <div class="door"></div>
+            <div class="window"></div>
+          </div>
+        </div>
+        <div class="house house--6 col--3">
+          <div class="roof">
+            <div class="chimney"></div>
+          </div>
+          <div class="roof-extension">
+            <div class="roof-window"></div>
+          </div>
+          <div class="facade">
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+          </div>
+          <div class="entry">
+            <div class="door"></div>
+            <div class="window"></div>
+            <div class="window"></div>
+          </div>
+        </div>
+      </div>
+      <div class="boat-wrapper">
+        <div class="boat">
+          <div class="mast"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+  <script src='https://cdnjs.cloudflare.com/ajax/libs/jquery/3.1.0/jquery.min.js'></script>
+<script src='https://cdnjs.cloudflare.com/ajax/libs/d3/4.2.2/d3.min.js'></script>
+    <script id="rendered-js" >
+// Based on a Dribbble shot by Glenn Catteeuw
+// https://dribbble.com/shots/3201701-Copenhagen
+  </script>
+
+  
+</body>
+
+</html>

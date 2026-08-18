@@ -273,7 +273,7 @@ export default function SettingsDrawer({ open, settings, onChange, onClose }) {
 // ramp that paints the whole UI. Pick a preset, shuffle a random hue, scrub the
 // shade strip, or use the native picker; the Dark/Light toggle flips the ramp.
 function ThemeSection({ settings, update }) {
-  const seed = settings.themeAccent || '#2f86d6';
+  const seed = settings.themeAccent || '#e85a2b';
   const customShades = settings.customShades || [];
   const invert = settings.themeInvert || false;
   const swap = settings.themeSwap || false;
@@ -281,7 +281,6 @@ function ThemeSection({ settings, update }) {
   const activeShade = nearestShadeIndex(shades, seed);
 
   function saveShade() {
-    // Only save if it's not already in the list
     if (customShades.includes(seed)) return;
     const next = [seed, ...customShades].slice(0, 3);
     update({ customShades: next });
@@ -290,9 +289,9 @@ function ThemeSection({ settings, update }) {
   return (
     <section className="cohear-settings-section">
       <div>
-        <h3 className="text-sm font-semibold text-white">Theme</h3>
+        <h3 className="text-sm font-semibold text-white">Theme & Appearance</h3>
         <p className="mt-1 text-sm leading-6 text-zinc-500">
-          One seed colour drives the entire palette — the whole app is built from varying shades of it. Only concert start and end times stay green and red.
+          Choose your accent color and toggle between Dark Mode and the signature Cohere Landing Page Light Mode (warm sand, cream paper, and dark ink).
         </p>
       </div>
 
@@ -305,7 +304,7 @@ function ThemeSection({ settings, update }) {
               onClick={() => update({ themeAccent: p.hex })}
               title={p.label}
               aria-label={p.label}
-              className={`h-7 w-7 rounded-full border-2 transition-transform ${active ? 'scale-110 border-white' : 'border-transparent hover:border-white/50'}`}
+              className={`h-7 w-7 rounded-full border-2 transition-transform ${active ? 'scale-110 border-white ring-2 ring-[var(--orange-2,#e85a2b)]' : 'border-transparent hover:border-white/50'}`}
               style={{ background: p.hex }}
             />
           );
@@ -318,7 +317,7 @@ function ThemeSection({ settings, update }) {
               onClick={() => update({ themeAccent: hex })}
               title={`Custom shade ${i + 1}`}
               aria-label="Custom shade"
-              className={`h-7 w-7 rounded-full border-2 transition-transform ${active ? 'scale-110 border-white' : 'border-transparent hover:border-white/50'}`}
+              className={`h-7 w-7 rounded-full border-2 transition-transform ${active ? 'scale-110 border-white ring-2 ring-[var(--orange-2,#e85a2b)]' : 'border-transparent hover:border-white/50'}`}
               style={{ background: hex }}
             />
           );
@@ -341,10 +340,13 @@ function ThemeSection({ settings, update }) {
 
       <div className="mt-4 flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <div className="text-sm font-medium text-zinc-300">Invert to Light Mode</div>
+          <div>
+            <div className="text-sm font-medium text-zinc-300">Light Mode (Landing Page)</div>
+            <div className="text-xs text-zinc-500">Warm cream paper, crisp dark ink & amber glow</div>
+          </div>
           <button
-            onClick={() => update({ themeInvert: !invert })}
-            className={`relative h-6 w-11 rounded-full transition-colors ${invert ? 'bg-cyan-500' : 'bg-zinc-700'}`}
+            onClick={() => update({ themeInvert: !invert, themeAccent: settings.themeAccent || '#e85a2b' })}
+            className={`relative h-6 w-11 rounded-full transition-colors ${invert ? 'bg-[var(--orange-2,#e85a2b)]' : 'bg-zinc-700'}`}
           >
             <span className={`absolute top-1 left-1 h-4 w-4 transform rounded-full bg-white transition-transform ${invert ? 'translate-x-5' : ''}`} />
           </button>
@@ -353,7 +355,7 @@ function ThemeSection({ settings, update }) {
           <div className="text-sm font-medium text-zinc-300">Swap Accent & Main Colour</div>
           <button
             onClick={() => update({ themeSwap: !swap })}
-            className={`relative h-6 w-11 rounded-full transition-colors ${swap ? 'bg-cyan-500' : 'bg-zinc-700'}`}
+            className={`relative h-6 w-11 rounded-full transition-colors ${swap ? 'bg-[var(--orange-2,#e85a2b)]' : 'bg-zinc-700'}`}
           >
             <span className={`absolute top-1 left-1 h-4 w-4 transform rounded-full bg-white transition-transform ${swap ? 'translate-x-5' : ''}`} />
           </button>
