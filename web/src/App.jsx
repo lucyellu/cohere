@@ -13,22 +13,24 @@ import { applyTheme } from './theme.js';
 import { initSfx, sfxEnabled, setSfxEnabled } from './sfx.js';
 import Onboarding, { shouldOnboard } from './components/Onboarding.jsx';
 
-// Non-landing views are split into their own chunks so the Discover view (what
-// loads first) ships far less JavaScript on the first visit. They fetch on
-// demand the moment you navigate to them.
+import LandingView from './components/LandingView.jsx';
+
+// Non-landing views are split into their own chunks so the initial
+// view ships minimal JavaScript. They fetch on demand when navigated to.
 const LiveLanding = lazy(() => import('./live/LiveLanding.jsx'));
 const LiveRoom = lazy(() => import('./live/LiveRoom.jsx'));
 const PassportView = lazy(() => import('./components/PassportView.jsx'));
 const CityView = lazy(() => import('./components/CityView.jsx'));
 
 const NAV = [
+  { id: 'home', label: 'Home' },
   { id: 'discover', label: 'Discover' },
   { id: 'live', label: 'Live Rooms' },
   { id: 'passport', label: 'Passport' },
 ];
 
 export default function App() {
-  const [view, setView] = useState('discover');
+  const [view, setView] = useState(() => (currentRoomCode() ? 'live' : 'home'));
   const [liveEvent, setLiveEvent] = useState(null);
   const [cityTarget, setCityTarget] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -135,7 +137,7 @@ export default function App() {
         <div className="mx-auto flex min-h-screen w-full max-w-[1480px] flex-col px-4 py-5 pb-28 sm:px-6 lg:px-8">
           <header className="cohear-topbar flex-wrap justify-between gap-y-3">
             <div className="flex items-center gap-3 w-full lg:w-auto lg:flex-none justify-between">
-              <button className="flex min-w-0 items-center gap-2.5 text-left group" onClick={() => setView('discover')} aria-label="Open Discover">
+              <button className="flex min-w-0 items-center gap-2.5 text-left group" onClick={() => setView('home')} aria-label="Open Home">
                 <span className="cohear-logo-dot shrink-0 transition-transform duration-300 group-hover:scale-110" />
                 <span className="min-w-0">
                   <span className="block text-xl font-bold tracking-tight text-white leading-none font-sans">Cohere</span>
@@ -197,6 +199,7 @@ export default function App() {
           </header>
 
           <main className="mt-5 flex-1">
+            {view === 'home' && <LandingView onNavigate={(nextView) => setView(nextView)} />}
             {view === 'discover' && <ConcertsView onSyncLive={syncLive} settings={settings} onSettingsChange={updateSettings} />}
 
             <ErrorBoundary onBack={() => { setLiveEvent(null); setRoomLoading(false); setView('discover'); }}>
