@@ -252,10 +252,10 @@ export default function LandingView({ onNavigate }) {
         <div id="landingSubline" className="landing-subline relative z-10 text-center mt-44 sm:mt-48">
           <button
             onClick={() => onNavigate?.('discover')}
-            className="landing-arrow-pill inline-flex items-center gap-3 bg-[var(--ink)] text-[#fafaf7] px-6 py-3 rounded-full text-sm font-semibold shadow-xl transition-transform duration-300 hover:-translate-y-0.5 cursor-pointer"
+            className="landing-arrow-pill"
           >
-            <span>See the lineup</span>
-            <span className="landing-ar w-6 h-6 rounded-full bg-gradient-to-b from-[var(--orange-1)] to-[var(--orange-3)] flex items-center justify-center text-white transition-transform duration-300">
+            <span className="text-white font-semibold">See the lineup</span>
+            <span className="landing-ar w-6 h-6 rounded-full bg-gradient-to-b from-[var(--orange-1,#d9351f)] to-[var(--orange-3,#f58b4e)] flex items-center justify-center text-white shrink-0 shadow-sm">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                 <line x1="7" y1="17" x2="17" y2="7" />
                 <polyline points="7 7 17 7 17 17" />
