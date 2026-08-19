@@ -126,6 +126,58 @@ create policy "voice transcripts update own"
   using ((select auth.uid()) = user_id)
   with check ((select auth.uid()) = user_id);
 
+-- JamBase monthly call quota (server-only; the gateway is the sole reader/writer,
+-- authenticated with the Supabase service-role key, which bypasses RLS). RLS is
+-- enabled with no policies so the anon/authenticated client keys get zero access.
+create table if not exists public.api_quota (
+  service text primary key,
+  month text not null,
+  calls integer not null default 0,
+  cap integer not null,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.api_quota enable row level security;
+
+-- Atomically checks-and-increments the monthly call count for a service,
+-- rolling over on UTC month change. Returns allowed=false without
+-- incrementing once calls >= cap, so the gateway can fail closed to
+-- cache/mock instead of risking an over-cap (billable) call. search_path is
+-- pinned so it can't be hijacked via a mutable search_path in the caller's
+-- session (see: https://supabase.com/docs/guides/database/database-linter?lint=0011_function_search_path_mutable).
+create or replace function public.bump_api_quota(p_service text, p_cap_fallback integer default 900)
+returns table(allowed boolean, calls integer, cap integer, month text)
+language plpgsql
+set search_path = public
+as $function$
+declare
+  cur_month text := to_char(now() at time zone 'utc', 'YYYY-MM');
+  v_calls integer;
+  v_cap integer;
+begin
+  insert into api_quota (service, month, calls, cap)
+  values (p_service, cur_month, 0, p_cap_fallback)
+  on conflict (service) do nothing;
+
+  update api_quota
+    set month = cur_month, calls = 0, updated_at = now()
+    where api_quota.service = p_service and api_quota.month <> cur_month;
+
+  select api_quota.calls, api_quota.cap into v_calls, v_cap
+    from api_quota where api_quota.service = p_service;
+
+  if v_calls >= v_cap then
+    return query select false, v_calls, v_cap, cur_month;
+  end if;
+
+  update api_quota q set calls = q.calls + 1, updated_at = now()
+    where q.service = p_service
+    returning q.calls into v_calls;
+
+  return query select true, v_calls, v_cap, cur_month;
+end;
+$function$;
+
 -- YouTube API Caching
 create table if not exists public.youtube_cache (
   query text primary key,
