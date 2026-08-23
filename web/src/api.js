@@ -23,7 +23,7 @@ const PROBES = {
   songstats: '/api/songstats/search?q=coldplay',
   spotify: '/api/spotify/artist?name=Coldplay',
   ticketmaster: '/api/ticketmaster/match?artist=Coldplay&city=Toronto',
-  websearch: '/api/tickets/web-estimate?artist=Coldplay&city=Toronto&venue=Rogers%20Stadium&date=2026-07-01&currency=CAD',
+  websearch: '/api/tickets/web-estimate?artist=Coldplay&city=Toronto&venue=Rogers%20Centre&date=2026-07-01&currency=CAD',
   suno: '/api/suno/accounts',
   pinterest: '/api/pinterest/extract?url=https://www.pinterest.com/pin/concert-stage-design-stage-set-design-stage-lighting-design--59039445095226117/',
   pollinations: '/api/pollinations/probe',

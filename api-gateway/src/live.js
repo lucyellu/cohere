@@ -267,6 +267,11 @@ function isoToDmy(iso) {
 }
 
 // Real-ish fallback setlists so the featured shows always work offline.
+const BTS_FALLBACK = [
+  'Dynamite', 'Butter', 'Boy With Luv', 'DNA', 'MIC Drop', 'Spring Day',
+  'Blood Sweat & Tears', 'Fake Love', 'IDOL', 'Life Goes On', 'Permission to Dance',
+  'Run BTS', 'Fire', 'Save ME', 'Euphoria', 'Black Swan', 'Yet To Come',
+];
 const POSTMALONE_FALLBACK = [
   'Wow.', 'Too Young', 'Better Now', 'I Fall Apart', 'Reputation', 'Goodbyes',
   'Saint-Tropez', 'Otherside', 'Chemical', 'Cooped Up', 'Circles', 'Wrapped Around Your Finger',
@@ -324,18 +329,17 @@ function dmyToIso(dmy) {
 }
 
 // ---- Featured shows -----------------------------------------------------
-// 1) Post Malone @ Rogers Stadium, Toronto — the new (2025) open-air stadium at
-//    Downsview Park (NOT downtown by the CN Tower — that's Rogers *Centre*).
+// 1) BTS @ Rogers Centre, Toronto — downtown Toronto iconic stadium next to CN Tower.
 //    A LIVE/upcoming show: predict + crowd-correct.
 // 2) Madison Beer @ Vancouver — a PAST show replayed in sync (real setlist.fm
 //    setlist; great for fan footage since attendees have already uploaded).
 const FEATURED = [
   {
-    id: 'featured-postmalone-toronto',
-    artist: 'Post Malone', venue: 'Rogers Stadium', city: 'Toronto', country: 'Canada',
-    lat: 43.7460, lng: -79.4768, tz: 'America/Toronto', mode: 'live',
-    opener: 'Jelly Roll', openerOffsetMin: 90, // Jelly Roll opens ~90 min before Posty
-    fallback: POSTMALONE_FALLBACK,
+    id: 'featured-bts-toronto',
+    artist: 'BTS', venue: 'Rogers Centre', city: 'Toronto', country: 'Canada',
+    lat: 43.6414, lng: -79.3894, tz: 'America/Toronto', mode: 'live',
+    opener: 'Jung Kook', openerOffsetMin: 60,
+    fallback: BTS_FALLBACK,
   },
   {
     id: 'featured-madisonbeer-vancouver',
@@ -404,7 +408,10 @@ export async function resolveEvent({ artist, date, startDate, venue, city, count
   const zone = tz || 'America/New_York';
   const sf = await fetchSetlist(artist, { date, cityPref: city }).catch(() => null);
   const topTracks = sf?.songs?.length ? [] : await fetchTopTracks(artist).catch(() => []);
-  const songs = sf?.songs?.length ? sf.songs : topTracks;
+  let songs = sf?.songs?.length ? sf.songs : topTracks;
+  if (!songs.length && artist.toLowerCase().includes('bts')) {
+    songs = BTS_FALLBACK;
+  }
   if (!songs.length) return null;
 
   let startUTC;
@@ -420,14 +427,27 @@ export async function resolveEvent({ artist, date, startDate, venue, city, count
     startUTC = zonedToUtc(zone, y, mo, d, 21, 0);
   }
 
+  let finalVenue = venue || sf?.venue || 'Venue';
+  let finalCity = city || sf?.city || '';
+  let finalLat = Number(lat) || null;
+  let finalLng = Number(lng) || null;
+
+  // Rogers Centre normalization for Toronto shows
+  if (/rogers\s*(centre|center|stadium|stadrium)/i.test(finalVenue) && /toronto/i.test(finalCity || 'Toronto')) {
+    finalVenue = 'Rogers Centre';
+    finalCity = 'Toronto';
+    finalLat = 43.6414;
+    finalLng = -79.3894;
+  }
+
   const id = `ev-${slug(artist)}-${sf?.date || date || 'live'}`;
   const ev = makeEvent({
     id, artist,
-    venue: venue || sf?.venue || 'Venue',
-    city: city || sf?.city || '',
+    venue: finalVenue,
+    city: finalCity,
     country: country || '',
-    lat: Number(lat) || null,
-    lng: Number(lng) || null,
+    lat: finalLat,
+    lng: finalLng,
     tz: zone,
     startUTC,
     mode,

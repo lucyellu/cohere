@@ -3,30 +3,104 @@ import { loadGoogleMaps, hasMapsKey } from './maps.js';
 
 // Satellite zoom on the exact venue, with a pulsing "LIVE" dot and a live-viewer
 // overlay — "you and N others are here, watching from anywhere." A Street View
-// peek drops you at the gates. Degrades to a static link if no key is present.
+// peek drops you right at the venue gates with camera aimed directly at the structure.
+// Degrades to a static link if no key is present.
+
+function computeHeading(from, to) {
+  const fromLat = (from.lat * Math.PI) / 180;
+  const fromLng = (from.lng * Math.PI) / 180;
+  const toLat = (to.lat * Math.PI) / 180;
+  const toLng = (to.lng * Math.PI) / 180;
+  const dLng = toLng - fromLng;
+
+  const y = Math.sin(dLng) * Math.cos(toLat);
+  const x = Math.cos(fromLat) * Math.sin(toLat) - Math.sin(fromLat) * Math.cos(toLat) * Math.cos(dLng);
+  const heading = (Math.atan2(y, x) * 180) / Math.PI;
+  return (heading + 360) % 360;
+}
 
 export default function VenueMap({ venue, city, lat, lng, live, viewers }) {
   const mapRef = useRef(null);
   const [err, setErr] = useState(null);
   const [viewMode, setViewMode] = useState('hybrid'); // 'hybrid' | 'roadmap' | 'street'
   const [mapObj, setMapObj] = useState(null);
+  const [venueCoords, setVenueCoords] = useState(null);
+
+  // Clean / normalize venue name: e.g. fix "Rogers Stadrium" / "Rogers Stadium" in Toronto -> "Rogers Centre"
+  const normalizedVenue = (venue || '')
+    .replace(/stadrium/gi, 'Centre')
+    .replace(/rogers\s+stadium/gi, 'Rogers Centre');
+  const displayVenue = normalizedVenue || venue || 'Rogers Centre';
+  const displayCity = city || 'Toronto';
 
   useEffect(() => {
     if (!mapObj) return;
+    const pano = mapObj.getStreetView();
+
     if (viewMode === 'hybrid' || viewMode === 'roadmap') {
       mapObj.setMapTypeId(viewMode);
-      mapObj.getStreetView().setVisible(false);
+      if (pano) pano.setVisible(false);
     } else if (viewMode === 'street') {
-      const pano = mapObj.getStreetView();
-      pano.setOptions({
-        position: mapObj.getCenter(),
-        pov: { heading: 165, pitch: 0 },
-        zoom: 0,
-        disableDefaultUI: true,
-      });
-      pano.setVisible(true);
+      const center = venueCoords || (mapObj.getCenter() ? { lat: mapObj.getCenter().lat(), lng: mapObj.getCenter().lng() } : null);
+      if (!center) return;
+
+      if (window.google?.maps) {
+        const maps = window.google.maps;
+        const sv = new maps.StreetViewService();
+        // Try to find nearest outdoor street view panorama within 350m
+        sv.getPanorama(
+          {
+            location: center,
+            radius: 350,
+            preference: maps.StreetViewPreference?.NEAREST || 'nearest',
+            source: maps.StreetViewSource?.OUTDOOR || 'outdoor',
+          },
+          (data, status) => {
+            if (status === 'OK' && data?.location?.latLng) {
+              const panoLat = data.location.latLng.lat();
+              const panoLng = data.location.latLng.lng();
+              const heading = computeHeading({ lat: panoLat, lng: panoLng }, center);
+
+              pano.setPano(data.location.pano);
+              pano.setPov({ heading, pitch: 10 });
+              pano.setOptions({
+                disableDefaultUI: false,
+                panControl: true,
+                zoomControl: true,
+                addressControl: true,
+                fullscreenControl: false,
+                motionTracking: false,
+                linksControl: true,
+              });
+              pano.setVisible(true);
+            } else {
+              // Expand search radius to 1000m
+              sv.getPanorama(
+                { location: center, radius: 1000 },
+                (data2, status2) => {
+                  if (status2 === 'OK' && data2?.location?.latLng) {
+                    const panoLat = data2.location.latLng.lat();
+                    const panoLng = data2.location.latLng.lng();
+                    const heading = computeHeading({ lat: panoLat, lng: panoLng }, center);
+                    pano.setPano(data2.location.pano);
+                    pano.setPov({ heading, pitch: 10 });
+                    pano.setVisible(true);
+                  } else {
+                    pano.setPosition(center);
+                    pano.setPov({ heading: 0, pitch: 10 });
+                    pano.setVisible(true);
+                  }
+                }
+              );
+            }
+          }
+        );
+      } else {
+        pano.setPosition(center);
+        pano.setVisible(true);
+      }
     }
-  }, [viewMode, mapObj]);
+  }, [viewMode, mapObj, venueCoords]);
 
   useEffect(() => {
     if (!hasMapsKey()) {
@@ -38,25 +112,31 @@ export default function VenueMap({ venue, city, lat, lng, live, viewers }) {
       .then(async (maps) => {
         if (cancelled || !mapRef.current) return;
 
-        // Accuracy: geocode the venue BY NAME (so "Rogers Stadium, Toronto"
-        // lands on the actual stadium) rather than trusting a hardcoded coord.
-        // Fall back to provided lat/lng, then a default.
-        let center = Number(lat) && Number(lng) ? { lat: Number(lat), lng: Number(lng) } : null;
-        try {
-          const geocoder = new maps.Geocoder();
-          const { results } = await geocoder.geocode({ address: `${venue}, ${city}` });
-          if (results?.[0]?.geometry?.location) {
-            center = { lat: results[0].geometry.location.lat(), lng: results[0].geometry.location.lng() };
+        // Specific well-known coordinates for Rogers Centre downtown Toronto (1 Blue Jays Way)
+        const isRogersCentre = /rogers\s*(centre|center|stadium|stadrium)/i.test(displayVenue) && /toronto/i.test(displayCity);
+        let center = isRogersCentre
+          ? { lat: 43.6414, lng: -79.3894 }
+          : Number(lat) && Number(lng) ? { lat: Number(lat), lng: Number(lng) } : null;
+
+        if (!center) {
+          try {
+            const geocoder = new maps.Geocoder();
+            const { results } = await geocoder.geocode({ address: `${displayVenue}, ${displayCity}` });
+            if (results?.[0]?.geometry?.location) {
+              center = { lat: results[0].geometry.location.lat(), lng: results[0].geometry.location.lng() };
+            }
+          } catch {
+            /* fall back to coords below */
           }
-        } catch {
-          /* fall back to coords below */
         }
-        if (!center) center = { lat: 43.7460, lng: -79.4768 };
+        if (!center) center = { lat: 43.6414, lng: -79.3894 };
         if (cancelled) return;
+
+        setVenueCoords(center);
 
         const map = new maps.Map(mapRef.current, {
           center,
-          zoom: 16,
+          zoom: 17,
           mapTypeId: 'hybrid', // satellite + labels
           disableDefaultUI: true,
           gestureHandling: 'greedy',
@@ -66,7 +146,7 @@ export default function VenueMap({ venue, city, lat, lng, live, viewers }) {
         new maps.Marker({
           position: center,
           map,
-          title: venue,
+          title: displayVenue,
         });
         // Pulsing "live" ring drawn as a self-animating circle.
         if (live) {
@@ -95,15 +175,15 @@ export default function VenueMap({ venue, city, lat, lng, live, viewers }) {
     return () => {
       cancelled = true;
     };
-  }, [lat, lng, venue, live]);
+  }, [lat, lng, displayVenue, displayCity, live]);
 
   if (err) {
-    const q = encodeURIComponent(`${venue} ${city}`);
+    const q = encodeURIComponent(`${displayVenue} ${displayCity}`);
     return (
       <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-zinc-900 p-4 text-center">
         <div className="text-3xl">📍</div>
-        <p className="text-sm font-medium text-zinc-200">{venue}</p>
-        <p className="text-xs text-zinc-500">{city}</p>
+        <p className="text-sm font-medium text-zinc-200">{displayVenue}</p>
+        <p className="text-xs text-zinc-500">{displayCity}</p>
         <a
           href={`https://www.google.com/maps/search/?api=1&query=${q}`}
           target="_blank"
@@ -142,8 +222,8 @@ export default function VenueMap({ venue, city, lat, lng, live, viewers }) {
       {/* Venue label + street view toggle */}
       <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between gap-2">
         <div className="rounded-lg bg-black/70 px-3 py-1.5 backdrop-blur">
-          <p className="text-sm font-semibold text-zinc-100">{venue}</p>
-          <p className="text-[11px] text-zinc-400">{city}</p>
+          <p className="text-sm font-semibold text-zinc-100">{displayVenue}</p>
+          <p className="text-[11px] text-zinc-400">{displayCity}</p>
         </div>
         <div className="flex gap-2">
           <button

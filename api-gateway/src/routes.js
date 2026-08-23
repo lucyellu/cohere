@@ -1067,7 +1067,7 @@ function isoToDmy(iso) {
 // "Be in the crowd" extends to the air: for a LIVE show we show current
 // conditions at the venue; for a REPLAY we pull the ARCHIVE for that date at
 // ~9pm local ("it was 12°C and raining that night"). Especially good for the
-// open-air Rogers Stadium featured show. No key, no cost.
+// Rogers Centre featured show. No key, no cost.
 const WMO = {
   0: { label: 'Clear', emoji: '☀️' },
   1: { label: 'Mainly clear', emoji: '🌤️' }, 2: { label: 'Partly cloudy', emoji: '⛅' }, 3: { label: 'Overcast', emoji: '☁️' },

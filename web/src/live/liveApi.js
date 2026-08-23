@@ -180,6 +180,7 @@ async function fallbackEvent(body = {}) {
 
 async function fallbackSongs(artist) {
   const key = String(artist || '').toLowerCase();
+  if (key.includes('bts')) return ['Dynamite', 'Butter', 'Boy With Luv', 'DNA', 'MIC Drop', 'Spring Day', 'Blood Sweat & Tears', 'Fake Love', 'IDOL', 'Life Goes On', 'Permission to Dance', 'Run BTS', 'Fire', 'Save ME', 'Euphoria', 'Black Swan', 'Yet To Come'];
   if (key.includes('bruno')) return ['24K Magic', 'Treasure', 'That’s What I Like', 'Leave the Door Open', 'Locked Out of Heaven', 'Just the Way You Are', 'Uptown Funk'];
   if (key.includes('harry')) return ['Music for a Sushi Restaurant', 'Golden', 'Adore You', 'Watermelon Sugar', 'Sign of the Times', 'As It Was', 'Kiwi'];
   if (key.includes('olivia')) return ['bad idea right?', 'vampire', 'drivers license', 'deja vu', 'traitor', 'good 4 u', 'all-american bitch'];

@@ -503,7 +503,7 @@ function AccuracyBar({ event, presenceCount, synced }) {
 }
 
 // Venue weather — current for a live show, that night's archive for a replay.
-// Reinforces "be there": especially for the open-air Rogers Stadium show.
+// Reinforces "be there": especially for the iconic Rogers Centre show.
 function Weather({ event }) {
   const [wx, setWx] = useState(null);
   useEffect(() => {
