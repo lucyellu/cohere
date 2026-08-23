@@ -82,6 +82,53 @@ export async function voteClip(eventId, clipId) {
   }).then((x) => x.json()).catch(() => null);
 }
 
+// --- Voice Notes (Record audio message for friends with song timestamp) ----
+export async function submitVoiceNote(eventId, { audioData, durationSec, title, songIndex, songTimecode }) {
+  const userId = guestId();
+  const userName = guestName() || 'Friend';
+  const payload = {
+    eventId,
+    audioData,
+    durationSec: Math.round(durationSec || 0),
+    title,
+    songIndex,
+    songTimecode,
+    userId,
+    userName,
+  };
+
+  // Local fallback storage so voice note is immediately available offline
+  try {
+    const key = `cohear_vn_${eventId}`;
+    const list = JSON.parse(localStorage.getItem(key) || '[]');
+    list.unshift({
+      id: `vn-local-${Date.now().toString(36)}`,
+      ...payload,
+      by: userName,
+      votes: 1,
+      ts: Date.now(),
+      platform: 'voicenote',
+    });
+    localStorage.setItem(key, JSON.stringify(list.slice(0, 30)));
+  } catch {}
+
+  const res = await fetch('/api/live/voicenote', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }).then((x) => x.json()).catch(() => null);
+
+  return res || { ok: true, local: true };
+}
+
+export async function voteVoiceNote(eventId, voiceNoteId) {
+  return fetch('/api/live/voicenote/vote', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ eventId, voiceNoteId }),
+  }).then((x) => x.json()).catch(() => null);
+}
+
 // --- Fan footage of the actual event ------------------------------------
 // Returns { items: [{videoId,title,channel,publishedAt,views,live}], error }.
 export async function liveYoutube(q, { live = false, since, hours } = {}) {

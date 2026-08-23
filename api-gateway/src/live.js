@@ -221,7 +221,8 @@ function snapshot(ev) {
     timeline: ev.timeline,
     showLengthMs: showLengthMs(ev.timeline),
     correctionMs: ev.correctionMs || 0,
-    clips: [...ev.clips].sort((a, b) => b.votes - a.votes).slice(0, 24),
+    clips: [...ev.clips].sort((a, b) => b.votes - a.votes).slice(0, 50),
+    voiceNotes: (ev.voiceNotes || []).slice(0, 30),
     serverNow: Date.now(),
   };
 }
@@ -297,6 +298,7 @@ function makeEvent({ id, artist, venue, city, country, lat, lng, tz, startUTC, m
     lastSetlistCheck: 0,
     beacons: [], correctionMs: 0, beaconCount: 0, beaconPeople: 0,
     clips: [],
+    voiceNotes: [],
   };
   events.set(id, ev);
   return ev;
@@ -531,7 +533,61 @@ export function voteClip(id, clipId) {
   const clip = ev.clips.find((c) => c.id === clipId);
   if (!clip) return { ok: false, error: 'clip not found' };
   clip.votes += 1;
+  const vn = (ev.voiceNotes || []).find((v) => v.id === clipId);
+  if (vn) vn.votes = clip.votes;
   return { ok: true, votes: clip.votes };
+}
+
+export function addVoiceNote(id, { audioData, durationSec, title, userId, userName, songIndex, songTimecode }) {
+  const ev = events.get(id);
+  if (!ev) return null;
+  if (!audioData) return { ok: false, error: 'audioData required' };
+  if (!ev.voiceNotes) ev.voiceNotes = [];
+
+  const idx = Number.isInteger(Number(songIndex)) && Number(songIndex) >= 0 && Number(songIndex) < ev.timeline.length
+    ? Number(songIndex)
+    : null;
+
+  const currentSong = idx != null ? ev.timeline[idx].song : null;
+  const noteTitle = String(title || (currentSong ? `Voice note during “${currentSong}”` : 'Live voice note')).slice(0, 140);
+  const authorName = String(userName || userId || 'Friend').slice(0, 40);
+
+  const voiceNote = {
+    id: `vn-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+    audioData,
+    durationSec: Math.max(1, Math.round(Number(durationSec) || 0)),
+    title: noteTitle,
+    songIndex: idx,
+    song: currentSong,
+    songTimecode: songTimecode || (currentSong ? `During ${currentSong}` : null),
+    by: authorName,
+    userId: userId || 'anon',
+    votes: 1,
+    ts: Date.now(),
+  };
+
+  ev.voiceNotes.unshift(voiceNote);
+  if (ev.voiceNotes.length > 50) ev.voiceNotes.pop();
+
+  // Add to clips as platform 'voicenote' so it surfaces in media feeds
+  const clip = {
+    id: voiceNote.id,
+    url: audioData,
+    platform: 'voicenote',
+    title: voiceNote.title,
+    songIndex: idx,
+    song: currentSong,
+    songTimecode: voiceNote.songTimecode,
+    durationSec: voiceNote.durationSec,
+    by: voiceNote.by,
+    votes: 1,
+    ts: voiceNote.ts,
+    audioData,
+  };
+  ev.clips.unshift(clip);
+  if (ev.clips.length > 100) ev.clips.pop();
+
+  return { ok: true, voiceNote, clip };
 }
 
 function detectPlatform(url) {

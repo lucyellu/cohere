@@ -1859,6 +1859,21 @@ router.post('/live/clip/vote', express.json(), (req, res) => {
   res.status(out.ok ? 200 : 400).json(out);
 });
 
+// Voice note: record audio message pinned to setlist song timestamp for friends
+router.post('/live/voicenote', express.json({ limit: '20mb' }), (req, res) => {
+  const { eventId, audioData, durationSec, title, userId, userName, songIndex, songTimecode } = req.body || {};
+  const out = live.addVoiceNote(eventId, { audioData, durationSec, title, userId, userName, songIndex, songTimecode });
+  if (!out) return res.status(404).json({ ok: false, error: 'event not found' });
+  res.status(out.ok ? 200 : 400).json(out);
+});
+
+router.post('/live/voicenote/vote', express.json(), (req, res) => {
+  const { eventId, voiceNoteId } = req.body || {};
+  const out = live.voteClip(eventId, voiceNoteId);
+  if (!out) return res.status(404).json({ ok: false, error: 'event not found' });
+  res.status(out.ok ? 200 : 400).json(out);
+});
+
 // Fan footage of the ACTUAL event: fresh uploads (publishedAfter + order=date)
 // and active livestreams (eventType=live) — not old concerts. Each result is
 // enriched with viewCount + publishedAt (one videos.list call) so the UI can

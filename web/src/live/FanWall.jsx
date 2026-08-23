@@ -1,18 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { liveYoutube, socialSearch, submitClip, voteClip } from './liveApi.js';
+import { VoiceNoteRecorder, VoiceNoteCard } from './VoiceNoteRecorder.jsx';
 
 // The crowd-sourced live feed of the actual event — ONE grid, every platform,
-// each clip embedded inline with a SOURCE BADGE (YouTube / TikTok / IG / X):
-//   • YouTube  — auto-pulled (the only platform with a free search API),
-//                enriched with view counts + upload times
-//   • TikTok / Instagram / X — embedded from URLs the crowd drops in (no free
-//                search API exists for these, so they can't be auto-discovered,
-//                but a pasted link embeds + plays inline like the rest)
+// each clip embedded inline with a SOURCE BADGE (Voice Notes / YouTube / TikTok / IG / X):
+//   • Voice Notes — recorded messages pinned to specific song timestamps
+//   • YouTube  — auto-pulled (the only platform with a free search API)
+//   • TikTok / Instagram / X — embedded from URLs the crowd drops in
 // Controls: sort (recent / views / A–Z), platform filter, and a setlist-song
 // selector so the feed maps onto individual songs.
 
 const PLATFORMS = [
   { id: 'all', label: 'All' },
+  { id: 'voicenote', label: '🎙️ Voice Notes' },
   { id: 'youtube', label: '▶️ YouTube' },
   { id: 'tiktok', label: '🎵 TikTok' },
   { id: 'instagram', label: '📸 Instagram' },
@@ -88,7 +88,39 @@ export default function FanWall({ event, np, clips, onClipsChanged, compact = fa
       ts: s.ts || 0,
       song: scopeSong,
     }));
+    // Voice notes from event snapshot and local storage
+    const localNotes = (() => {
+      try {
+        return JSON.parse(localStorage.getItem(`cohear_vn_${event.id}`) || '[]');
+      } catch {
+        return [];
+      }
+    })();
+    const allNotes = [...(event.voiceNotes || []), ...localNotes];
+    const seenNotes = new Set();
+    const noteItems = [];
+    for (const vn of allNotes) {
+      if (!vn || !vn.audioData || seenNotes.has(vn.id || vn.audioData)) continue;
+      seenNotes.add(vn.id || vn.audioData);
+      if (scope !== 'all' && vn.songIndex != null && String(vn.songIndex) !== String(scope)) continue;
+      noteItems.push({
+        key: 'vn-' + (vn.id || vn.ts),
+        source: 'voicenote',
+        audioData: vn.audioData,
+        durationSec: vn.durationSec,
+        title: vn.title,
+        song: vn.song,
+        songIndex: vn.songIndex,
+        songTimecode: vn.songTimecode,
+        by: vn.by || 'Friend',
+        votes: vn.votes || 1,
+        ts: vn.ts || 0,
+        id: vn.id,
+      });
+    }
+
     const crowd = (clips || [])
+      .filter((c) => c.platform !== 'voicenote') // voice notes handled separately above
       .filter((c) => scope === 'all' || String(c.songIndex) === String(scope))
       .map((c) => ({
         key: 'cw-' + c.id,
@@ -103,7 +135,7 @@ export default function FanWall({ event, np, clips, onClipsChanged, compact = fa
         clipId: c.id,
       }));
 
-    let list = [...crowd, ...ytItems, ...socialItems];
+    let list = [...noteItems, ...crowd, ...ytItems, ...socialItems];
     if (platform !== 'all') list = list.filter((i) => i.source === platform);
 
     if (sort === 'views') list.sort((a, b) => (b.views ?? b.votes ?? -1) - (a.views ?? a.votes ?? -1));
@@ -111,15 +143,15 @@ export default function FanWall({ event, np, clips, onClipsChanged, compact = fa
     else list.sort((a, b) => (b.ts || 0) - (a.ts || 0));
     list.sort((a, b) => (b.live ? 1 : 0) - (a.live ? 1 : 0)); // livestreams first
     return list;
-  }, [yt.items, social.items, clips, platform, sort, scope, scopeSong]);
+  }, [yt.items, social.items, clips, event.voiceNotes, event.id, platform, sort, scope, scopeSong]);
 
   return (
     <div className={compact ? '' : 'rounded-2xl border border-white/10 bg-white/[0.03] p-4'}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold text-zinc-100">{compact ? 'Crowd media' : 'Crowd-sourced live feed'}</h3>
+          <h3 className="text-sm font-semibold text-zinc-100">{compact ? 'Crowd media & voice notes' : 'Crowd-sourced live feed'}</h3>
           <p className="text-[11px] text-zinc-500">
-            {scopeSong ? <>Footage of <span className="text-fuchsia-300">“{scopeSong}”</span></> : 'Every platform, one feed'}
+            {scopeSong ? <>Footage & voice notes for <span className="text-fuchsia-300">“{scopeSong}”</span></> : 'Every platform & friend voice notes in one feed'}
           </p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
@@ -166,21 +198,28 @@ export default function FanWall({ event, np, clips, onClipsChanged, compact = fa
         ))}
       </div>
 
+      {/* Leave a voice note for friends */}
+      <VoiceNoteRecorder event={event} np={np} onSubmitted={onClipsChanged} compact={compact} />
+
       {/* Add any clip (the only way to pull TikTok/IG/X in — no free search API) */}
       <PasteBar event={event} np={np} onClipsChanged={onClipsChanged} />
 
       {/* Unified embedded grid */}
       {(yt.loading) && !items.length ? (
-        <p className="py-6 text-center text-sm text-zinc-500">Pulling footage from YouTube…</p>
+        <p className="py-6 text-center text-sm text-zinc-500">Pulling footage and voice notes…</p>
       ) : !items.length ? (
         <p className="py-6 text-center text-sm text-zinc-500">
-          No {platform === 'all' ? '' : platform + ' '}footage found yet for this {scopeSong ? 'song' : 'show'}.
+          No {platform === 'all' ? '' : platform + ' '}items found yet for this {scopeSong ? 'song' : 'show'}.
         </p>
       ) : (
         <>
           <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
-            {items.slice(0, 18).map((it) => (
-              <FeedCard key={it.key} it={it} event={event} onVote={onClipsChanged} />
+            {items.slice(0, 24).map((it) => (
+              it.source === 'voicenote' || it.audioData ? (
+                <VoiceNoteCard key={it.key} item={it} event={event} onVote={onClipsChanged} />
+              ) : (
+                <FeedCard key={it.key} it={it} event={event} onVote={onClipsChanged} />
+              )
             ))}
           </div>
           {social.loading && <p className="mt-2 text-center text-[11px] text-zinc-500">loading more from TikTok / IG / X…</p>}
