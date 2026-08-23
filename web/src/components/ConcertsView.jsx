@@ -354,7 +354,15 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
   const paginatedVisible = useMemo(() => visible.slice(0, page * 100), [visible, page]);
 
   const selected = useMemo(() => visible.find((c) => c.id === selectedId) || null, [selectedId, visible]);
-  const biggest = visible[0] || null;
+  const featuredConcert = useMemo(() => {
+    // Prefer tonight's BTS featured concert at Rogers Centre if present in visible or concerts
+    const btsVis = visible.find((c) => c.artist && c.artist.toLowerCase().includes('bts'));
+    if (btsVis) return btsVis;
+    const btsAny = concerts.find((c) => c.artist && c.artist.toLowerCase().includes('bts'));
+    if (btsAny && browse) return btsAny;
+    // Otherwise fallback to highest capacity in view
+    return [...visible].sort((a, b) => (b.capacity || b.popularity || 0) - (a.capacity || a.popularity || 0))[0] || visible[0] || null;
+  }, [visible, concerts, browse]);
   const stats = useMemo(() => {
     const upcoming = concerts.filter((c) => c.when === 'upcoming').length;
     return { count: visible.length, upcoming, past: concerts.length - upcoming };
@@ -406,7 +414,8 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
       <DiscoverHeader
         artist={artist}
         browse={browse}
-        biggest={biggest}
+        featured={featuredConcert}
+        onSelectConcert={(c) => setSelectedId(c.id)}
         loading={loading}
         stats={stats}
         spotify={spotify}
@@ -549,7 +558,7 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
   );
 }
 
-function DiscoverHeader({ artist, browse, biggest, loading, stats, spotify, userZone, currency, now, me, onBrowse }) {
+function DiscoverHeader({ artist, browse, featured, onSelectConcert, loading, stats, spotify, userZone, currency, now, me, onBrowse }) {
   return (
     <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
       <div className="cohear-panel p-5">
@@ -572,25 +581,26 @@ function DiscoverHeader({ artist, browse, biggest, loading, stats, spotify, user
           )}
         </div>
 
-        {biggest && (
+        {featured && (
           <button
             type="button"
+            onClick={() => onSelectConcert?.(featured)}
             className="mt-5 grid w-full gap-4 rounded-lg border border-amber-300/25 bg-amber-300/[0.07] p-4 text-left transition hover:border-amber-200/50 md:grid-cols-[1fr_auto]"
           >
             <div className="min-w-0">
               <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-amber-200">
-                <span className="h-2 w-2 rounded-full bg-amber-300" />
-                Biggest in view
+                <span className="h-2 w-2 animate-pulse rounded-full bg-rose-400" />
+                Featured tonight
               </div>
-              <div className="mt-2 truncate text-xl font-semibold text-white">{biggest.artist || biggest.venue}</div>
+              <div className="mt-2 truncate text-xl font-semibold text-white">{featured.artist || featured.venue}</div>
               <div className="mt-1 truncate text-sm text-zinc-300">
-                {biggest.venue} · {[biggest.city, biggest.country].filter(Boolean).join(', ')}
+                {featured.venue} · {[featured.city, featured.country].filter(Boolean).join(', ')}
               </div>
             </div>
             <div className="flex items-end gap-6 md:text-right">
-              <Metric label="Capacity" value={fmtCapacity(biggest.capacity)} tone="amber" />
-              <Metric label="Starts" value={countdownLabel(biggest, now).text} />
-              <Metric label="Your time" value={formatUserShowTime(biggest, userZone)} />
+              <Metric label="Capacity" value={fmtCapacity(featured.capacity)} tone="amber" />
+              <Metric label="Starts" value={countdownLabel(featured, now).text} />
+              <Metric label="Your time" value={formatUserShowTime(featured, userZone)} />
             </div>
           </button>
         )}

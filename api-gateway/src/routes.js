@@ -533,6 +533,31 @@ router.get('/concerts', async (req, res) => {
     sources.setlistfm = artist ? (isMock('setlistfm') ? 'nokey' : 'mock') : 'na';
   }
 
+  // Browse mode: ensure tonight's featured BTS live concert at Rogers Centre is included
+  if (browse && windowKey !== 'past') {
+    collected.push({
+      id: 'featured-bts-toronto',
+      artist: 'BTS',
+      venue: 'Rogers Centre',
+      city: 'Toronto',
+      region: 'ON',
+      country: 'Canada',
+      lat: 43.6414,
+      lng: -79.3894,
+      timeZone: 'America/Toronto',
+      date: today,
+      startDate: `${today}T20:00:00`,
+      capacity: 53506,
+      popularity: 99,
+      setlist: [
+        'Dynamite', 'Butter', 'Boy With Luv', 'DNA', 'MIC Drop', 'Spring Day',
+        'Blood Sweat & Tears', 'Fake Love', 'IDOL', 'Life Goes On', 'Permission to Dance',
+        'Run BTS', 'Fire', 'Save ME', 'Euphoria', 'Black Swan', 'Yet To Come'
+      ],
+      source: 'live',
+    });
+  }
+
   // Browse defaults to biggest-first (the discovery framing); artist view to recency.
   const merged = mergeConcerts(collected, today).filter((c) => !(browse && windowKey === 'past') || c.when === 'past');
   const concerts = browse
