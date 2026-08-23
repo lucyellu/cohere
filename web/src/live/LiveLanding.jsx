@@ -289,6 +289,8 @@ function MediaCard({ item }) {
 
 function pickBestTonight(tonight, week) {
   const pool = tonight.length ? tonight : week.filter((c) => c.when !== 'past').slice(0, 12);
+  const bts = pool.find((c) => c.artist && c.artist.toLowerCase().includes('bts'));
+  if (bts) return bts;
   return [...pool].sort((a, b) => (b.capacity || b.popularity || 0) - (a.capacity || a.popularity || 0))[0] || null;
 }
 

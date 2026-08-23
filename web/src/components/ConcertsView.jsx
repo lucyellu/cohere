@@ -59,7 +59,7 @@ function readDiscoverState() {
     hideEnded: true,
     showMyArtists: false,
     selectedId: null,
-    minCapacity: 5000,
+    minCapacity: 10000,
     timeLimitHrs: 0,
     customStart: new Date().toISOString().slice(0, 10),
     customEnd: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
@@ -67,7 +67,7 @@ function readDiscoverState() {
   try {
     const parsed = JSON.parse(sessionStorage.getItem(DISCOVER_STATE_KEY) || 'null');
     if (!parsed) return fallback;
-    return { ...fallback, ...parsed, hideEnded: parsed.hideEnded ?? true, minCapacity: parsed.minCapacity ?? 5000 };
+    return { ...fallback, ...parsed, hideEnded: parsed.hideEnded ?? true, minCapacity: parsed.minCapacity ?? 10000 };
   } catch {
     return fallback;
   }
@@ -109,7 +109,7 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
   const [when, setWhen] = useState(initialState.when);
   const [hideEnded, setHideEnded] = useState(Boolean(initialState.hideEnded));
   const [selectedId, setSelectedId] = useState(initialState.selectedId);
-  const [minCapacity, setMinCapacity] = useState(initialState.minCapacity ?? 5000);
+  const [minCapacity, setMinCapacity] = useState(initialState.minCapacity ?? 10000);
   const [timeLimitHrs, setTimeLimitHrs] = useState(initialState.timeLimitHrs ?? 0);
   const [customStart, setCustomStart] = useState(initialState.customStart);
   const [customEnd, setCustomEnd] = useState(initialState.customEnd);

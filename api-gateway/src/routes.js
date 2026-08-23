@@ -269,8 +269,8 @@ const dmyToIso = (dmy) => {
   const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(dmy || '');
   return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
 };
-const PAST_DISCOVERY_ARTISTS = ['Bruno Mars', 'Coldplay', 'Olivia Rodrigo', 'Sabrina Carpenter', 'Post Malone', 'Taylor Swift', 'Billie Eilish', 'Bad Bunny'];
-const FEATURED_DISCOVERY_ARTISTS = ['Harry Styles'];
+const PAST_DISCOVERY_ARTISTS = ['BTS', 'Bruno Mars', 'Coldplay', 'Olivia Rodrigo', 'Sabrina Carpenter', 'Post Malone', 'Taylor Swift', 'Billie Eilish', 'Bad Bunny'];
+const FEATURED_DISCOVERY_ARTISTS = ['BTS', 'Harry Styles'];
 
 function normJambase(events) {
   return (events || []).map((e) => {
