@@ -269,8 +269,8 @@ const dmyToIso = (dmy) => {
   const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(dmy || '');
   return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
 };
-const PAST_DISCOVERY_ARTISTS = ['BTS', 'Bruno Mars', 'Coldplay', 'Olivia Rodrigo', 'Sabrina Carpenter', 'Post Malone', 'Taylor Swift', 'Billie Eilish', 'Bad Bunny'];
-const FEATURED_DISCOVERY_ARTISTS = ['BTS', 'Harry Styles'];
+const PAST_DISCOVERY_ARTISTS = ['Bruno Mars', 'Coldplay', 'Olivia Rodrigo', 'Sabrina Carpenter', 'Post Malone', 'Taylor Swift', 'Billie Eilish', 'Bad Bunny'];
+const FEATURED_DISCOVERY_ARTISTS = ['Harry Styles'];
 
 function normJambase(events) {
   return (events || []).map((e) => {
@@ -395,6 +395,26 @@ async function fetchRecentSetlistsByArtist(artist) {
   return { setlists: r.data?.setlist || [], mode: r.ok ? 'live' : 'error' };
 }
 
+// In-memory cache for concerts to serve instant responses and protect JamBase quota
+const CONCERTS_CACHE = new Map();
+const CONCERTS_CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+
+function getConcertsMemoryCache(key) {
+  const hit = CONCERTS_CACHE.get(key);
+  if (hit && Date.now() - hit.ts < CONCERTS_CACHE_TTL_MS) {
+    return hit.data;
+  }
+  return null;
+}
+
+function setConcertsMemoryCache(key, data) {
+  CONCERTS_CACHE.set(key, { ts: Date.now(), data });
+  if (CONCERTS_CACHE.size > 200) {
+    const firstKey = CONCERTS_CACHE.keys().next().value;
+    CONCERTS_CACHE.delete(firstKey);
+  }
+}
+
 router.get('/concerts', async (req, res) => {
   const artist = String(req.query.artist || '').trim();
   const source = String(req.query.source || '');
@@ -406,6 +426,15 @@ router.get('/concerts', async (req, res) => {
   const today = /^\d{4}-\d{2}-\d{2}$/.test(localDateStr) ? localDateStr : fallbackToday;
 
   const browse = !artist; // no artist -> DISCOVER everything happening
+  const cacheKey = `${today}:${artist}:${source}:${windowKey}:${customStart}:${customEnd}`;
+
+  // 1. Fast in-memory cache hit
+  const memCached = getConcertsMemoryCache(cacheKey);
+  if (memCached) {
+    res.set('Cache-Control', 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400');
+    return res.json({ ...memCached, cached: true });
+  }
+
   const sources = { jambase: null, setlistfm: null };
   const collected = [];
 
@@ -417,8 +446,6 @@ router.get('/concerts', async (req, res) => {
       dateTo = addDaysIso(today, -1);
     } else {
       dateFrom = today;
-      // "Tonight" is today's calendar date — stretching it to tomorrow let the
-      // (capacity-sorted) next-day stadium shows bury the ones happening now.
       if (windowKey === 'tonight') { dateFrom = today; dateTo = today; }
       else if (windowKey === 'week') dateTo = addDaysIso(today, 7);
       else if (windowKey === 'custom') { dateFrom = customStart || today; dateTo = customEnd || addDaysIso(today, 30); }
@@ -443,22 +470,6 @@ router.get('/concerts', async (req, res) => {
       const jbEvents = cached.map((c) => c.jambase_payload);
       collected.push(...normJambase(jbEvents));
       sources.jambase = 'live'; // Effectively live via cache
-
-      // The nightly cron only samples every 4th day, so the cache is sparse: a
-      // multi-day window can "hit" it while holding nothing at all for the day
-      // the user actually cares about. Top up the leading edge in real time —
-      // mergeConcerts dedupes, so an overlap with cached rows is harmless.
-      if (!cached.some((c) => c.date === dateFrom)) {
-        const capTo = addDaysIso(dateFrom, 1);
-        const jb = await fetchJambaseEvents({
-          artist: '',
-          source,
-          dateFrom,
-          dateTo: dateTo < capTo ? dateTo : capTo,
-          perPage: 100,
-        });
-        collected.push(...normJambase(jb.events));
-      }
     } catch (e) {
       console.error('Supabase cache error:', e.message);
       // Fallback to real-time if cache isn't ready
@@ -471,15 +482,7 @@ router.get('/concerts', async (req, res) => {
       }
     }
   } else {
-    // Artist search: try the cache FIRST. This is the path that scales with
-    // users — every search used to cost two JamBase calls (name -> id, then
-    // events), so a handful of people searching would outrun the 1,000/month
-    // free tier on its own. The cache already holds every worldwide show in
-    // the near-term window, so most searches never leave the database.
-    // TRADE-OFF: past that window the cache is a sampled tail, so a tour
-    // stretching months out returns the sampled dates rather than every one.
-    // Full fidelity there needs a per-artist cache table with its own TTL;
-    // until then this trades far-future detail for not burning the quota.
+    // Artist search: try the cache FIRST.
     let served = false;
     if (source !== 'mock' && SB_URL && SB_KEY) {
       try {
@@ -533,31 +536,6 @@ router.get('/concerts', async (req, res) => {
     sources.setlistfm = artist ? (isMock('setlistfm') ? 'nokey' : 'mock') : 'na';
   }
 
-  // Browse mode: ensure tonight's featured BTS live concert at Rogers Centre is included
-  if (browse && windowKey !== 'past') {
-    collected.push({
-      id: 'featured-bts-toronto',
-      artist: 'BTS',
-      venue: 'Rogers Centre',
-      city: 'Toronto',
-      region: 'ON',
-      country: 'Canada',
-      lat: 43.6414,
-      lng: -79.3894,
-      timeZone: 'America/Toronto',
-      date: today,
-      startDate: `${today}T20:00:00`,
-      capacity: 53506,
-      popularity: 99,
-      setlist: [
-        'Dynamite', 'Butter', 'Boy With Luv', 'DNA', 'MIC Drop', 'Spring Day',
-        'Blood Sweat & Tears', 'Fake Love', 'IDOL', 'Life Goes On', 'Permission to Dance',
-        'Run BTS', 'Fire', 'Save ME', 'Euphoria', 'Black Swan', 'Yet To Come'
-      ],
-      source: 'live',
-    });
-  }
-
   // Browse defaults to biggest-first (the discovery framing); artist view to recency.
   const merged = mergeConcerts(collected, today).filter((c) => !(browse && windowKey === 'past') || c.when === 'past');
   const concerts = browse
@@ -565,7 +543,31 @@ router.get('/concerts', async (req, res) => {
       ? merged.sort((a, b) => b.date.localeCompare(a.date))
       : merged.sort((a, b) => (b.popularity ?? -1) - (a.popularity ?? -1)))
     : merged.sort((a, b) => b.date.localeCompare(a.date));
-  res.json({ ok: true, artist, browse, window: browse ? windowKey : null, concerts, sources });
+  
+  const payload = { ok: true, artist, browse, window: browse ? windowKey : null, concerts, sources };
+  
+  // Cache in-memory and return with CDN edge caching headers
+  setConcertsMemoryCache(cacheKey, payload);
+  res.set('Cache-Control', 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400');
+  res.json(payload);
+});
+
+// Endpoint to trigger background sync via cron webhook or monitor
+router.all('/cron/sync-jambase', async (req, res) => {
+  const secret = req.query.secret || req.headers['x-cron-secret'] || '';
+  const expected = process.env.CRON_SECRET || ADMIN_TOKEN;
+  if (expected && secret !== expected && !isAdminRequest(req)) {
+    return res.status(401).json({ ok: false, error: 'unauthorized' });
+  }
+  console.log('🔄 Triggering background JamBase sync from cron endpoint...');
+  try {
+    const { spawn } = await import('node:child_process');
+    const p = spawn('node', ['src/cron-jambase.js'], { stdio: 'inherit', detached: true });
+    p.unref();
+    res.json({ ok: true, message: 'JamBase sync spawned successfully in background' });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
 // --- Ticketmaster Discovery: single-ticket price range + buy link --------
@@ -1821,6 +1823,7 @@ router.get('/live/featured', async (_req, res) => {
 router.get('/live/event/:id', (req, res) => {
   const event = live.getEvent(req.params.id);
   if (!event) return res.status(404).json({ ok: false, error: 'event not found' });
+  res.set('Cache-Control', 'public, max-age=2, stale-while-revalidate=5');
   res.json({ ok: true, event });
 });
 
@@ -1829,6 +1832,7 @@ router.post('/live/resolve', express.json(), async (req, res) => {
   try {
     const event = await live.resolveEvent(req.body || {});
     if (!event) return res.status(404).json({ ok: false, error: 'no setlist found for that artist' });
+    res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=3600');
     res.json({ ok: true, event });
   } catch (e) {
     res.status(400).json({ ok: false, error: e.message });

@@ -32,6 +32,8 @@ const USER_ZONE_KEY = 'cohear_user_timezone';
 const DISCOVER_STATE_KEY = 'cohear_discover_state_v4';
 const DISCOVER_LAYOUT_KEY = 'cohear_discover_layout_v1';
 const DEFAULT_INSPECTOR_WIDTH = 380;
+// Sections of Discover the reader can fold away to give the results list more room.
+const DEFAULT_COLLAPSED = { hero: false, passport: false, controls: false, map: false };
 const DETECTED_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Vancouver';
 const USER_TIME_ZONES = withDetectedZone([
   { zone: 'America/Vancouver', city: 'Vancouver', label: 'Vancouver / Pacific' },
@@ -63,11 +65,18 @@ function readDiscoverState() {
     timeLimitHrs: 0,
     customStart: new Date().toISOString().slice(0, 10),
     customEnd: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+    collapsed: { ...DEFAULT_COLLAPSED },
   };
   try {
     const parsed = JSON.parse(sessionStorage.getItem(DISCOVER_STATE_KEY) || 'null');
     if (!parsed) return fallback;
-    return { ...fallback, ...parsed, hideEnded: parsed.hideEnded ?? true, minCapacity: parsed.minCapacity ?? 10000 };
+    return {
+      ...fallback,
+      ...parsed,
+      hideEnded: parsed.hideEnded ?? true,
+      minCapacity: parsed.minCapacity ?? 10000,
+      collapsed: { ...DEFAULT_COLLAPSED, ...(parsed.collapsed || null) },
+    };
   } catch {
     return fallback;
   }
@@ -122,6 +131,8 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
   const [inspectorWidth, setInspectorWidth] = useState(() => readInspectorWidth());
   const [me, setMe] = useState(() => personalStats());
   const [showMyArtists, setShowMyArtists] = useState(Boolean(initialState.showMyArtists));
+  const [collapsed, setCollapsed] = useState(() => ({ ...DEFAULT_COLLAPSED, ...(initialState.collapsed || null) }));
+  const toggleCollapsed = useCallback((key) => setCollapsed((prev) => ({ ...prev, [key]: !prev[key] })), []);
   const [inviteConcert, setInviteConcert] = useState(null);
   const resizeRef = useRef(null);
 
@@ -226,8 +237,8 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
   }, [windowKey, customStart, customEnd]);
 
   useEffect(() => {
-    writeDiscoverState({ query, artist, location, windowKey, mode, sortKey, dir, when, hideEnded, showMyArtists, selectedId, minCapacity, timeLimitHrs, customStart, customEnd });
-  }, [artist, dir, hideEnded, location, mode, query, selectedId, showMyArtists, sortKey, when, windowKey, minCapacity, timeLimitHrs, customStart, customEnd]);
+    writeDiscoverState({ query, artist, location, windowKey, mode, sortKey, dir, when, hideEnded, showMyArtists, selectedId, minCapacity, timeLimitHrs, customStart, customEnd, collapsed });
+  }, [artist, dir, hideEnded, location, mode, query, selectedId, showMyArtists, sortKey, when, windowKey, minCapacity, timeLimitHrs, customStart, customEnd, collapsed]);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30_000);
@@ -298,6 +309,7 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
     setShowMyArtists(false);
     setMinCapacity(0);
     setTimeLimitHrs(0);
+    setCollapsed({ ...DEFAULT_COLLAPSED });
     try {
       localStorage.removeItem(DISCOVER_LAYOUT_KEY);
     } catch {
@@ -319,7 +331,10 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
     const base = browse ? concerts : filterWhen(concerts, when);
     const filtered = base.filter((c) => {
       if (minCapacity > 0 && (c.capacity == null || c.capacity < minCapacity)) return false;
-
+      if (timeLimitHrs > 0) {
+        const start = showStartMs(c);
+        if (!start || start - now > timeLimitHrs * 3600_000) return false;
+      }
       const st = showState(c, now);
       // Hide a show only once it's ended AND past the configured grace window.
       if (hideEnded && st.ended && st.end && now - st.end > graceMs) return false;
@@ -354,15 +369,10 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
   const paginatedVisible = useMemo(() => visible.slice(0, page * 100), [visible, page]);
 
   const selected = useMemo(() => visible.find((c) => c.id === selectedId) || null, [selectedId, visible]);
-  const featuredConcert = useMemo(() => {
-    // Prefer tonight's BTS featured concert at Rogers Centre if present in visible or concerts
-    const btsVis = visible.find((c) => c.artist && c.artist.toLowerCase().includes('bts'));
-    if (btsVis) return btsVis;
-    const btsAny = concerts.find((c) => c.artist && c.artist.toLowerCase().includes('bts'));
-    if (btsAny && browse) return btsAny;
-    // Otherwise fallback to highest capacity in view
-    return [...visible].sort((a, b) => (b.capacity || b.popularity || 0) - (a.capacity || a.popularity || 0))[0] || visible[0] || null;
-  }, [visible, concerts, browse]);
+  const biggest = useMemo(
+    () => [...visible].sort((a, b) => (b.capacity || b.popularity || 0) - (a.capacity || a.popularity || 0))[0] || visible[0] || null,
+    [visible],
+  );
   const stats = useMemo(() => {
     const upcoming = concerts.filter((c) => c.when === 'upcoming').length;
     return { count: visible.length, upcoming, past: concerts.length - upcoming };
@@ -414,8 +424,7 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
       <DiscoverHeader
         artist={artist}
         browse={browse}
-        featured={featuredConcert}
-        onSelectConcert={(c) => setSelectedId(c.id)}
+        biggest={biggest}
         loading={loading}
         stats={stats}
         spotify={spotify}
@@ -424,6 +433,10 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
         now={now}
         me={me}
         onBrowse={() => loadBrowse(windowKey)}
+        heroCollapsed={collapsed.hero}
+        onToggleHero={() => toggleCollapsed('hero')}
+        passportCollapsed={collapsed.passport}
+        onTogglePassport={() => toggleCollapsed('passport')}
       />
 
       <ControlSurface
@@ -463,6 +476,8 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
         }}
         onRefresh={refreshConcerts}
         onResetLayout={resetDiscoverLayout}
+        collapsed={collapsed.controls}
+        onToggleCollapsed={() => toggleCollapsed('controls')}
       />
 
       {loading ? (
@@ -541,6 +556,8 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
             timeLimitHrs={timeLimitHrs}
             setTimeLimitHrs={setTimeLimitHrs}
             visibleCount={visible.length}
+            mapCollapsed={collapsed.map}
+            onToggleMap={() => toggleCollapsed('map')}
           />
         </div>
       )}
@@ -558,57 +575,108 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
   );
 }
 
-function DiscoverHeader({ artist, browse, featured, onSelectConcert, loading, stats, spotify, userZone, currency, now, me, onBrowse }) {
+const passportSummary = (me) =>
+  `${me.attended.toLocaleString()} attended · ${Math.round(me.miles).toLocaleString()} mi · ${fmtUsd(me.savedUsd)} saved`;
+
+function CollapseButton({ collapsed, onToggle, label }) {
   return (
-    <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-      <div className="cohear-panel p-5">
+    <button
+      type="button"
+      className="cohear-icon-button h-8 w-8 shrink-0"
+      onClick={onToggle}
+      aria-expanded={!collapsed}
+      aria-label={collapsed ? `Show ${label}` : `Hide ${label}`}
+      title={collapsed ? `Show ${label}` : `Hide ${label} to give the results more room`}
+    >
+      <svg
+        viewBox="0 0 24 24"
+        className={`h-4 w-4 transition-transform ${collapsed ? '-rotate-90' : ''}`}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M6 9l6 6 6-6" />
+      </svg>
+    </button>
+  );
+}
+
+function DiscoverHeader({ artist, browse, biggest, loading, stats, spotify, userZone, currency, now, me, onBrowse, heroCollapsed, onToggleHero, passportCollapsed, onTogglePassport }) {
+  const heading = browse ? 'Concerts happening in the next 24 hours.' : artist;
+  return (
+    <section className={`grid gap-4 ${passportCollapsed ? '' : 'lg:grid-cols-[minmax(0,1fr)_320px]'}`}>
+      <div className={`cohear-panel ${heroCollapsed ? 'p-3' : 'p-5'}`}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="cohear-label">{browse ? 'Discover' : 'Artist timeline'}</p>
-            <h2 className="mt-2 max-w-3xl text-4xl italic tracking-tight text-[var(--accent)] md:text-5xl">
-              {browse ? 'Concerts happening in the next 24 hours.' : artist}
-            </h2>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-400">
-              {browse
-                ? 'Ordered by most recent show time, with quick filters for city, venue, artist, date, and live-room readiness.'
-                : `${stats.upcoming} upcoming and ${stats.past} past shows from the available concert sources.`}
-            </p>
+            {heroCollapsed ? (
+              <p className="mt-1 truncate text-sm text-zinc-300">
+                <span className="italic text-[var(--accent)]">{heading}</span>
+                {biggest ? ` · Biggest: ${biggest.artist || biggest.venue}, ${fmtCapacity(biggest.capacity)} seats` : ''}
+              </p>
+            ) : (
+              <>
+                <h2 className="mt-2 max-w-3xl text-4xl italic tracking-tight text-[var(--accent)] md:text-5xl">
+                  {heading}
+                </h2>
+                <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-400">
+                  {browse
+                    ? 'Ordered by most recent show time, with quick filters for city, venue, artist, date, and live-room readiness.'
+                    : `${stats.upcoming} upcoming and ${stats.past} past shows from the available concert sources.`}
+                </p>
+              </>
+            )}
           </div>
-          {!browse && (
-            <button className="cohear-secondary" onClick={onBrowse}>
-              All concerts
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {!browse && (
+              <button className="cohear-secondary" onClick={onBrowse}>
+                All concerts
+              </button>
+            )}
+            {passportCollapsed && (
+              <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-black/20 py-1 pl-3 pr-1">
+                <p className="cohear-label">Your live passport</p>
+                <span className="text-xs text-zinc-400">{passportSummary(me)}</span>
+                <CollapseButton collapsed onToggle={onTogglePassport} label="your live passport" />
+              </div>
+            )}
+            <CollapseButton collapsed={heroCollapsed} onToggle={onToggleHero} label="the Discover header" />
+          </div>
         </div>
 
-        {featured && (
+        {!heroCollapsed && biggest && (
           <button
             type="button"
-            onClick={() => onSelectConcert?.(featured)}
             className="mt-5 grid w-full gap-4 rounded-lg border border-amber-300/25 bg-amber-300/[0.07] p-4 text-left transition hover:border-amber-200/50 md:grid-cols-[1fr_auto]"
           >
             <div className="min-w-0">
               <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-amber-200">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-rose-400" />
-                Featured tonight
+                <span className="h-2 w-2 rounded-full bg-amber-300" />
+                Biggest in view
               </div>
-              <div className="mt-2 truncate text-xl font-semibold text-white">{featured.artist || featured.venue}</div>
+              <div className="mt-2 truncate text-xl font-semibold text-white">{biggest.artist || biggest.venue}</div>
               <div className="mt-1 truncate text-sm text-zinc-300">
-                {featured.venue} · {[featured.city, featured.country].filter(Boolean).join(', ')}
+                {biggest.venue} · {[biggest.city, biggest.country].filter(Boolean).join(', ')}
               </div>
             </div>
             <div className="flex items-end gap-6 md:text-right">
-              <Metric label="Capacity" value={fmtCapacity(featured.capacity)} tone="amber" />
-              <Metric label="Starts" value={countdownLabel(featured, now).text} />
-              <Metric label="Your time" value={formatUserShowTime(featured, userZone)} />
+              <Metric label="Capacity" value={fmtCapacity(biggest.capacity)} tone="amber" />
+              <Metric label="Starts" value={countdownLabel(biggest, now).text} />
+              <Metric label="Your time" value={formatUserShowTime(biggest, userZone)} />
             </div>
           </button>
         )}
       </div>
 
+      {!passportCollapsed && (
       <div className="cohear-panel grid content-between gap-4 p-5">
         <div>
-          <p className="cohear-label">Your live passport</p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="cohear-label">Your live passport</p>
+            <CollapseButton collapsed={passportCollapsed} onToggle={onTogglePassport} label="your live passport" />
+          </div>
           <div className="mt-3 grid grid-cols-2 gap-3">
             <MetricBlock
               label="Concerts attended"
@@ -643,6 +711,7 @@ function DiscoverHeader({ artist, browse, featured, onSelectConcert, loading, st
           </div>
         )}
       </div>
+      )}
     </section>
   );
 }
@@ -654,11 +723,31 @@ function ControlSurface(props) {
     showMyArtists, setShowMyArtists, hasMyArtists,
     loading, onArtistSearch, onClearSearch, onRefresh, onResetLayout,
     customStart, setCustomStart, customEnd, setCustomEnd, loadBrowse,
+    collapsed, onToggleCollapsed,
   } = props;
+
+  // Read back the settings that are hidden while the surface is folded away.
+  const summary = [
+    (browse ? WINDOWS : WHEN).find((o) => o.id === (browse ? windowKey : when))?.label,
+    VIEW_MODES.find((o) => o.id === mode)?.label,
+    query.trim() ? `"${query.trim()}"` : null,
+    location.trim() || null,
+    C_SORTS[sortKey] ? `Sort: ${C_SORTS[sortKey].label}` : null,
+  ].filter(Boolean).join(' · ');
 
   return (
     <section className="cohear-panel p-3">
-      <div className="grid gap-3 lg:grid-cols-[minmax(260px,1.1fr)_minmax(160px,.55fr)_minmax(180px,.55fr)_auto]">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <p className="cohear-label shrink-0">Search &amp; filters</p>
+          {collapsed && <span className="truncate text-xs text-zinc-500">{summary}</span>}
+        </div>
+        <CollapseButton collapsed={collapsed} onToggle={onToggleCollapsed} label="search and filters" />
+      </div>
+
+      {collapsed ? null : (
+      <>
+      <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(260px,1.1fr)_minmax(160px,.55fr)_minmax(180px,.55fr)_auto]">
         <label className="cohear-field relative flex-1">
           <SearchIcon />
           <input
@@ -777,6 +866,8 @@ function ControlSurface(props) {
           Reset layout
         </button>
       </div>
+      </>
+      )}
     </section>
   );
 }
@@ -989,7 +1080,7 @@ function SortHeader({ id, label, sortKey, dir, onSort, align = 'left' }) {
   );
 }
 
-function ConcertInspector({ concert, saved, calendared, sources, userZone, currency, now, onSave, onAddCalendar, onInvite, onEnterShow, onSyncLive, minCapacity, setMinCapacity, timeLimitHrs, setTimeLimitHrs, visibleCount }) {
+function ConcertInspector({ concert, saved, calendared, sources, userZone, currency, now, onSave, onAddCalendar, onInvite, onEnterShow, onSyncLive, minCapacity, setMinCapacity, timeLimitHrs, setTimeLimitHrs, visibleCount, mapCollapsed, onToggleMap }) {
   const [syncing, setSyncing] = useState(false);
   const [ticket, setTicket] = useState(null);
   const [sgTicket, setSgTicket] = useState(null);
@@ -1083,7 +1174,30 @@ function ConcertInspector({ concert, saved, calendared, sources, userZone, curre
               ))}
             </div>
           </div>
-
+          <div>
+            <label className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-400">Time Window</label>
+            <div className="mt-3 grid gap-2">
+              {[
+                { id: 0, label: 'Any Time' },
+                { id: 24, label: 'Next 24 Hours' },
+                { id: 48, label: 'Next 48 Hours' },
+                { id: 168, label: 'Next 7 Days' },
+              ].map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => setTimeLimitHrs(opt.id)}
+                  className={`flex items-center justify-between rounded-lg border p-3 text-left transition ${
+                    timeLimitHrs === opt.id
+                      ? 'border-cyan-300/50 bg-cyan-300/[0.1] text-cyan-100'
+                      : 'border-white/10 bg-black/20 text-zinc-400 hover:border-white/20 hover:text-zinc-200'
+                  }`}
+                >
+                  <span className="text-sm font-medium">{opt.label}</span>
+                  {timeLimitHrs === opt.id && <span className="h-2 w-2 rounded-full bg-cyan-400" />}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </aside>
     );
@@ -1181,7 +1295,17 @@ function ConcertInspector({ concert, saved, calendared, sources, userZone, curre
           </div>
         </div>
 
-        <MiniMap concert={concert} />
+        <div>
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-600">Venue map</div>
+            <CollapseButton collapsed={mapCollapsed} onToggle={onToggleMap} label="the venue map" />
+          </div>
+          {!mapCollapsed && (
+            <div className="mt-2">
+              <MiniMap concert={concert} />
+            </div>
+          )}
+        </div>
 
         <TicketCard ticket={ticketInfo} sgTicket={sgTicketInfo} webEstimate={webEstimate} loading={priceLoading} concert={concert} currency={currency} />
 
