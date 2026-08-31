@@ -33,6 +33,8 @@ export default function PassportSpread({
   entries = [],
   stubs = [],
   onOpenCity,
+  onSelectStub,
+  friendTags = {},
 }) {
   const name = (profile.name || '').trim();
   const display = name || 'Guest Traveller';
@@ -98,13 +100,37 @@ export default function PassportSpread({
     finally { setBusy(''); }
   }
 
+  const [mobileTab, setMobileTab] = useState('id'); // 'id' | 'stamps'
+
   return (
     <>
+    {/* Mobile Passport Tab Switcher (< 768px) */}
+    <div className="md:hidden flex rounded-xl border border-black/15 bg-black/10 p-1 mb-3">
+      <button
+        type="button"
+        onClick={() => setMobileTab('id')}
+        className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+          mobileTab === 'id' ? 'bg-white text-black shadow-sm' : 'text-zinc-400 hover:text-white'
+        }`}
+      >
+        🪪 Identity Card
+      </button>
+      <button
+        type="button"
+        onClick={() => setMobileTab('stamps')}
+        className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+          mobileTab === 'stamps' ? 'bg-white text-black shadow-sm' : 'text-zinc-400 hover:text-white'
+        }`}
+      >
+        📑 Stamps & Visas ({items.length})
+      </button>
+    </div>
+
     <div className="cohear-spread">
       {/* LEFT PAGE — identity, laid out like a national passport data card:
           PASSPORT kicker + big country name + biometric chip symbol up top,
           QR with vertical serial bottom-left, bearer signature bottom-right. */}
-      <div className="cohear-spread__page cohear-passport-page left" style={{ display: 'flex', flexDirection: 'column' }}>
+      <div className={`cohear-spread__page cohear-passport-page left ${mobileTab === 'id' ? 'flex' : 'hidden md:flex'}`} style={{ flexDirection: 'column' }}>
         <div className="flex items-start justify-between gap-2 border-b border-black/20 pb-2">
           <div className="pt-0.5">
             <div className="text-[10px] font-black uppercase tracking-[0.3em]">Passport</div>
@@ -250,7 +276,7 @@ export default function PassportSpread({
       </div>
 
       {/* RIGHT PAGE — stamps / pages */}
-      <div className="cohear-spread__page cohear-passport-page right">
+      <div className={`cohear-spread__page cohear-passport-page right ${mobileTab === 'stamps' ? 'block' : 'hidden md:block'}`}>
         <div className="flex items-center justify-between border-b border-black/15 pb-1.5">
           <span className="text-[11px] font-black uppercase tracking-[0.24em]">{onChart ? 'Journey log' : 'Stamps & visas'}</span>
           <span className="text-[9px] font-bold uppercase tracking-[0.14em] opacity-60">
@@ -278,11 +304,11 @@ export default function PassportSpread({
           /* the loupe magnifies the whole page area — everything on it is small */
           <Magnifier active={loupe} zoom={2.4} size={150} content={
             <div className="cohear-spread__stamps">
-              {pageItems.map((it, i) => <StampTile key={it.key} item={it} i={i} />)}
+              {pageItems.map((it, i) => <StampTile key={it.key} item={it} i={i} onSelectStub={onSelectStub} friendTags={friendTags} />)}
             </div>
           }>
             <div className="cohear-spread__stamps">
-              {pageItems.map((it, i) => <StampTile key={it.key} item={it} i={i} onOpenCity={onOpenCity} />)}
+              {pageItems.map((it, i) => <StampTile key={it.key} item={it} i={i} onOpenCity={onOpenCity} onSelectStub={onSelectStub} friendTags={friendTags} />)}
             </div>
           </Magnifier>
         )}
@@ -412,11 +438,11 @@ function JourneyChart({ points = [] }) {
 }
 
 // --- Stamp tiles --------------------------------------------------------------
-function StampTile({ item, i, onOpenCity }) {
+function StampTile({ item, i, onOpenCity, onSelectStub, friendTags = {} }) {
   const rot = ((i * 53) % 9) - 4; // gentle scatter, like a real page
   if (item.kind === 'visa') return <VisaTile visa={item.data} rot={rot} />;
   if (item.kind === 'entry') return <EntryRubberStamp entry={item.data} rot={rot} onOpenCity={onOpenCity} />;
-  return <MiniStub stub={item.data} rot={rot} onOpenCity={onOpenCity} />;
+  return <MiniStub stub={item.data} rot={rot} onOpenCity={onOpenCity} onSelectStub={onSelectStub} friends={friendTags[item.data.id]} />;
 }
 
 // The real landscape visa stamp, seated small on the spread page.
@@ -450,20 +476,24 @@ function EntryRubberStamp({ entry, rot, onOpenCity }) {
 
 // A miniature of the real ticket stub — same dark header / paper body /
 // perforated counterfoil — scaled to drop onto a passport page.
-function MiniStub({ stub, rot, onOpenCity }) {
+function MiniStub({ stub, rot, onOpenCity, onSelectStub, friends = [] }) {
   const pal = ticketPalette(stub.artist || stub.id);
   const mint = String(stub.mintNo ?? stub.edition ?? 1).padStart(4, '0');
-  const interactive = Boolean(onOpenCity && stub.city);
+  const interactive = Boolean(onSelectStub || (onOpenCity && stub.city));
+  const handleClick = () => {
+    if (onSelectStub) onSelectStub(stub);
+    else if (onOpenCity && stub.city) onOpenCity(stub.city, stub.country);
+  };
   return (
     <article
       className={`cohear-ministub ${interactive ? 'cohear-stub--link' : ''}`}
       data-cuelume-toggle={interactive ? 'sparkle' : undefined}
       style={{ '--paper': pal.paper, '--ink': pal.ink, '--accent': pal.accent, transform: `rotate(${rot}deg)` }}
-      onClick={interactive ? () => onOpenCity(stub.city, stub.country) : undefined}
+      onClick={interactive ? handleClick : undefined}
       role={interactive ? 'button' : undefined}
       tabIndex={interactive ? 0 : undefined}
-      onKeyDown={interactive ? (e) => (e.key === 'Enter' || e.key === ' ') && onOpenCity(stub.city, stub.country) : undefined}
-      title={`${stub.artist || ''}${stub.venue ? ` · ${stub.venue}` : ''}`}
+      onKeyDown={interactive ? (e) => (e.key === 'Enter' || e.key === ' ') && handleClick() : undefined}
+      title={onSelectStub ? `${stub.artist || 'Concert'} — click for closeup & details` : `${stub.artist || ''}${stub.venue ? ` · ${stub.venue}` : ''}`}
     >
       <div className="cohear-ministub__main">
         <div className="cohear-ministub__head">
@@ -472,6 +502,14 @@ function MiniStub({ stub, rot, onOpenCity }) {
         </div>
         <div className="cohear-ministub__venue">{stub.venue || '—'}</div>
         <div className="cohear-ministub__meta">{[stub.city, (stub.date || '').slice(0, 10)].filter(Boolean).join(' · ') || '—'}</div>
+        {friends.length > 0 && (
+          <div className="cohear-ministub__friends" title={`Also there: ${friends.map((f) => f.name).join(', ')}`}>
+            {friends.slice(0, 3).map((friend) => (
+              <span key={friend.userKey} className="cohear-ministub__dot" style={{ '--chip': friend.color }}>{friend.initials[0]}</span>
+            ))}
+            {friends.length > 3 && <span className="cohear-ministub__dot cohear-ministub__dot--more">+{friends.length - 3}</span>}
+          </div>
+        )}
         <div className="cohear-ministub__barcode" aria-hidden="true" />
       </div>
       <div className="cohear-ministub__side">

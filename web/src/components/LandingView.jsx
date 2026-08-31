@@ -136,15 +136,17 @@ export default function LandingView({ onNavigate }) {
         scrub: 0.8,
         onUpdate: (self) => {
           const p = self.progress;
-          gsap.set('.landing-big-results', { scale: 1 + 0.15 * p, opacity: 1 - 0.4 * p });
+          const isSmall = window.innerWidth < 768;
+          const scaleFactor = isSmall ? 0.4 : 1;
+          gsap.set('.landing-big-results', { scale: 1 + (isSmall ? 0.08 : 0.15) * p, opacity: 1 - 0.4 * p });
           gsap.set('.landing-small-team', { y: -60 * p, opacity: 1 - p * 1.5 });
           document.querySelectorAll('.landing-card').forEach((card, i) => {
             const m = moves[i] || { x: 0, y: 0, rot: 0 };
             const rest = parseFloat(card.dataset.restRot) || 0;
             gsap.set(card, {
-              x: m.x * p,
-              y: m.y * p,
-              rotation: rest + m.rot * p,
+              x: m.x * p * scaleFactor,
+              y: m.y * p * scaleFactor,
+              rotation: rest + m.rot * p * (isSmall ? 0.6 : 1),
             });
           });
           gsap.set('#landingSubline', { opacity: 1 - p * 2 });

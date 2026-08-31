@@ -3,7 +3,10 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 import './live/supabase.js'; // self-registers Realtime presence when configured
 import { loadPublicConfig } from './live/maps.js';
+import { initAnalytics } from './analytics.js';
 import App from './App.jsx';
+
+initAnalytics();
 
 function render() {
   createRoot(document.getElementById('root')).render(

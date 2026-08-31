@@ -402,11 +402,19 @@ export async function getFeatured() {
   return snapshot(await buildFeatured(FEATURED[0]));
 }
 
+// In-memory cache for resolved events
+const resolveCache = new Map();
+
 // ---- Resolve an arbitrary artist into a live/replay event ---------------
 // `when`: 'live' uses tonight @ a generic time; 'replay' anchors to the real
 // past show's date. Venue/coords come from the caller (globe) when available.
 export async function resolveEvent({ artist, date, startDate, venue, city, country, lat, lng, tz, mode = 'live' }) {
   if (!artist) throw new Error('artist required');
+  const cacheKey = `${artist}:${date || ''}:${venue || ''}:${city || ''}:${mode}`;
+  if (resolveCache.has(cacheKey)) {
+    return snapshot(resolveCache.get(cacheKey));
+  }
+
   const zone = tz || 'America/New_York';
   const sf = await fetchSetlist(artist, { date, cityPref: city }).catch(() => null);
   const topTracks = sf?.songs?.length ? [] : await fetchTopTracks(artist).catch(() => []);
@@ -459,6 +467,7 @@ export async function resolveEvent({ artist, date, startDate, venue, city, count
     exact: mode === 'replay', // a chosen past show IS that show's real setlist
     watchDateDmy: mode === 'live' ? dmyToday(zone) : null,
   });
+  resolveCache.set(cacheKey, ev);
   enrichDurations(ev); // real per-song lengths
   return snapshot(ev);
 }

@@ -7,6 +7,7 @@ import { GOOGLE_PAPER_MAP } from '../live/mapStyle.js';
 import { claimStamp, optOutConcert, recordConcertAction, personalStats, backfillStubs, pruneDuplicates, HISTORY_EVENT } from '../account.js';
 import { readCalendar, addToCalendar, scheduleReminders } from '../calendar.js';
 import ConcertInviteModal from './ConcertInviteModal.jsx';
+import { FRIENDS_EVENT, buildFriendTagMap, friendsOn, refreshFriendTags } from '../friends.js';
 
 
 const VIEW_MODES = [
@@ -103,7 +104,7 @@ function clampInspectorWidth(width) {
   return Math.max(300, Math.min(560, Number(width) || DEFAULT_INSPECTOR_WIDTH));
 }
 
-export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSettingsChange }) {
+export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSettingsChange, isMobile }) {
   const initialState = useMemo(() => readDiscoverState(), []);
   const [query, setQuery] = useState(initialState.query);
   const [artist, setArtist] = useState(initialState.artist);
@@ -125,6 +126,8 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
   const [spotify, setSpotify] = useState(null);
   const [saved, setSaved] = useState(() => new Set(JSON.parse(localStorage.getItem('cohear_saved_shows') || '[]')));
   const [calendared, setCalendared] = useState(() => new Set(readCalendar().map((e) => e.id)));
+  // Which friends went to which of these shows — cached, so it paints instantly.
+  const [friendTags, setFriendTags] = useState(() => buildFriendTagMap());
   const [fallbackUserZone, setFallbackUserZone] = useState(() => settings?.timezone || localStorage.getItem(USER_ZONE_KEY) || DETECTED_TIME_ZONE);
   const [page, setPage] = useState(1);
   const [now, setNow] = useState(() => Date.now());
@@ -243,6 +246,15 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(t);
+  }, []);
+
+  // Friend attendance for the calendar: paint from cache immediately, then
+  // refresh in the background and repaint if anything changed.
+  useEffect(() => {
+    const repaint = () => setFriendTags(buildFriendTagMap());
+    window.addEventListener(FRIENDS_EVENT, repaint);
+    refreshFriendTags().then(repaint);
+    return () => window.removeEventListener(FRIENDS_EVENT, repaint);
   }, []);
 
   useEffect(() => {
@@ -483,6 +495,7 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
       {loading ? (
         <EmptyState title="Finding concerts" body="Loading the current concert window from the gateway." />
       ) : (
+        <>
         <div className="cohear-resizable-layout" style={{ '--cohear-inspector-width': `${inspectorWidth}px` }}>
           <main className="min-w-0">
             {!visible.length ? (
@@ -523,14 +536,14 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
                   </div>
                 )}
                 {mode === 'map' && <ConcertMap rows={visible} selectedId={selected?.id} onSelect={setSelectedId} />}
-                {mode === 'calendar' && <ConcertCalendar rows={visible} selectedId={selected?.id} onSelect={setSelectedId} calendared={calendared} />}
+                {mode === 'calendar' && <ConcertCalendar rows={visible} selectedId={selected?.id} onSelect={setSelectedId} calendared={calendared} friendTags={friendTags} />}
               </>
             )}
           </main>
 
           <button
             type="button"
-            className="cohear-resize-handle"
+            className="cohear-resize-handle max-lg:hidden"
             onPointerDown={beginInspectorResize}
             aria-label="Resize concert detail panel"
             title="Drag to resize details"
@@ -538,28 +551,75 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
             <span />
           </button>
 
-          <ConcertInspector
-            concert={selected}
-            saved={selected ? saved.has(selected.id) : false}
-            calendared={selected ? calendared.has(selected.id) : false}
-            sources={sources}
-            userZone={userZone}
-            currency={preferredCurrency}
-            now={now}
-            onSave={() => selected && toggleSave(selected.id)}
-            onAddCalendar={() => selected && addCalendar(selected)}
-            onInvite={() => selected && setInviteConcert(selected)}
-            onEnterShow={onEnterShow}
-            onSyncLive={onSyncLive}
-            minCapacity={minCapacity}
-            setMinCapacity={setMinCapacity}
-            timeLimitHrs={timeLimitHrs}
-            setTimeLimitHrs={setTimeLimitHrs}
-            visibleCount={visible.length}
-            mapCollapsed={collapsed.map}
-            onToggleMap={() => toggleCollapsed('map')}
-          />
+          {/* Desktop Inspector */}
+          <div className="max-lg:hidden">
+            <ConcertInspector
+              concert={selected}
+              saved={selected ? saved.has(selected.id) : false}
+              calendared={selected ? calendared.has(selected.id) : false}
+              sources={sources}
+              userZone={userZone}
+              currency={preferredCurrency}
+              now={now}
+              onSave={() => selected && toggleSave(selected.id)}
+              onAddCalendar={() => selected && addCalendar(selected)}
+              onInvite={() => selected && setInviteConcert(selected)}
+              onEnterShow={onEnterShow}
+              onSyncLive={onSyncLive}
+              minCapacity={minCapacity}
+              setMinCapacity={setMinCapacity}
+              timeLimitHrs={timeLimitHrs}
+              setTimeLimitHrs={setTimeLimitHrs}
+              visibleCount={visible.length}
+              mapCollapsed={collapsed.map}
+              onToggleMap={() => toggleCollapsed('map')}
+            />
+          </div>
         </div>
+
+        {/* Mobile Inspector Bottom Sheet */}
+        {selected && (
+          <div className="lg:hidden fixed inset-0 z-50 flex flex-col justify-end bg-black/65 backdrop-blur-sm animate-fade-in" onClick={() => setSelectedId(null)}>
+            <div
+              className="relative w-full max-h-[85vh] overflow-y-auto rounded-t-3xl border-t border-white/15 bg-zinc-950 shadow-2xl pb-10"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="sticky top-0 z-20 flex items-center justify-between border-b border-white/10 bg-zinc-950/90 px-5 py-3 backdrop-blur">
+                <div className="mx-auto h-1.5 w-12 rounded-full bg-white/25" />
+                <button
+                  onClick={() => setSelectedId(null)}
+                  className="absolute right-4 top-2.5 cohear-icon-button"
+                  aria-label="Close concert details"
+                >
+                  ✕
+                </button>
+              </div>
+              <ConcertInspector
+                concert={selected}
+                saved={selected ? saved.has(selected.id) : false}
+                calendared={selected ? calendared.has(selected.id) : false}
+                sources={sources}
+                userZone={userZone}
+                currency={preferredCurrency}
+                now={now}
+                onClose={() => setSelectedId(null)}
+                onSave={() => selected && toggleSave(selected.id)}
+                onAddCalendar={() => selected && addCalendar(selected)}
+                onInvite={() => selected && setInviteConcert(selected)}
+                onEnterShow={onEnterShow}
+                onSyncLive={onSyncLive}
+                minCapacity={minCapacity}
+                setMinCapacity={setMinCapacity}
+                timeLimitHrs={timeLimitHrs}
+                setTimeLimitHrs={setTimeLimitHrs}
+                visibleCount={visible.length}
+                mapCollapsed={collapsed.map}
+                onToggleMap={() => toggleCollapsed('map')}
+              />
+            </div>
+          </div>
+        )}
+        </>
       )}
 
       {/* Concert Invitation Modal */}
@@ -998,63 +1058,135 @@ function ConcertTable({ rows, selectedId, onSelect, saved, calendared, onAddCale
           return (
             <li
               key={c.id}
-              className={`cohear-concert-row grid gap-3 border-b border-white/[0.06] px-4 py-4 last:border-b-0 lg:items-center ${tint}`}
+              className={`border-b border-white/[0.06] last:border-b-0 transition-colors ${tint}`}
             >
-              <button
-                onClick={() => onSelect(c.id)}
-                className="contents text-left"
-              >
-                <span className="flex items-center gap-3 text-sm font-semibold text-zinc-300">
-                  <span className="w-7 tabular-nums text-zinc-500">{String(i + 1).padStart(2, '0')}</span>
-                  {state.current && <span className="ct-dot-live h-2 w-2 rounded-full" title="Happening now" />}
-                  {saved.has(c.id) && <span className="h-1.5 w-1.5 rounded-full bg-cyan-300" title="Saved" />}
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold text-white">{c.artist || 'Unknown artist'}</span>
-                  <span className="mt-1 block text-xs text-zinc-500 lg:hidden">
-                    {c.venue} · {[c.city, c.country].filter(Boolean).join(', ')}
+              {/* Desktop View (>= 1024px) */}
+              <div className="hidden lg:grid cohear-concert-row gap-3 px-4 py-3.5 items-center">
+                <button
+                  onClick={() => onSelect(c.id)}
+                  className="contents text-left"
+                >
+                  <span className="flex items-center gap-3 text-sm font-semibold text-zinc-300">
+                    <span className="w-7 tabular-nums text-zinc-500">{String(i + 1).padStart(2, '0')}</span>
+                    {state.current && <span className="ct-dot-live h-2 w-2 rounded-full" title="Happening now" />}
+                    {saved.has(c.id) && <span className="h-1.5 w-1.5 rounded-full bg-cyan-300" title="Saved" />}
                   </span>
-                </span>
-                <span className="hidden min-w-0 truncate text-sm text-zinc-300 lg:block">{c.venue}</span>
-                <span className="hidden min-w-0 truncate text-sm text-zinc-400 lg:block">{[c.city, c.country].filter(Boolean).join(', ')}</span>
-                <TimeStack concert={c} userZone={userZone} now={now} />
-                <span className="text-left text-sm font-semibold tabular-nums text-amber-200 lg:text-right">{fmtCapacity(c.capacity)}</span>
-              </button>
-              <span className="flex items-center gap-1.5 lg:justify-self-end">
-                {showStartMs(c) && (
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold text-white">{c.artist || 'Unknown artist'}</span>
+                  </span>
+                  <span className="min-w-0 truncate text-sm text-zinc-300">{c.venue}</span>
+                  <span className="min-w-0 truncate text-sm text-zinc-400">{[c.city, c.country].filter(Boolean).join(', ')}</span>
+                  <TimeStack concert={c} userZone={userZone} now={now} />
+                  <span className="text-right text-sm font-semibold tabular-nums text-amber-200">{fmtCapacity(c.capacity)}</span>
+                </button>
+                <span className="flex items-center gap-1.5 justify-self-end">
+                  {showStartMs(c) && (
+                    <button
+                      type="button"
+                      className={`cohear-icon-button h-9 w-9 shrink-0 ${calendared?.has(c.id) ? 'text-cyan-300' : ''}`}
+                      onClick={() => onAddCalendar?.(c)}
+                      title={calendared?.has(c.id) ? 'On your calendar — click to remove' : 'Add to calendar (downloads an .ics with reminders)'}
+                      aria-pressed={calendared?.has(c.id) || false}
+                    >
+                      <CalendarPlusIcon added={calendared?.has(c.id)} />
+                    </button>
+                  )}
                   <button
                     type="button"
-                    className={`cohear-icon-button h-9 w-9 shrink-0 ${calendared?.has(c.id) ? 'text-cyan-300' : ''}`}
-                    onClick={() => onAddCalendar?.(c)}
-                    title={calendared?.has(c.id) ? 'On your calendar — click to remove' : 'Add to calendar (downloads an .ics with reminders)'}
-                    aria-pressed={calendared?.has(c.id) || false}
+                    className="cohear-icon-button h-9 w-9 shrink-0 text-amber-300 hover:text-amber-200"
+                    onClick={() => onInvite?.(c)}
+                    title="Invite friends to this concert"
+                    aria-label="Invite friends"
                   >
-                    <CalendarPlusIcon added={calendared?.has(c.id)} />
+                    <InvitePlusIcon />
                   </button>
-                )}
-                <button
-                  type="button"
-                  className="cohear-icon-button h-9 w-9 shrink-0 text-amber-300 hover:text-amber-200"
-                  onClick={() => onInvite?.(c)}
-                  title="Invite friends to this concert"
-                  aria-label="Invite friends"
-                >
-                  <InvitePlusIcon />
-                </button>
-                <button
-                  className="cohear-play-btn"
-                  onClick={() => join(c)}
-                  disabled={syncingId === c.id}
-                  title={c.when === 'past' ? 'Watch concert replay' : 'Join live room'}
-                  aria-label={c.when === 'past' ? 'Watch replay' : 'Join live room'}
-                >
-                  {syncingId === c.id ? (
-                    <span className="animate-spin text-[10px] text-white">◌</span>
-                  ) : (
-                    <PlayIcon className="h-3.5 w-3.5 fill-white ml-0.5" />
-                  )}
-                </button>
-              </span>
+                  <button
+                    className="cohear-play-btn"
+                    onClick={() => join(c)}
+                    disabled={syncingId === c.id}
+                    title={c.when === 'past' ? 'Watch concert replay' : 'Join live room'}
+                    aria-label={c.when === 'past' ? 'Watch replay' : 'Join live room'}
+                  >
+                    {syncingId === c.id ? (
+                      <span className="animate-spin text-[10px] text-white">◌</span>
+                    ) : (
+                      <PlayIcon className="h-3.5 w-3.5 fill-white ml-0.5" />
+                    )}
+                  </button>
+                </span>
+              </div>
+
+              {/* Mobile Concert Card (< 1024px) */}
+              <div className="lg:hidden p-3 sm:p-4 space-y-2">
+                <div className="flex items-center justify-between gap-2" onClick={() => onSelect(c.id)}>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="flex h-5 w-6 items-center justify-center rounded bg-white/10 text-[11px] font-bold tabular-nums text-zinc-300 shrink-0">
+                      {i + 1}
+                    </span>
+                    {state.current && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" /> LIVE
+                      </span>
+                    )}
+                    {saved.has(c.id) && (
+                      <span className="h-2 w-2 rounded-full bg-cyan-300 shrink-0" title="Saved" />
+                    )}
+                  </div>
+                  <span className="text-[10px] font-semibold tabular-nums text-amber-200/90 rounded bg-amber-400/10 px-1.5 py-0.5">
+                    {fmtCapacity(c.capacity)} seats
+                  </span>
+                </div>
+
+                <div className="cursor-pointer" onClick={() => onSelect(c.id)}>
+                  <h4 className="text-base font-bold text-white tracking-tight leading-snug">{c.artist || 'Unknown artist'}</h4>
+                  <p className="text-xs text-zinc-400 mt-0.5 truncate flex items-center gap-1">
+                    <span>{c.venue}</span>
+                    <span className="text-zinc-600">·</span>
+                    <span className="text-zinc-300">{[c.city, c.country].filter(Boolean).join(', ')}</span>
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between pt-1 border-t border-white/[0.04] gap-2">
+                  <div onClick={() => onSelect(c.id)} className="cursor-pointer min-w-0">
+                    <TimeStack concert={c} userZone={userZone} now={now} />
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {showStartMs(c) && (
+                      <button
+                        type="button"
+                        className={`cohear-icon-button h-8 w-8 min-w-[32px] ${calendared?.has(c.id) ? 'text-cyan-300' : ''}`}
+                        onClick={() => onAddCalendar?.(c)}
+                        title="Add to calendar"
+                        aria-label="Add to calendar"
+                      >
+                        <CalendarPlusIcon added={calendared?.has(c.id)} />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="cohear-icon-button h-8 w-8 min-w-[32px] text-amber-300 hover:text-amber-200"
+                      onClick={() => onInvite?.(c)}
+                      title="Invite friends"
+                      aria-label="Invite friends"
+                    >
+                      <InvitePlusIcon />
+                    </button>
+                    <button
+                      className="cohear-play-btn h-8 w-8 min-w-[32px]"
+                      onClick={() => join(c)}
+                      disabled={syncingId === c.id}
+                      title={c.when === 'past' ? 'Watch concert replay' : 'Join live room'}
+                      aria-label={c.when === 'past' ? 'Watch replay' : 'Join live room'}
+                    >
+                      {syncingId === c.id ? (
+                        <span className="animate-spin text-[10px] text-white">◌</span>
+                      ) : (
+                        <PlayIcon className="h-3 w-3 fill-white ml-0.5" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
             </li>
           );
         })}
@@ -1080,7 +1212,7 @@ function SortHeader({ id, label, sortKey, dir, onSort, align = 'left' }) {
   );
 }
 
-function ConcertInspector({ concert, saved, calendared, sources, userZone, currency, now, onSave, onAddCalendar, onInvite, onEnterShow, onSyncLive, minCapacity, setMinCapacity, timeLimitHrs, setTimeLimitHrs, visibleCount, mapCollapsed, onToggleMap }) {
+function ConcertInspector({ concert, saved, calendared, sources, userZone, currency, now, onSave, onAddCalendar, onInvite, onEnterShow, onSyncLive, minCapacity, setMinCapacity, timeLimitHrs, setTimeLimitHrs, visibleCount, mapCollapsed, onToggleMap, onClose }) {
   const [syncing, setSyncing] = useState(false);
   const [ticket, setTicket] = useState(null);
   const [sgTicket, setSgTicket] = useState(null);
@@ -1254,6 +1386,11 @@ function ConcertInspector({ concert, saved, calendared, sources, userZone, curre
               <button className="cohear-icon-button" onClick={onSave} title={saved ? 'Remove saved concert' : 'Save concert'}>
                 <BookmarkIcon filled={saved} />
               </button>
+              {onClose && (
+                <button className="cohear-icon-button" onClick={onClose} title="Close inspector" aria-label="Close inspector">
+                  ✕
+                </button>
+              )}
             </div>
           </div>
           <div>
@@ -1644,7 +1781,7 @@ function FallbackMap({ rows, selectedId, onSelect, showLabels, trailRows, routeS
   );
 }
 
-function ConcertCalendar({ rows, selectedId, onSelect, calendared }) {
+function ConcertCalendar({ rows, selectedId, onSelect, calendared, friendTags = {} }) {
   const firstIso = rows.map((c) => c.date).filter(Boolean).sort()[0] || new Date().toISOString().slice(0, 10);
   const [monthAnchor, setMonthAnchor] = useState(() => firstIso.slice(0, 7));
 
@@ -1665,15 +1802,28 @@ function ConcertCalendar({ rows, selectedId, onSelect, calendared }) {
 
   const days = useMemo(() => monthGrid(monthAnchor), [monthAnchor]);
   const monthShows = rows.filter((c) => c.date?.startsWith(monthAnchor)).length;
+  // Shows this month that at least one friend has a ticket for.
+  const friendShowCount = useMemo(
+    () => rows.filter((c) => c.date?.startsWith(monthAnchor) && friendsOn(friendTags, c).length).length,
+    [rows, monthAnchor, friendTags],
+  );
 
   return (
     <div className="cohear-panel overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-4">
         <div>
           <h3 className="text-sm font-semibold text-white">{monthLabel(monthAnchor)}</h3>
-          <p className="mt-1 text-xs text-zinc-500">Month view with the biggest shows inside each date.</p>
+          <p className="mt-1 text-xs text-zinc-500">
+            Month view with the biggest shows inside each date.
+            {friendShowCount > 0 && <> Coloured initials mark shows a friend went to.</>}
+          </p>
         </div>
         <div className="flex items-center gap-2">
+          {friendShowCount > 0 && (
+            <span className="rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-zinc-400">
+              👥 {friendShowCount} with friends
+            </span>
+          )}
           <span className="text-xs text-zinc-500">{monthShows} shows</span>
           <button className="cohear-icon-button h-8 w-8" onClick={() => setMonthAnchor(addMonths(monthAnchor, -1))} title="Previous month">‹</button>
           <button className="cohear-icon-button h-8 w-8" onClick={() => setMonthAnchor(addMonths(monthAnchor, 1))} title="Next month">›</button>
@@ -1697,20 +1847,26 @@ function ConcertCalendar({ rows, selectedId, onSelect, calendared }) {
               <div className="mt-2 grid gap-1">
                 {shows.slice(0, 3).map((c) => {
                   const onCal = calendared?.has(c.id);
+                  const withFriends = friendsOn(friendTags, c);
                   return (
                     <button
                       key={c.id}
                       onClick={() => onSelect(c.id)}
                       className={`rounded border px-2 py-1 text-left transition ${
-                        c.id === selectedId ? 'border-cyan-300/50 bg-cyan-300/[0.1]' : onCal ? 'border-cyan-300/30 bg-cyan-300/[0.05]' : 'border-white/10 bg-black/20 hover:border-white/25'
+                        c.id === selectedId ? 'border-cyan-300/50 bg-cyan-300/[0.1]'
+                          : withFriends.length ? 'border-emerald-300/35 bg-emerald-300/[0.06] hover:border-emerald-300/60'
+                          : onCal ? 'border-cyan-300/30 bg-cyan-300/[0.05]' : 'border-white/10 bg-black/20 hover:border-white/25'
                       }`}
-                      title={`${c.artist} at ${c.venue}${onCal ? ' · on your calendar' : ''}`}
+                      title={`${c.artist} at ${c.venue}${onCal ? ' · on your calendar' : ''}${
+                        withFriends.length ? ` · with ${withFriends.map((f) => f.name).join(', ')}` : ''
+                      }`}
                     >
                       <span className="flex items-center gap-1">
                         {onCal && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-300" title="On your calendar" />}
                         <span className="block truncate text-[11px] font-semibold text-white">{c.artist}</span>
                       </span>
                       <span className="block truncate text-[10px] text-zinc-500">{fmtCapacity(c.capacity)}</span>
+                      {withFriends.length > 0 && <FriendDots friends={withFriends} />}
                     </button>
                   );
                 })}
@@ -1732,12 +1888,37 @@ function ConcertCalendar({ rows, selectedId, onSelect, calendared }) {
             <span className="min-w-0">
               <span className="block truncate text-sm font-semibold text-white">{c.artist}</span>
               <span className="mt-1 block truncate text-xs text-zinc-500">{c.venue} · {c.city}</span>
+              {friendsOn(friendTags, c).length > 0 && (
+                <span className="mt-1.5 flex flex-wrap gap-1">
+                  {friendsOn(friendTags, c).map((friend) => (
+                    <span key={friend.userKey} className="cohear-friend-chip" style={{ '--chip': friend.color }}>
+                      <i aria-hidden="true">{friend.initials}</i>
+                      <b>{friend.name}</b>
+                    </span>
+                  ))}
+                </span>
+              )}
             </span>
             <span className="text-sm font-semibold text-amber-200">{fmtCapacity(c.capacity)}</span>
           </button>
         ))}
       </div>
     </div>
+  );
+}
+
+// Initial dots on a calendar cell — the whole name never fits, so the colour
+// plus first initial does the identifying and the button's title spells it out.
+function FriendDots({ friends }) {
+  return (
+    <span className="mt-1 flex flex-wrap gap-0.5">
+      {friends.slice(0, 4).map((friend) => (
+        <span key={friend.userKey} className="cohear-cal-dot" style={{ '--chip': friend.color }}>
+          {friend.initials[0]}
+        </span>
+      ))}
+      {friends.length > 4 && <span className="cohear-cal-dot cohear-cal-dot--more">+{friends.length - 4}</span>}
+    </span>
   );
 }
 

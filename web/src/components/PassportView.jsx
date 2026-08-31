@@ -31,6 +31,7 @@ import {
   exportJson,
   importJson,
 } from '../account.js';
+import { FRIENDS_EVENT, buildFriendTagMap, refreshFriendTags } from '../friends.js';
 import { supabase, supabaseEnabled } from '../live/supabase.js';
 import { play } from '../sfx.js';
 import { hasMapsKey, geocodeCity } from '../live/maps.js';
@@ -41,20 +42,25 @@ import VisaCard from './passport/VisaCard.jsx';
 import EntryStamp from './passport/EntryStamp.jsx';
 import SouvenirStamp from './passport/SouvenirStamp.jsx';
 import TicketStub from './passport/TicketStub.jsx';
+import TicketCloseupModal from './passport/TicketCloseupModal.jsx';
 import ExportSheet from './passport/ExportSheet.jsx';
+import FriendsPanel from './FriendsPanel.jsx';
 import PassportMap from './passport/PassportMap.jsx';
 import ArtistTourMap from './passport/ArtistTourMap.jsx';
 import { exportPng, exportPdf, exportBookletPdf } from './passport/passportExport.js';
 
-export default function PassportView({ onOpenCity }) {
+export default function PassportView({ onOpenCity, onSyncLive, isMobile }) {
   const [history, setHistory] = useState(() => readHistory());
   const [visas, setVisas] = useState(() => readVisas());
   const [entries, setEntries] = useState(() => readEntries());
   const [stubs, setStubs] = useState(() => readStubs());
   const [profile, setProfile] = useState(() => readProfile());
   const [trash, setTrash] = useState(() => readTrash());
+  const [selectedStub, setSelectedStub] = useState(null);
   const [dupCount, setDupCount] = useState(() => findDuplicateStubs().reduce((n, g) => n + g.length - 1, 0));
   const [art, setArt] = useState(() => readArtMap());
+  // concertId -> [friend] for every show a friend of yours also has a stub for.
+  const [friendTags, setFriendTags] = useState(() => buildFriendTagMap());
   // Which cards are showing their art view (vs the standard printed card).
   // Freshly generated art switches its card to the art view automatically.
   const [artView, setArtView] = useState({});
@@ -96,13 +102,21 @@ export default function PassportView({ onOpenCity }) {
       setTrash(readTrash());
       setDupCount(findDuplicateStubs().reduce((n, g) => n + g.length - 1, 0));
     }
+    const refreshFriends = () => setFriendTags(buildFriendTagMap());
     window.addEventListener(HISTORY_EVENT, refresh);
+    window.addEventListener(FRIENDS_EVENT, refreshFriends);
     ensurePassportId(); // mint the permanent unique id the QR code encodes
     pruneDuplicates(); // silently collapse any duplicate stubs/stamps before showing them
     pruneViewedOnlyStamps(); // undo old over-stamping of merely-browsed concerts
     autoStampHistory(); // every attended show stamps itself — no manual button
     resyncTokens(); // re-attempt signing for anything still "pending"
-    return () => window.removeEventListener(HISTORY_EVENT, refresh);
+    // Ask the registry who else was there, in the background — badges come from
+    // the cache first so the stubs never wait on the network.
+    refreshFriendTags().then(() => setFriendTags(buildFriendTagMap()));
+    return () => {
+      window.removeEventListener(HISTORY_EVENT, refresh);
+      window.removeEventListener(FRIENDS_EVENT, refreshFriends);
+    };
   }, []);
 
   async function generate(item) {
@@ -328,6 +342,8 @@ export default function PassportView({ onOpenCity }) {
   }
 
   const isLoggedIn = !supabaseEnabled || (session?.user && !session.user.is_anonymous);
+  // Your own name leads the party printed on a shared stub.
+  const youName = (profile.name || '').trim() || 'You';
 
   // One list drives both the stats-panel edge tabs and the sticky top rail.
   const jumpSections = [
@@ -336,6 +352,7 @@ export default function PassportView({ onOpenCity }) {
     ['entries', 'Stamps', '#3a7d4f'],
     ['souvenirs', 'Souvenirs', '#2f6f9e'],
     ['tickets', 'Tickets', '#8a3f93'],
+    ['friends', 'Friends', '#2f6f6f'],
     ['history', 'History', '#71685c'],
   ];
 
@@ -475,6 +492,8 @@ export default function PassportView({ onOpenCity }) {
           entries={entries}
           stubs={stubs}
           onOpenCity={onOpenCity}
+          onSelectStub={(stub) => setSelectedStub(stub)}
+          friendTags={friendTags}
         />
         )}
         </div>
@@ -659,12 +678,21 @@ export default function PassportView({ onOpenCity }) {
                   onGenerate={() => generate(stub)}
                   generating={genId === stub.id}
                   onOpen={onOpenCity}
+                  onSelect={(stub) => setSelectedStub(stub)}
+                  friends={friendTags[stub.id]}
+                  youName={youName}
                 />
               ))}
             </div>
           )}
         </div>
       </section>
+
+      {/* Friends — codes in, "together with" badges out */}
+      <FriendsPanel
+        stubIds={stubs.map((stub) => stub.id)}
+        onRefreshed={() => setFriendTags(buildFriendTagMap())}
+      />
 
       {/* History */}
       <section className="cohear-panel overflow-hidden" id="pp-history">
@@ -731,6 +759,26 @@ export default function PassportView({ onOpenCity }) {
         </section>
       )}
 
+      {/* Concert stub closeup modal with right-hand details panel */}
+      <TicketCloseupModal
+        open={Boolean(selectedStub)}
+        stub={selectedStub}
+        onClose={() => setSelectedStub(null)}
+        friends={selectedStub ? friendTags[selectedStub.id] : []}
+        youName={youName}
+        entries={entries}
+        visas={visas}
+        stubs={stubs}
+        art={art}
+        artView={artView}
+        onToggleArt={toggleArtView}
+        onGenerate={generate}
+        generating={Boolean(genId)}
+        home={home}
+        onOpenCity={onOpenCity}
+        onSyncLive={onSyncLive}
+      />
+
       {/* Off-screen export sheet — the source for PNG / PDF downloads and the
           print view. Portalled to <body> (outside #root) so the print CSS can
           hide the whole app and show only these pages. */}
@@ -748,6 +796,8 @@ export default function PassportView({ onOpenCity }) {
             stubs={stubs}
             identitySeed={session?.user?.email || profile.name || ''}
             art={art}
+            friendTags={friendTags}
+            youName={youName}
           />
         </div>,
         document.body,

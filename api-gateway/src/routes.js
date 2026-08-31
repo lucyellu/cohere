@@ -66,6 +66,17 @@ router.get('/passport/verify', async (req, res) => {
   }
 });
 
+// Which of the supplied friends hold a ticket token for the supplied shows?
+// Answers only about user keys the caller already has (from friend codes), so
+// it can't be used to enumerate other people's passports.
+router.post('/passport/attendance', express.json({ limit: '64kb' }), async (req, res) => {
+  try {
+    res.json(await passport.attendance(req.body || {}));
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 // Read-only peek at the shared JamBase monthly quota row (does NOT consume a
 // slot — that only happens via tryConsumeJambaseCall in jambaseBudget.js).
 // Lets the monitor panel show "312/900 calls used this month" instead of the

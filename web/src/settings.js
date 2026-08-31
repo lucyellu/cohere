@@ -5,7 +5,7 @@ export const SETTINGS_KEY = 'cohear_settings_v1';
 export const DEFAULT_SETTINGS = {
   timezone: DETECTED_TIME_ZONE,
   currency: 'USD',
-  themeAccent: '#e85a2b',
+  themeAccent: '#71717a',
   // How long an ended concert stays visible in Discover (hours). 0 = hide the
   // moment it ends; up to 8 = linger so you can still join to collect the stamp.
   endedGraceHours: 2,
@@ -84,6 +84,23 @@ function migrateDefaultAccentGray() {
   }
 }
 migrateDefaultAccentGray();
+
+// Third migration: set default theme to neutral charcoal (#71717a)
+const CHARCOAL_MIGRATION_KEY = 'cohere_accent_charcoal_v3';
+function migrateDefaultAccentCharcoal() {
+  try {
+    if (localStorage.getItem(CHARCOAL_MIGRATION_KEY)) return;
+    const parsed = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');
+    if (parsed && typeof parsed === 'object' && (!parsed.themeAccent || ['#e85a2b', '#e0662f', '#2f86d6', '#d9351f'].includes(String(parsed.themeAccent).toLowerCase()))) {
+      parsed.themeAccent = '#71717a';
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(parsed));
+    }
+    localStorage.setItem(CHARCOAL_MIGRATION_KEY, '1');
+  } catch {
+    /* storage unavailable */
+  }
+}
+migrateDefaultAccentCharcoal();
 
 export function readSettings() {
   try {

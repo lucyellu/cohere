@@ -1,0 +1,37 @@
+name: Daily JamBase Cache Sync (6:00 AM)
+
+on:
+  schedule:
+    # 13:00 UTC = 6:00 AM PDT (Pacific Daylight Time) / 5:00 AM PST
+    - cron: '0 13 * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub Actions UI anytime
+
+jobs:
+  sync-cache:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: api-gateway/package-lock.json
+
+      - name: Install dependencies
+        working-directory: api-gateway
+        run: npm ci
+
+      - name: Run JamBase Cache Ingestion
+        working-directory: api-gateway
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          JAMBASE_API_KEY: ${{ secrets.JAMBASE_API_KEY }}
+          JAMBASE_MONTHLY_CAP: ${{ secrets.JAMBASE_MONTHLY_CAP || '900' }}
+          JB_NEAR_DAYS: 7
+          JB_FAR_DAYS: 60
+          JB_FAR_STEP: 5
+        run: node src/cron-jambase.js

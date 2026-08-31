@@ -203,10 +203,11 @@ Keep responses concise (2-3 sentences max) and always include specific concert d
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--accent)] text-white shadow-lg transition-transform hover:scale-110 hover:shadow-xl"
+          className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-40 flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-full bg-[var(--accent)] text-white shadow-xl transition-transform hover:scale-110"
           title="Ask about concerts"
+          aria-label="Ask about concerts"
         >
-          <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg viewBox="0 0 24 24" className="h-6 w-6 sm:h-7 sm:w-7" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
           </svg>
         </button>
@@ -214,7 +215,7 @@ Keep responses concise (2-3 sentences max) and always include specific concert d
 
       {/* Chat Panel */}
       {isOpen && (
-        <div className="fixed bottom-6 right-6 z-50 flex w-[calc(100vw-2rem)] flex-col rounded-lg border border-white/10 bg-black/95 shadow-2xl md:w-96 max-h-[600px]">
+        <div className="fixed inset-x-0 bottom-0 sm:inset-auto sm:bottom-6 sm:right-6 z-50 flex w-full sm:w-96 flex-col rounded-t-2xl sm:rounded-lg border border-white/10 bg-black/95 shadow-2xl max-h-[88dvh] sm:max-h-[600px] pb-[env(safe-area-inset-bottom,0px)]">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
             <div className="flex items-center gap-2">

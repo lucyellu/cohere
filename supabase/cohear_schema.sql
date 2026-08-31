@@ -199,3 +199,36 @@ create policy "youtube cache update all"
   on public.youtube_cache for update
   using (true)
   with check (true);
+
+-- Passport token registry (server-only; written by the gateway with the
+-- service-role key, which bypasses RLS). Every visa / entry stamp / ticket the
+-- browser mints is signed here and gets a global mint number. This is also the
+-- table the friends feature reads: a ticket row for (scope_key, user_key) means
+-- that person's passport holds a stub for that show, which is how "who else was
+-- in the crowd?" is answered without any social graph on the server.
+create table if not exists public.passport_tokens (
+  id uuid primary key default gen_random_uuid(),
+  mint_no bigint generated always as identity,
+  type text not null check (type in ('visa', 'entry', 'ticket')),
+  scope_key text not null,
+  user_key text not null default 'guest',
+  artist text,
+  venue text,
+  city text,
+  country text,
+  concert_date text,
+  serial text not null,
+  payload jsonb not null,
+  signature text not null,
+  public_key text not null,
+  issued_at timestamptz not null default now(),
+  unique (type, scope_key, user_key)
+);
+
+alter table public.passport_tokens enable row level security;
+-- No policies: only the service-role key (the gateway) may read or write.
+
+-- Serves the friend-attendance lookup:
+--   type = 'ticket' AND user_key IN (…) [AND scope_key IN (…)]
+create index if not exists passport_tokens_ticket_user_idx
+  on public.passport_tokens (type, user_key, scope_key);

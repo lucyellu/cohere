@@ -12,6 +12,8 @@
   VITE_GOOGLE_MAPS_KEY = "AIzaSyAQdm7UCr8aMXilvvKj4eh0l2bs56lc-50"
   VITE_SUPABASE_URL = "https://bzbxtnivfzeqgoajsyhc.supabase.co"
   VITE_SUPABASE_ANON_KEY = "sb_publishable_DfOQMiEWdIpyu03N90jQUg_t4eops9r"
+  VITE_POSTHOG_KEY = "phc_BMHyBbZSfYZTkd9kyzqr8mLjb6VKpbBCoMwWH7xBHze3"
+  VITE_POSTHOG_HOST = "https://us.i.posthog.com"
 
 # Proxy API calls to the gateway so the browser stays same-origin.
 # CURRENT: a temporary Cloudflare quick tunnel to the gateway running on Lucy's

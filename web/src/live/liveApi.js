@@ -47,13 +47,22 @@ export async function getEvent(id) {
   return r?.ok ? r.event : null;
 }
 
+const RESOLVE_CACHE = new Map();
+
 export async function resolveEvent(body) {
+  if (!body?.artist) return null;
+  const key = `${body.artist}:${body.date || ''}:${body.venue || ''}:${body.mode || ''}`;
+  if (RESOLVE_CACHE.has(key)) return RESOLVE_CACHE.get(key);
+
   const r = await fetch('/api/live/resolve', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   }).then((x) => x.json()).catch(() => null);
-  return r?.ok ? r.event : await fallbackEvent(body);
+
+  const result = r?.ok ? r.event : await fallbackEvent(body);
+  if (result) RESOLVE_CACHE.set(key, result);
+  return result;
 }
 
 // --- Crowd beacon (tap-to-sync) -----------------------------------------
@@ -148,25 +157,14 @@ export async function liveYoutube(q, { live = false, since, hours } = {}) {
 // the feed merges with YouTube and embeds with a source badge.
 export async function socialSearch({ q, artist, platform = 'all' }) {
   const p = new URLSearchParams({ q, artist, platform });
-  // Forward the user's own Google Programmable Search key + engine id (same BYOK
-  // pair the ticket search uses) so the gateway can find TikTok footage via CSE.
-  const settings = readSettings();
-  const cseKey = readApiKey('googleCse');
-  const cseId = settings?.searchEngineIds?.googleCse || '';
-  const headers = {
-    ...(cseKey ? { 'x-cohear-google-cse-key': cseKey } : {}),
-    ...(cseId ? { 'x-cohear-google-cse-id': cseId } : {}),
-  };
-  const r = await fetch(`/api/live/social?${p.toString()}`, { headers }).then((x) => x.json()).catch(() => null);
-  return r?.items || [];
+  const r = await fetch(`/api/social/search?${p.toString()}`).then((x) => x.json()).catch(() => null);
+  return r || { items: [] };
 }
 
-// --- Venue weather (Open-Meteo, keyless) ---------------------------------
-// Current conditions for a live show; historical (that date @ ~9pm) for a replay.
-export async function getWeather({ lat, lng, date } = {}) {
+// --- Weather at the venue (ambient detail on the live card) -------------
+export async function getWeather(lat, lng) {
   if (lat == null || lng == null) return null;
-  const p = new URLSearchParams({ lat, lng });
-  if (date) p.set('date', date);
+  const p = new URLSearchParams({ lat: String(lat), lng: String(lng) });
   const r = await fetch(`/api/weather?${p.toString()}`).then((x) => x.json()).catch(() => null);
   return r?.ok ? r : null;
 }
@@ -195,7 +193,7 @@ export async function youtubeTop(query) {
 
 async function fallbackEvent(body = {}) {
   if (!body.artist) return null;
-  const songs = await fallbackSongs(body.artist);
+  const songs = fallbackSongs(body.artist);
   const startUTC = startMs(body.startDate, body.date, body.tz || 'America/Vancouver');
   const timeline = songs.map((song, i) => ({
     i,
@@ -225,30 +223,15 @@ async function fallbackEvent(body = {}) {
   };
 }
 
-async function fallbackSongs(artist) {
+function fallbackSongs(artist) {
   const key = String(artist || '').toLowerCase();
   if (key.includes('bts')) return ['Dynamite', 'Butter', 'Boy With Luv', 'DNA', 'MIC Drop', 'Spring Day', 'Blood Sweat & Tears', 'Fake Love', 'IDOL', 'Life Goes On', 'Permission to Dance', 'Run BTS', 'Fire', 'Save ME', 'Euphoria', 'Black Swan', 'Yet To Come'];
   if (key.includes('bruno')) return ['24K Magic', 'Treasure', 'That’s What I Like', 'Leave the Door Open', 'Locked Out of Heaven', 'Just the Way You Are', 'Uptown Funk'];
   if (key.includes('harry')) return ['Music for a Sushi Restaurant', 'Golden', 'Adore You', 'Watermelon Sugar', 'Sign of the Times', 'As It Was', 'Kiwi'];
   if (key.includes('olivia')) return ['bad idea right?', 'vampire', 'drivers license', 'deja vu', 'traitor', 'good 4 u', 'all-american bitch'];
   if (key.includes('beyonce')) return ['Crazy in Love', 'Formation', 'Cuff It', 'Break My Soul', 'Love on Top', 'Texas Hold ’Em', 'Halo'];
-
-  try {
-    const prompt = `Return a JSON array of strings containing the top 10 most popular songs by ${artist}. Only output the JSON array, no other text.`;
-    const res = await fetch(`https://text.pollinations.ai/prompt/${encodeURIComponent(prompt)}`);
-    const text = await res.text();
-    const match = text.match(/\[.*\]/s);
-    if (match) {
-      const parsed = JSON.parse(match[0]);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.map((s) => String(s));
-      }
-    }
-  } catch (e) {
-    // Ignore error and fall through
-  }
-
-  return ['No setlist available'];
+  if (key.includes('madison')) return ['Make You Mine', 'Home to Another One', 'Reckless', 'Selfish', 'Good in Goodbye', 'Spinnin', 'Baby'];
+  return ['Main Stage Opener', 'Hit Track 1', 'Hit Track 2', 'Acoustic Medley', 'Fan Favorite', 'Encore Finale'];
 }
 
 function startMs(startDate, date, zone) {

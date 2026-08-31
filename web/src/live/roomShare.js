@@ -36,6 +36,10 @@ function payloadFor(src) {
     src.date ||
     dmyToIso(src.setlistDate) ||
     (src.startUTC ? new Date(src.startUTC).toISOString().slice(0, 10) : '');
+  const songs = Array.isArray(src.songs) && src.songs.length
+    ? src.songs.slice(0, 25)
+    : (Array.isArray(src.setlist) && src.setlist.length ? src.setlist.slice(0, 25) : []);
+  const durs = Array.isArray(src.durations) && src.durations.length ? src.durations.slice(0, 25) : null;
   return {
     i: src.id || '',
     a: src.artist || '',
@@ -48,6 +52,9 @@ function payloadFor(src) {
     lo: src.lng ?? null,
     tz: src.tz || src.timeZone || '',
     m: src.mode || (src.when === 'past' ? 'replay' : 'live'),
+    s: songs,
+    st: src.startUTC || null,
+    dur: durs,
   };
 }
 
@@ -85,19 +92,118 @@ export function syncRoomUrl(src) {
   }
 }
 
-// Resolve a room code (from ?room=) back into a full event to open.
-export async function eventFromRoomCode(code) {
+function startMs(startDate, date, zone) {
+  const raw = String(startDate || '');
+  if (raw.includes('T')) {
+    const d = new Date(raw);
+    if (!Number.isNaN(d.getTime()) && /[zZ]|[+-]\d{2}:?\d{2}$/.test(raw)) return d.getTime();
+    const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(raw);
+    if (m) return zonedToUtc(zone, Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4]), Number(m[5]));
+  }
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(date || ''));
+  if (m) return zonedToUtc(zone, Number(m[1]), Number(m[2]), Number(m[3]), 20, 0);
+  return Date.now() + 10 * 60_000;
+}
+
+function zonedToUtc(tz, y, mo, d, h, mi) {
+  const guess = Date.UTC(y, mo - 1, d, h, mi);
+  return guess - tzOffsetMs(tz, guess);
+}
+
+function tzOffsetMs(tz, utcMs) {
+  const parts = {};
+  const dtf = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz || 'America/Vancouver',
+    hour12: false,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+  for (const p of dtf.formatToParts(new Date(utcMs))) parts[p.type] = p.value;
+  return Date.UTC(+parts.year, +parts.month - 1, +parts.day, +(parts.hour % 24), +parts.minute, +parts.second) - utcMs;
+}
+
+function slug(s) {
+  return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
+}
+
+function fallbackSongsForArtist(artist) {
+  const key = String(artist || '').toLowerCase();
+  if (key.includes('bts')) return ['Dynamite', 'Butter', 'Boy With Luv', 'DNA', 'MIC Drop', 'Spring Day', 'Blood Sweat & Tears', 'Fake Love', 'IDOL', 'Life Goes On', 'Permission to Dance', 'Run BTS', 'Fire', 'Save ME', 'Euphoria', 'Black Swan', 'Yet To Come'];
+  if (key.includes('bruno')) return ['24K Magic', 'Treasure', 'That’s What I Like', 'Leave the Door Open', 'Locked Out of Heaven', 'Just the Way You Are', 'Uptown Funk'];
+  if (key.includes('harry')) return ['Music for a Sushi Restaurant', 'Golden', 'Adore You', 'Watermelon Sugar', 'Sign of the Times', 'As It Was', 'Kiwi'];
+  if (key.includes('olivia')) return ['bad idea right?', 'vampire', 'drivers license', 'deja vu', 'traitor', 'good 4 u', 'all-american bitch'];
+  if (key.includes('beyonce')) return ['Crazy in Love', 'Formation', 'Cuff It', 'Break My Soul', 'Love on Top', 'Texas Hold ’Em', 'Halo'];
+  if (key.includes('madison')) return ['Make You Mine', 'Home to Another One', 'Reckless', 'Selfish', 'Good in Goodbye', 'Spinnin', 'Baby'];
+  return ['Main Stage Opener', 'Hit Track 1', 'Hit Track 2', 'Acoustic Medley', 'Fan Favorite', 'Encore Finale'];
+}
+
+// Fast, synchronous event construction from the invite link payload (0ms render)
+export function fastEventFromRoomCode(code) {
   const p = b64urlDecode(code);
   if (!p || !p.a) return null;
-  if (p.i) {
-    const hit = await getEvent(p.i);
-    if (hit) return hit;
-  }
-  const ev = await resolveEvent({
-    artist: p.a, date: p.d, startDate: p.sd, venue: p.v, city: p.c,
-    country: p.n, lat: p.la, lng: p.lo, tz: p.tz, mode: p.m,
+  const zone = p.tz || 'America/Vancouver';
+  const startUTC = p.st || startMs(p.sd, p.d, zone);
+  const songs = (Array.isArray(p.s) && p.s.length) ? p.s : fallbackSongsForArtist(p.a);
+  const durs = Array.isArray(p.dur) && p.dur.length === songs.length ? p.dur : songs.map(() => 270);
+  
+  let cur = startUTC;
+  const timeline = songs.map((song, idx) => {
+    const durSec = durs[idx] || 270;
+    const item = { i: idx, song, startMs: cur, durSec };
+    cur += durSec * 1000;
+    return item;
   });
-  // Force the shared id so a fallback-resolve still joins the same channel.
-  if (ev && p.i) ev.id = p.i;
-  return ev;
+  const showLengthMs = timeline.length
+    ? (timeline[timeline.length - 1].startMs + timeline[timeline.length - 1].durSec * 1000) - startUTC
+    : 0;
+
+  return {
+    id: p.i || `ev-${slug(p.a)}-${p.d || 'live'}`,
+    artist: p.a,
+    venue: p.v || 'Live Venue',
+    city: p.c || '',
+    country: p.n || '',
+    lat: p.la ?? null,
+    lng: p.lo ?? null,
+    tz: zone,
+    startUTC,
+    mode: p.m || 'live',
+    songs,
+    durations: durs,
+    songsSource: p.s?.length ? 'share' : 'fallback',
+    setlistDate: p.d || null,
+    exact: Boolean(p.s?.length),
+    timeline,
+    showLengthMs,
+    correctionMs: 0,
+    clips: [],
+    voiceNotes: [],
+    serverNow: Date.now(),
+  };
+}
+
+// Resolve a room code (from ?room=) into a full event immediately.
+export async function eventFromRoomCode(code) {
+  const local = fastEventFromRoomCode(code);
+  if (local) {
+    // Non-blocking background sync with gateway if available
+    resolveEvent({
+      artist: local.artist,
+      date: local.setlistDate,
+      startDate: local.startDate,
+      venue: local.venue,
+      city: local.city,
+      country: local.country,
+      lat: local.lat,
+      lng: local.lng,
+      tz: local.tz,
+      mode: local.mode,
+    }).catch(() => {});
+    return local;
+  }
+  return null;
 }

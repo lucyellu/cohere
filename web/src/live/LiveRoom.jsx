@@ -20,12 +20,13 @@ import { useVoice } from './voiceChannel.js';
 // lengths + setlist order); for a live show it auto-swaps to tonight's real
 // setlist the moment attendees log it on setlist.fm.
 
-export default function LiveRoom({ event: initial, onBack }) {
+export default function LiveRoom({ event: initial, onBack, isMobile }) {
   const [event, setEvent] = useState(initial);
   const [, tick] = useState(0); // force re-render each second
   const [synced, setSynced] = useState(false);
   const [panelOrder, setPanelOrder] = useState(() => readPanelOrder());
   const [resetNonce, setResetNonce] = useState(0);
+  const [mobileLiveTab, setMobileLiveTab] = useState('all'); // 'all' | 'video' | 'setlist' | 'chat' | 'lyrics' | 'map' | 'social'
   const { count: presenceCount } = usePresence(event.id);
   const voice = useVoice(event.id);
   const player = usePlayer();
@@ -133,110 +134,150 @@ export default function LiveRoom({ event: initial, onBack }) {
       <AccuracyBar event={event} presenceCount={presenceCount} synced={synced} />
 
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs text-zinc-600">Drag any panel's bottom-right corner to resize · use the arrows to reorder.</p>
-        <button onClick={resetPanels} className="cohear-secondary min-h-8 px-3 text-xs" title="Restore default panel layout">
+        <p className="text-xs text-zinc-500 hidden sm:block">Drag any panel's bottom-right corner to resize · use the arrows to reorder.</p>
+        
+        {/* Mobile Live Tabs (< 1024px) */}
+        <div className="lg:hidden flex w-full overflow-x-auto gap-1.5 py-1 scrollbar-none">
+          {[
+            { id: 'all', label: 'All' },
+            { id: 'video', label: '🔴 Stage' },
+            { id: 'setlist', label: '📋 Setlist' },
+            { id: 'chat', label: '💬 Chat' },
+            { id: 'lyrics', label: '🎵 Lyrics' },
+            { id: 'map', label: '📍 Map' },
+            { id: 'social', label: '📱 Feed' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setMobileLiveTab(tab.id)}
+              className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition-all ${
+                mobileLiveTab === tab.id
+                  ? 'bg-white text-black shadow'
+                  : 'border border-white/10 bg-white/5 text-zinc-400 hover:text-white'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <button onClick={resetPanels} className="cohear-secondary min-h-8 px-3 text-xs shrink-0 hidden sm:inline-flex" title="Restore default panel layout">
           ⤢ Reset panels
         </button>
       </div>
 
       <div className="cohear-live-grid">
-        <RoomPanel
-          id="video"
-          title="Video"
-          subtitle="Shared YouTube surface for the selected song"
-          order={panelIndex.video}
-          onMove={movePanel}
-          sizeStore={sizeStore}
-          resetNonce={resetNonce}
-        >
-          <LiveVideoPanel event={event} np={np} />
-          <NowPlaying np={np} event={event} syncedNow={now} />
+        {(mobileLiveTab === 'all' || mobileLiveTab === 'video') && (
+          <RoomPanel
+            id="video"
+            title="Video"
+            subtitle="Shared YouTube surface for the selected song"
+            order={panelIndex.video}
+            onMove={movePanel}
+            sizeStore={sizeStore}
+            resetNonce={resetNonce}
+          >
+            <LiveVideoPanel event={event} np={np} />
+            <NowPlaying np={np} event={event} syncedNow={now} />
 
-          {/* Demo time-warp */}
-          <DemoWarp event={event} onWarp={warpToSong} />
-        </RoomPanel>
+            {/* Demo time-warp */}
+            <DemoWarp event={event} onWarp={warpToSong} />
+          </RoomPanel>
+        )}
 
-        <RoomPanel
-          id="lyrics"
-          title="Lyrics"
-          subtitle={np.song ? np.song : 'Current-song lyrics'}
-          order={panelIndex.lyrics}
-          onMove={movePanel}
-          sizeStore={sizeStore}
-          resetNonce={resetNonce}
-        >
-          {np.song ? (
-            <Lyrics artist={event.artist} song={np.song} />
-          ) : (
-            <EmptyPanelText>Lyrics appear when a song is selected or the show reaches a track.</EmptyPanelText>
-          )}
-        </RoomPanel>
+        {(mobileLiveTab === 'all' || mobileLiveTab === 'lyrics') && (
+          <RoomPanel
+            id="lyrics"
+            title="Lyrics"
+            subtitle={np.song ? np.song : 'Current-song lyrics'}
+            order={panelIndex.lyrics}
+            onMove={movePanel}
+            sizeStore={sizeStore}
+            resetNonce={resetNonce}
+          >
+            {np.song ? (
+              <Lyrics artist={event.artist} song={np.song} />
+            ) : (
+              <EmptyPanelText>Lyrics appear when a song is selected or the show reaches a track.</EmptyPanelText>
+            )}
+          </RoomPanel>
+        )}
 
-        <RoomPanel
-          id="setlist"
-          title="Setlist"
-          subtitle="Predicted timing, current song, and quick play"
-          order={panelIndex.setlist}
-          onMove={movePanel}
-          sizeStore={sizeStore}
-          resetNonce={resetNonce}
-        >
-          <SetlistTimeline event={event} np={np} />
-        </RoomPanel>
+        {(mobileLiveTab === 'all' || mobileLiveTab === 'setlist') && (
+          <RoomPanel
+            id="setlist"
+            title="Setlist"
+            subtitle="Predicted timing, current song, and quick play"
+            order={panelIndex.setlist}
+            onMove={movePanel}
+            sizeStore={sizeStore}
+            resetNonce={resetNonce}
+          >
+            <SetlistTimeline event={event} np={np} />
+          </RoomPanel>
+        )}
 
-        <RoomPanel
-          id="map"
-          title="Venue map"
-          subtitle={`${event.venue} · ${event.city}`}
-          order={panelIndex.map}
-          onMove={movePanel}
-          sizeStore={sizeStore}
-          resetNonce={resetNonce}
-        >
-          <div className="aspect-[4/3] w-full overflow-hidden rounded-xl border border-white/10 xl:aspect-square">
-            <VenueMap venue={event.venue} city={event.city} lat={event.lat} lng={event.lng} live={isLive} viewers={presenceCount != null ? presenceCount : null} />
-          </div>
-          <Weather event={event} />
-        </RoomPanel>
+        {(mobileLiveTab === 'all' || mobileLiveTab === 'map') && (
+          <RoomPanel
+            id="map"
+            title="Venue map"
+            subtitle={`${event.venue} · ${event.city}`}
+            order={panelIndex.map}
+            onMove={movePanel}
+            sizeStore={sizeStore}
+            resetNonce={resetNonce}
+          >
+            <div className="aspect-[4/3] w-full overflow-hidden rounded-xl border border-white/10 xl:aspect-square">
+              <VenueMap venue={event.venue} city={event.city} lat={event.lat} lng={event.lng} live={isLive} viewers={presenceCount != null ? presenceCount : null} />
+            </div>
+            <Weather event={event} />
+          </RoomPanel>
+        )}
 
-        <RoomPanel
-          id="social"
-          title="Social feed"
-          subtitle="YouTube, TikTok, Instagram, X, and crowd links"
-          order={panelIndex.social}
-          onMove={movePanel}
-          sizeStore={sizeStore}
-          resetNonce={resetNonce}
-        >
-          <FanWall event={event} np={np} clips={event.clips || []} onClipsChanged={async () => {
-            const fresh = await getEvent(event.id);
-            if (fresh) setEvent((prev) => ({ ...prev, ...fresh }));
-          }} compact />
-        </RoomPanel>
+        {(mobileLiveTab === 'all' || mobileLiveTab === 'social') && (
+          <RoomPanel
+            id="social"
+            title="Social feed"
+            subtitle="YouTube, TikTok, Instagram, X, and crowd links"
+            order={panelIndex.social}
+            onMove={movePanel}
+            sizeStore={sizeStore}
+            resetNonce={resetNonce}
+          >
+            <FanWall event={event} np={np} clips={event.clips || []} onClipsChanged={async () => {
+              const fresh = await getEvent(event.id);
+              if (fresh) setEvent((prev) => ({ ...prev, ...fresh }));
+            }} compact />
+          </RoomPanel>
+        )}
 
-        <RoomPanel
-          id="chat"
-          title="Chat & Voice"
-          subtitle="Text and voice chat with others in the room"
-          order={panelIndex.chat}
-          onMove={movePanel}
-          sizeStore={sizeStore}
-          resetNonce={resetNonce}
-        >
-          <ChatPanel eventId={event.id} voiceProp={voice} />
-        </RoomPanel>
+        {(mobileLiveTab === 'all' || mobileLiveTab === 'chat') && (
+          <RoomPanel
+            id="chat"
+            title="Chat & Voice"
+            subtitle="Text and voice chat with others in the room"
+            order={panelIndex.chat}
+            onMove={movePanel}
+            sizeStore={sizeStore}
+            resetNonce={resetNonce}
+          >
+            <ChatPanel eventId={event.id} voiceProp={voice} />
+          </RoomPanel>
+        )}
 
-        <RoomPanel
-          id="transcription"
-          title="Transcription"
-          subtitle="Live group chat of the voice channel"
-          order={panelIndex.transcription || 99}
-          onMove={movePanel}
-          sizeStore={sizeStore}
-          resetNonce={resetNonce}
-        >
-          <TranscriptPanel eventId={event.id} voice={voice} />
-        </RoomPanel>
+        {(mobileLiveTab === 'all' || mobileLiveTab === 'chat') && (
+          <RoomPanel
+            id="transcription"
+            title="Transcription"
+            subtitle="Live group chat of the voice channel"
+            order={panelIndex.transcription || 99}
+            onMove={movePanel}
+            sizeStore={sizeStore}
+            resetNonce={resetNonce}
+          >
+            <TranscriptPanel eventId={event.id} voice={voice} />
+          </RoomPanel>
+        )}
       </div>
     </div>
   );

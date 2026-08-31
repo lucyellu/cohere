@@ -16,7 +16,7 @@ import QrBadge from './QrBadge.jsx';
 const PER_PAGE = { visas: 2, entries: 4, souvenirs: 4, stubs: 3 };
 
 const ExportSheet = forwardRef(function ExportSheet(
-  { profile, stats, travel, home, memberSince, visas, entries, stubs, identitySeed, art = {} },
+  { profile, stats, travel, home, memberSince, visas, entries, stubs, identitySeed, art = {}, friendTags = {}, youName = '' },
   ref,
 ) {
   const name = (profile?.name || '').trim() || 'Guest Traveller';
@@ -89,7 +89,7 @@ const ExportSheet = forwardRef(function ExportSheet(
               ))}
             </div>
           )}
-          {page.kind === 'stubs' && page.items.map((s) => <StubRow key={s.serial || s.id} stub={s} />)}
+          {page.kind === 'stubs' && page.items.map((s) => <StubRow key={s.serial || s.id} stub={s} friends={friendTags[s.id]} youName={youName} />)}
         </Page>
       ))}
     </div>
@@ -181,7 +181,7 @@ function IdentityPage({ name, initials, avatar, passportNo, qrValue, profile, me
   );
 }
 
-function StubRow({ stub: s }) {
+function StubRow({ stub: s, friends = [], youName = '' }) {
   const pal = ticketPalette(s.artist || s.id);
   const type = ticketTypography(s.artist || s.id);
   const seat = s.seat || {};
@@ -196,6 +196,12 @@ function StubRow({ stub: s }) {
         <div className="cohear-export__stub-body">
           <div className="cohear-export__stub-venue">{place || '—'}</div>
           <div className="cohear-export__stub-line">{s.date || 'TBA'} · {seat.section || 'GA'} {seat.row || ''}{seat.seat ? ` ${seat.seat}` : ''}</div>
+          {/* Printed flat rather than as chips — html2canvas rasterises plain text most reliably. */}
+          {friends.length > 0 && (
+            <div className="cohear-export__stub-line" style={{ color: pal.accent }}>
+              Party · {[youName || 'You', ...friends.map((f) => f.name)].join(', ')}
+            </div>
+          )}
           <div className="cohear-export__serial">{s.serial}{s.mintNo != null ? ` · #${String(s.mintNo).padStart(4, '0')}` : ''}</div>
         </div>
         <div className="cohear-export__stub-foil" style={{ borderColor: pal.ink }}>

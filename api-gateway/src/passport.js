@@ -170,3 +170,62 @@ export async function verify(serial) {
     issuedAt: row.issued_at,
   };
 }
+
+// --- Friend attendance -------------------------------------------------------
+// "Which of my friends were also at this show?" — answered straight out of the
+// token registry: a ticket token exists for (scope_key = concert, user_key =
+// person) exactly when that person's passport minted a stub for it.
+//
+// Privacy model: the caller must already know the user keys it asks about
+// (they come from friend codes the user was handed), and the reply only ever
+// contains keys from that list. There is no way to enumerate strangers.
+const MAX_KEYS = 100;
+const MAX_SCOPES = 400;
+
+// PostgREST `in.(…)` list. Values are quoted; the characters that could break
+// out of the list are stripped rather than escaped (our keys never contain them).
+function inList(values) {
+  const clean = values.map((v) => String(v).replace(/["(),]/g, '').trim()).filter(Boolean);
+  return `in.(${clean.map((v) => `"${v}"`).join(',')})`;
+}
+
+export async function attendance(input = {}) {
+  const userKeys = [...new Set((Array.isArray(input.userKeys) ? input.userKeys : []).map(String))].slice(0, MAX_KEYS);
+  const concertKeys = [...new Set((Array.isArray(input.concertKeys) ? input.concertKeys : []).map(String))].slice(0, MAX_SCOPES);
+  if (!userKeys.length) return { ok: true, registry: registryEnabled, matches: {} };
+  if (!registryEnabled) return { ok: true, registry: false, matches: {} };
+
+  const params = [
+    'type=eq.ticket',
+    `user_key=${encodeURIComponent(inList(userKeys))}`,
+    'select=scope_key,user_key,artist,venue,city,country,concert_date,issued_at',
+    'limit=2000',
+  ];
+  // No concert list → every show these friends hold a ticket for (used by
+  // "shows your friends went to" as well as by a full passport refresh).
+  if (concertKeys.length) params.push(`scope_key=${encodeURIComponent(inList(concertKeys))}`);
+
+  try {
+    const res = await sbFetch(`passport_tokens?${params.join('&')}`);
+    if (!res.ok) throw new Error(`registry ${res.status}: ${await res.text()}`);
+    const rows = await res.json();
+    const matches = {};
+    for (const row of Array.isArray(rows) ? rows : []) {
+      const scope = row.scope_key;
+      if (!scope) continue;
+      (matches[scope] ||= []).push({
+        userKey: row.user_key,
+        artist: row.artist || '',
+        venue: row.venue || '',
+        city: row.city || '',
+        country: row.country || '',
+        date: row.concert_date || '',
+        issuedAt: row.issued_at || '',
+      });
+    }
+    return { ok: true, registry: true, matches };
+  } catch (e) {
+    console.warn('  ⚠️  passport attendance lookup failed:', e.message);
+    return { ok: false, registry: true, error: 'lookup failed', matches: {} };
+  }
+}

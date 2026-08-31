@@ -9,6 +9,8 @@ const STUBS_KEY = 'cohear_ticket_stubs_v1';
 const OPTOUT_KEY = 'cohear_passport_optout_v1';
 const PROFILE_KEY = 'cohear_passport_profile_v1';
 const TRASH_KEY = 'cohear_passport_trash_v1';
+// Owned by friends.js, but listed here so the cloud snapshot carries it too.
+export const FRIENDS_KEY = 'cohear_friends_v1';
 const TRASH_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 // --- Real-world-ish visa rules ------------------------------------------------
@@ -890,7 +892,9 @@ export function travelItinerary(entries = [], home = null) {
 // survives being offline (records stay "pending" and re-sync later).
 const TYPE_KEY = { visa: VISAS_KEY, entry: ENTRIES_KEY, ticket: STUBS_KEY };
 
-function guestKey() {
+// The identity every signed token is minted under. Friends exchange this key
+// (inside a friend code) so the registry can answer "were we at the same show?".
+export function guestKey() {
   let k = localStorage.getItem('cohear_guest_id');
   if (!k) {
     k = (window.crypto?.randomUUID?.() || `g-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -987,6 +991,7 @@ export function snapshotLocal() {
     stubs: readStubs(),
     history: readHistory(),
     optout: readOptOut(),
+    friends: readArray(FRIENDS_KEY),
   };
 }
 
@@ -1000,6 +1005,7 @@ export function writeLocalState(state = {}) {
     if (state.stubs) writeArray(STUBS_KEY, state.stubs);
     if (state.history) writeArray(HISTORY_KEY, state.history);
     if (state.optout) writeArray(OPTOUT_KEY, state.optout);
+    if (state.friends) writeArray(FRIENDS_KEY, state.friends);
   } catch (err) {
     console.error('Failed to write passport state (quota exceeded?):', err);
   }
@@ -1038,6 +1044,7 @@ export function mergeState(local = {}, remote = {}) {
     stubs: mergeById(local.stubs, remote.stubs, ['issuedAt']),
     history: mergeById(local.history, remote.history, ['lastViewedAt', 'firstViewedAt']),
     optout: [...new Set([...(local.optout || []), ...(remote.optout || [])])],
+    friends: mergeById(local.friends, remote.friends, ['addedAt']),
   };
 }
 
@@ -1051,7 +1058,7 @@ export function importJson(json) {
   try { parsed = JSON.parse(json); } catch { throw new Error('Invalid JSON file'); }
   if (!parsed || typeof parsed !== 'object') throw new Error('Unrecognised backup format');
   // Accept any object that has at least one recognisable passport key.
-  const known = ['history', 'visas', 'entries', 'stubs', 'profile', 'optout'];
+  const known = ['history', 'visas', 'entries', 'stubs', 'profile', 'optout', 'friends'];
   if (!known.some((k) => Array.isArray(parsed[k]) || (k === 'profile' && parsed[k]))) {
     throw new Error('File does not appear to be a Cohear passport backup');
   }

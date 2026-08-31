@@ -7,13 +7,13 @@
 export const SEED_KEY = 'cohere_theme_seed';
 export const INVERT_KEY = 'cohere_theme_invert';
 
-// Curated seed swatches for the picker — with Cohere's terracotta as the flagship
+// Curated seed swatches for the picker — with neutral Charcoal as default
 export const SEED_SWATCHES = [
+  { label: 'Charcoal', hex: '#71717a' },
+  { label: 'Slate', hex: '#5f6b78' },
   { label: 'Cohere Terracotta', hex: '#e85a2b' },
   { label: 'Warm Ember', hex: '#d9351f' },
   { label: 'Amber Peach', hex: '#f58b4e' },
-  { label: 'Slate', hex: '#5f6b78' },
-  { label: 'Muted Zinc', hex: '#71717a' },
 ];
 
 // Every Tailwind colour family the app uses inline. All of them collapse onto
@@ -58,25 +58,32 @@ export function isValidHex(hex) {
 // Paint the entire palette onto :root.
 // `invert = true` produces the landing page light mode.
 export function applyTheme(seed, invert = false, swap = false) {
-  if (!isValidHex(seed)) seed = '#e85a2b';
+  if (!isValidHex(seed)) seed = '#71717a';
   const root = document.documentElement;
   const set = (k, v) => root.style.setProperty(k, v);
   const [r, g, b] = hexRgb(seed);
   const { h, s } = hexToHsl(seed);
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const sat = s / 100; // 0..1
+  const seedL = hexToHsl(seed).l / 100;
 
   root.style.colorScheme = invert ? 'light' : 'dark';
   root.setAttribute('data-skin', invert ? 'paper' : 'night');
 
-  // Landing page branding orange ramp
-  set('--orange-1', '#d9351f');
-  set('--orange-2', '#e85a2b');
-  set('--orange-3', '#f58b4e');
-  set('--orange-4', '#fdc68a');
-  set('--ghost', '#c5bfae');
+  // Dynamic accent & highlight ramp matching the active theme seed
+  if (seed.toLowerCase() === '#e85a2b') {
+    set('--orange-1', '#d9351f');
+    set('--orange-2', '#e85a2b');
+    set('--orange-3', '#f58b4e');
+    set('--orange-4', '#fdc68a');
+  } else {
+    set('--orange-1', hslHex(h, clamp(sat * 100, 0, 100), clamp((seedL - 0.12) * 100, 10, 90)));
+    set('--orange-2', seed);
+    set('--orange-3', hslHex(h, clamp(sat * 100, 0, 100), clamp((seedL + 0.12) * 100, 15, 95)));
+    set('--orange-4', hslHex(h, clamp(sat * 0.75 * 100, 0, 100), clamp((seedL + 0.25) * 100, 20, 98)));
+  }
+  set('--ghost', invert ? '#c5bfae' : '#52525b');
 
-  const seedL = hexToHsl(seed).l / 100;
   const accentDim = hslHex(h, clamp(sat * 0.94, 0, 1) * 100, clamp(seedL - 0.13, 0.04, 1) * 100);
 
   if (invert) {

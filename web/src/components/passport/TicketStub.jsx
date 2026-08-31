@@ -9,7 +9,7 @@ import { ticketPalette, ticketTypography, barcodeBars, hashString } from './pale
 // generated poster art becomes the ticket's printed background (not a pasted
 // image) with the header/counterfoil structure kept. `showArt` toggles them;
 // regenerating is a separate action.
-export default function TicketStub({ stub, art, showArt, onToggleArt, onGenerate, generating, onOpen }) {
+export default function TicketStub({ stub, art, showArt, onToggleArt, onGenerate, generating, onOpen, onSelect, friends = [], youName = '', isCloseup = false }) {
   const seat = stub.seat || {};
   const pal = ticketPalette(stub.artist || stub.id);
   const typo = ticketTypography(stub.artist || stub.id);
@@ -26,17 +26,22 @@ export default function TicketStub({ stub, art, showArt, onToggleArt, onGenerate
   };
   const mint = String(stub.mintNo ?? stub.edition ?? 1).padStart(4, '0');
   const place = [stub.city, stub.country].filter(Boolean).join(', ');
-  const clickable = Boolean(onOpen && stub.city);
+  const clickable = Boolean(onSelect || (onOpen && stub.city));
+
+  const handleClick = () => {
+    if (onSelect) onSelect(stub);
+    else if (onOpen && stub.city) onOpen(stub.city, stub.country);
+  };
 
   return (
     <article
-      className={`cohear-stub ${artOn ? 'cohear-stub--art' : ''} ${clickable ? 'cohear-stub--link' : ''}`}
+      className={`cohear-stub ${artOn ? 'cohear-stub--art' : ''} ${clickable ? 'cohear-stub--link' : ''} ${isCloseup ? 'cohear-stub--closeup' : ''}`}
       style={style}
-      onClick={clickable ? () => onOpen(stub.city, stub.country) : undefined}
-      onKeyDown={clickable ? (e) => { if (e.key === 'Enter') onOpen(stub.city, stub.country); } : undefined}
+      onClick={clickable ? handleClick : undefined}
+      onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick(); } } : undefined}
       role={clickable ? 'button' : undefined}
       tabIndex={clickable ? 0 : undefined}
-      title={clickable ? `${place} — view city` : undefined}
+      title={clickable ? (onSelect ? `${stub.artist || 'Concert'} — click for closeup & details` : `${place} — view city`) : undefined}
     >
       <div className="cohear-stub__main">
         <header className="cohear-stub__head">
@@ -56,6 +61,8 @@ export default function TicketStub({ stub, art, showArt, onToggleArt, onGenerate
           <Field label="Seat" value={seat.seat ?? '—'} />
           <Field label="Gate" value={seat.gate ?? '—'} />
         </div>
+
+        <FriendTags friends={friends} youName={youName} max={isCloseup ? 8 : 4} />
 
         <Barcode seed={stub.serial || stub.id} />
         <div className="flex items-center justify-between">
@@ -117,6 +124,34 @@ function ArtControls({ art, showArt, onToggleArt, onGenerate, generating }) {
         {generating ? '…' : '↻'}
       </button>
     </>
+  );
+}
+
+// The party who held tickets for this show, printed on the stub like the names
+// on a group booking — you first, then every friend who also has a stub.
+// Nothing renders when you went alone.
+function FriendTags({ friends, youName = '', max = 4 }) {
+  if (!friends?.length) return null;
+  const shown = friends.slice(0, max);
+  const extra = friends.length - shown.length;
+  const roster = [youName || 'You', ...friends.map((f) => f.name)].join(', ');
+  return (
+    <div className="cohear-stub__friends" title={`In the crowd: ${roster}`}>
+      <label>Party</label>
+      <div className="cohear-stub__friend-chips">
+        <span className="cohear-friend-chip cohear-friend-chip--you">
+          <i aria-hidden="true">★</i>
+          <b>{youName || 'You'}</b>
+        </span>
+        {shown.map((friend) => (
+          <span key={friend.userKey} className="cohear-friend-chip" style={{ '--chip': friend.color }}>
+            <i aria-hidden="true">{friend.initials}</i>
+            <b>{friend.name}</b>
+          </span>
+        ))}
+        {extra > 0 && <span className="cohear-friend-chip cohear-friend-chip--more">+{extra}</span>}
+      </div>
+    </div>
   );
 }
 
