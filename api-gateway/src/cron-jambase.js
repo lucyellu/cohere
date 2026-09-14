@@ -110,7 +110,8 @@ async function jbGet(params, label) {
       await new Promise((res) => setTimeout(res, 5000));
       continue;
     }
-    throw new Error(`JamBase HTTP ${r.status} on ${label}`);
+    const errBody = await r.text().catch(() => '');
+    throw new Error(`JamBase HTTP ${r.status} on ${label}: ${errBody}`);
   }
   throw new Error(`JamBase still rate limited after retries on ${label}`);
 }
@@ -120,15 +121,9 @@ async function run() {
   let calls = 0;
 
   // --- Near term: every show worldwide, days 0..NEAR_DAYS, no gaps ---------
-  // A range query returns the whole span in date order, so paging through it
-  // gives contiguous coverage. The old code asked for one day per call
-  // (eventDateFrom === eventDateTo) and skipped 3 days in 4, which is why
-  // "tonight" could be missing from the cache entirely.
-  // Start YESTERDAY (UTC), not today. This job runs in UTC but users are not:
-  // at 10 PM Pacific it is already tomorrow in UTC, so a window starting at
-  // isoIn(0) omits the viewer's current evening entirely — the exact bug that
-  // made "tonight" look empty. One extra day of coverage is ~10 calls.
-  const nearFrom = isoIn(-1);
+  // JamBase free/developer tier disallows eventDateFrom in the past (< today UTC).
+  // isoIn(0) starts at today (UTC) to satisfy JamBase's earliestAllowed constraint.
+  const nearFrom = isoIn(0);
   const nearTo = isoIn(NEAR_DAYS);
   console.log(`Near term: ${nearFrom} .. ${nearTo} (contiguous)`);
 
