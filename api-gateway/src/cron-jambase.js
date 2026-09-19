@@ -32,29 +32,52 @@ function envIntEarly(name, fallback) {
   return Number.isFinite(+process.env[name]) ? +process.env[name] : fallback;
 }
 async function consumeQuota() {
-  const res = await sbFetch('rpc/bump_api_quota', {
-    method: 'POST',
-    body: JSON.stringify({ p_service: 'jambase', p_cap_fallback: JAMBASE_MONTHLY_CAP }),
-  });
-  if (!res.ok) {
-    console.warn(`  quota RPC failed (HTTP ${res.status}) — treating as exhausted (fail-closed).`);
+  try {
+    const res = await sbFetch('rpc/bump_api_quota', {
+      method: 'POST',
+      body: JSON.stringify({ p_service: 'jambase', p_cap_fallback: JAMBASE_MONTHLY_CAP }),
+    });
+    if (!res?.ok) {
+      console.warn(`  quota RPC failed (HTTP ${res?.status}) — treating as exhausted (fail-closed).`);
+      return { allowed: false, calls: null, cap: JAMBASE_MONTHLY_CAP };
+    }
+    const rows = await res.json();
+    return rows?.[0] || { allowed: false, calls: null, cap: JAMBASE_MONTHLY_CAP };
+  } catch (err) {
+    console.warn(`  quota RPC error (${err.message}) — treating as exhausted (fail-closed).`);
     return { allowed: false, calls: null, cap: JAMBASE_MONTHLY_CAP };
   }
-  const rows = await res.json();
-  return rows?.[0] || { allowed: false, calls: null, cap: JAMBASE_MONTHLY_CAP };
 }
 
-// Fetch options for Supabase
-function sbFetch(path, opts = {}) {
-  return fetch(`${SB_URL}/rest/v1/${path}`, {
-    ...opts,
-    headers: {
-      apikey: SB_KEY,
-      Authorization: `Bearer ${SB_KEY}`,
-      'Content-Type': 'application/json',
-      ...(opts.headers || {}),
-    },
-  });
+// Fetch options for Supabase with retries
+async function sbFetch(path, opts = {}, retries = 3) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
+        ...opts,
+        headers: {
+          apikey: SB_KEY,
+          Authorization: `Bearer ${SB_KEY}`,
+          'Content-Type': 'application/json',
+          ...(opts.headers || {}),
+        },
+      });
+      if (res.ok || res.status < 500) return res;
+      if (attempt < retries) {
+        console.warn(`  Supabase HTTP ${res.status} on ${path} (attempt ${attempt}/${retries}), retrying in ${attempt * 1000}ms...`);
+        await new Promise((r) => setTimeout(r, attempt * 1000));
+        continue;
+      }
+      return res;
+    } catch (err) {
+      if (attempt < retries) {
+        console.warn(`  Supabase network error on ${path} (attempt ${attempt}/${retries}): ${err.message}, retrying in ${attempt * 1000}ms...`);
+        await new Promise((r) => setTimeout(r, attempt * 1000));
+        continue;
+      }
+      throw err;
+    }
+  }
 }
 
 const numOrNull = (v) => {
@@ -82,7 +105,7 @@ const NEAR_DAYS = envInt('JB_NEAR_DAYS', 7); // days 0..N fetched CONTIGUOUSLY (
 const NEAR_MAX_CALLS = envInt('JB_MAX_CALLS', 150); // ceiling so a busy window can't run away
 const FAR_DAYS = envInt('JB_FAR_DAYS', 60); // sampled tail: browsing that far out doesn't need every show
 const FAR_STEP = envInt('JB_FAR_STEP', 5); // one sampled day every N days from NEAR_DAYS..FAR_DAYS
-const PAGE_DELAY_MS = 300; // rate limit is 120/min; this keeps us well under
+const PAGE_DELAY_MS = 400; // rate limit is 120/min; this keeps us comfortably under ~85-90/min
 const DRY_RUN = String(process.env.JB_DRY_RUN || '').toLowerCase() === 'true';
 
 const isoIn = (days) => {
@@ -93,6 +116,9 @@ const isoIn = (days) => {
 
 class QuotaExhaustedError extends Error {}
 
+const RETRYABLE_STATUS_CODES = new Set([408, 429, 500, 502, 503, 504]);
+const MAX_ATTEMPTS = 4; // 1 initial + 3 retries
+
 async function jbGet(params, label) {
   // Consume from the SHARED monthly budget before spending a real JamBase
   // call — this is the hard stop, independent of (and in addition to) the
@@ -102,18 +128,47 @@ async function jbGet(params, label) {
     throw new QuotaExhaustedError(`jambase monthly quota exhausted (${budget.calls}/${budget.cap}) on ${label}`);
   }
   const url = `${JB_BASE}/events?${params}`;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const r = await fetch(url, { headers: { Authorization: `Bearer ${JB_KEY}`, Accept: 'application/json' } });
-    if (r.ok) return r.json();
-    if (r.status === 429) {
-      console.warn(`  rate limited on ${label}, waiting 5s...`);
-      await new Promise((res) => setTimeout(res, 5000));
-      continue;
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const r = await fetch(url, { headers: { Authorization: `Bearer ${JB_KEY}`, Accept: 'application/json' } });
+      if (r.ok) return await r.json();
+
+      const isRetryable = RETRYABLE_STATUS_CODES.has(r.status);
+      if (isRetryable && attempt < MAX_ATTEMPTS) {
+        let delayMs;
+        if (r.status === 429) {
+          const retryAfter = r.headers.get('Retry-After');
+          delayMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : attempt * 5000;
+          console.warn(`  rate limited on ${label} (attempt ${attempt}/${MAX_ATTEMPTS}), waiting ${delayMs}ms...`);
+        } else {
+          delayMs = Math.pow(2, attempt - 1) * 2000; // 2s, 4s, 8s
+          console.warn(`  JamBase HTTP ${r.status} on ${label} (attempt ${attempt}/${MAX_ATTEMPTS}), retrying in ${delayMs}ms...`);
+        }
+        await new Promise((res) => setTimeout(res, delayMs));
+        continue;
+      }
+
+      const errBody = await r.text().catch(() => '');
+      throw new Error(`JamBase HTTP ${r.status} on ${label}: ${errBody}`);
+    } catch (err) {
+      lastError = err;
+      if (err instanceof QuotaExhaustedError) {
+        throw err;
+      }
+      const isNetworkError = !err.message?.startsWith('JamBase HTTP');
+      if (isNetworkError && attempt < MAX_ATTEMPTS) {
+        const delayMs = Math.pow(2, attempt - 1) * 2000;
+        console.warn(`  Network error on ${label} (attempt ${attempt}/${MAX_ATTEMPTS}): ${err.message}, retrying in ${delayMs}ms...`);
+        await new Promise((res) => setTimeout(res, delayMs));
+        continue;
+      }
+      throw err;
     }
-    const errBody = await r.text().catch(() => '');
-    throw new Error(`JamBase HTTP ${r.status} on ${label}: ${errBody}`);
   }
-  throw new Error(`JamBase still rate limited after retries on ${label}`);
+
+  throw lastError || new Error(`JamBase request failed on ${label} after ${MAX_ATTEMPTS} attempts`);
 }
 
 async function run() {
@@ -130,6 +185,7 @@ async function run() {
   let page = 1;
   let totalPages = 1;
   let quotaExhausted = false;
+  const failedPages = [];
   while (page <= totalPages && page <= NEAR_MAX_CALLS) {
     let data;
     try {
@@ -143,7 +199,13 @@ async function run() {
         quotaExhausted = true;
         break;
       }
-      throw e;
+      if (page === 1) {
+        throw e;
+      }
+      console.warn(`  ⚠️  Failed to fetch near p${page} after all retries (${e.message}) — skipping page to preserve remaining sync.`);
+      failedPages.push(page);
+      page++;
+      continue;
     }
     calls++;
     const events = data.events || [];
@@ -154,6 +216,12 @@ async function run() {
     }
     page++;
     await new Promise((res) => setTimeout(res, PAGE_DELAY_MS));
+  }
+  if (failedPages.length > 0) {
+    console.warn(`  ⚠️  ${failedPages.length} near-term page(s) failed during sync: [${failedPages.join(', ')}].`);
+    if (failedPages.length >= 5 && failedPages.length > totalPages * 0.2) {
+      throw new Error(`Too many near-term page failures (${failedPages.length}/${totalPages}), aborting sync.`);
+    }
   }
   if (totalPages > NEAR_MAX_CALLS) {
     console.warn(`  ⚠️  Stopped at the ${NEAR_MAX_CALLS}-call ceiling; ${totalPages - NEAR_MAX_CALLS} pages of near-term events were NOT fetched.`);
