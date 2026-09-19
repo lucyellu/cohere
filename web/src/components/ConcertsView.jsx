@@ -936,17 +936,17 @@ function ControlSurface(props) {
   );
 }
 
-const COLS_KEY = 'cohear_discover_cols_v2';
-const DEFAULT_COLS = { artist: 1.0, venue: 0.85, city: 1.0, time: 1.35 };
+const COLS_KEY = 'cohear_discover_cols_v3';
+const DEFAULT_COLS = { artist: 1.0, venue: 0.85, city: 1.15, time: 1.35 };
 
 function readCols() {
   try {
-    const parsed = JSON.parse(localStorage.getItem(COLS_KEY) || localStorage.getItem('cohear_discover_cols_v1') || 'null');
+    const parsed = JSON.parse(localStorage.getItem(COLS_KEY) || localStorage.getItem('cohear_discover_cols_v2') || localStorage.getItem('cohear_discover_cols_v1') || 'null');
     if (!parsed) return { ...DEFAULT_COLS };
     return {
       artist: clampFr(parsed.artist, DEFAULT_COLS.artist),
       venue: clampFr(parsed.venue, DEFAULT_COLS.venue),
-      city: clampFr(parsed.city, DEFAULT_COLS.city),
+      city: Math.max(DEFAULT_COLS.city, clampFr(parsed.city, DEFAULT_COLS.city)),
       time: Math.max(DEFAULT_COLS.time, clampFr(parsed.time, DEFAULT_COLS.time)),
     };
   } catch {
@@ -964,7 +964,7 @@ function clampFr(value, fallback) {
 // flexible tracks keep a sane min width (so a city never clips to a couple of
 // letters) and otherwise split the leftover space by the user's fr ratios.
 function colsTemplate(c) {
-  return `56px minmax(140px, ${c.artist}fr) minmax(120px, ${c.venue}fr) minmax(140px, ${c.city}fr) minmax(210px, ${c.time}fr) 88px 140px`;
+  return `56px minmax(140px, ${c.artist}fr) minmax(120px, ${c.venue}fr) minmax(165px, ${c.city}fr) minmax(210px, ${c.time}fr) 88px 140px`;
 }
 
 function ConcertTable({ rows, selectedId, onSelect, saved, calendared, onAddCalendar, onInvite, userZone, now, sortKey, dir, onSort, onSyncLive }) {
@@ -1082,7 +1082,7 @@ function ConcertTable({ rows, selectedId, onSelect, saved, calendared, onAddCale
                     <span className="block truncate text-sm font-semibold text-white">{c.artist || 'Unknown artist'}</span>
                   </span>
                   <span className="min-w-0 truncate text-sm text-zinc-300">{c.venue}</span>
-                  <span className="min-w-0 truncate text-sm text-zinc-400">{[c.city, c.country].filter(Boolean).join(', ')}</span>
+                  <CityStack concert={c} />
                   <TimeStack concert={c} userZone={userZone} now={now} />
                   <span className="text-right text-sm font-semibold tabular-nums text-amber-200">{fmtCapacity(c.capacity || estimateVenueCapacity(c.venue, c.capacity))}</span>
                 </button>
@@ -1149,7 +1149,7 @@ function ConcertTable({ rows, selectedId, onSelect, saved, calendared, onAddCale
                   <p className="text-xs text-zinc-400 mt-0.5 truncate flex items-center gap-1">
                     <span>{c.venue}</span>
                     <span className="text-zinc-600">·</span>
-                    <span className="text-zinc-300">{[c.city, c.country].filter(Boolean).join(', ')}</span>
+                    <span className="text-zinc-300">{formatLocationSummary(c)}</span>
                   </p>
                 </div>
 
@@ -1414,7 +1414,7 @@ function ConcertInspector({ concert, saved, calendared, sources, userZone, curre
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <MetricBlock label="Capacity" value={fmtCapacity(concert.capacity)} tone="amber" />
+          <MetricBlock label="Capacity" value={fmtCapacity(concert.capacity || estimateVenueCapacity(concert.venue, concert.capacity))} tone="amber" />
           <MetricBlock
             label={ticketPriceLabel(ticketInfo, webEstimate)}
             value={priceLoading ? 'Checking' : ticketPriceDisplay(ticketInfo, webEstimate, concert, currency)}
@@ -2063,6 +2063,75 @@ function MetricBlock({ label, value, tone, title }) {
       <div className={`mt-2 truncate text-base font-semibold tabular-nums ${metricTone(tone)}`}>{value}</div>
     </div>
   );
+}
+
+const US_STATE_ABBR = {
+  alabama: 'AL', alaska: 'AK', arizona: 'AZ', arkansas: 'AR', california: 'CA',
+  colorado: 'CO', connecticut: 'CT', delaware: 'DE', florida: 'FL', georgia: 'GA',
+  hawaii: 'HI', idaho: 'ID', illinois: 'IL', indiana: 'IN', iowa: 'IA',
+  kansas: 'KS', kentucky: 'KY', louisiana: 'LA', maine: 'ME', maryland: 'MD',
+  massachusetts: 'MA', michigan: 'MI', minnesota: 'MN', mississippi: 'MS', missouri: 'MO',
+  montana: 'MT', nebraska: 'NE', nevada: 'NV', 'new hampshire': 'NH', 'new jersey': 'NJ',
+  'new mexico': 'NM', 'new york': 'NY', 'north carolina': 'NC', 'north dakota': 'ND', ohio: 'OH',
+  oklahoma: 'OK', oregon: 'OR', pennsylvania: 'PA', 'rhode island': 'RI', 'south carolina': 'SC',
+  'south dakota': 'SD', tennessee: 'TN', texas: 'TX', utah: 'UT', vermont: 'VT',
+  virginia: 'VA', washington: 'WA', 'west virginia': 'WV', wisconsin: 'WI', wyoming: 'WY',
+  'district of columbia': 'DC', 'puerto rico': 'PR',
+  ontario: 'ON', quebec: 'QC', 'british columbia': 'BC', alberta: 'AB', manitoba: 'MB',
+  saskatchewan: 'SK', 'nova scotia': 'NS', 'new brunswick': 'NB', 'newfoundland and labrador': 'NL',
+};
+
+function stateAbbr(region) {
+  if (!region) return '';
+  const clean = region.trim();
+  if (clean.length === 2) return clean.toUpperCase();
+  const lower = clean.toLowerCase();
+  return US_STATE_ABBR[lower] || clean;
+}
+
+function CityStack({ concert }) {
+  const city = concert.city || '';
+  const abbr = stateAbbr(concert.region);
+  const country = concert.country || '';
+
+  let primary = city;
+  if (abbr && (!country || ['United States', 'USA', 'US', 'Canada', 'CA', 'Australia', 'AU'].includes(country))) {
+    primary = city ? `${city}, ${abbr}` : abbr;
+  }
+
+  let secondary = country;
+  if (!primary) {
+    primary = [concert.region, country].filter(Boolean).join(', ') || 'Unknown location';
+    secondary = '';
+  } else if (!secondary && concert.region && concert.region !== abbr) {
+    secondary = concert.region;
+  }
+
+  const fullText = [concert.city, concert.region, concert.country].filter(Boolean).join(', ');
+
+  return (
+    <span className="min-w-0 text-xs leading-5">
+      <span className="block font-semibold text-zinc-200" title={fullText}>
+        {primary}
+      </span>
+      {secondary && (
+        <span className="block text-zinc-400" title={fullText}>
+          {secondary}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function formatLocationSummary(concert) {
+  if (!concert) return '';
+  const city = concert.city || '';
+  const abbr = stateAbbr(concert.region);
+  const country = concert.country || '';
+  if (abbr && (!country || ['United States', 'USA', 'US', 'Canada', 'CA', 'Australia', 'AU'].includes(country))) {
+    return city ? `${city}, ${abbr}` : abbr;
+  }
+  return [city, country].filter(Boolean).join(', ') || [concert.region, country].filter(Boolean).join(', ');
 }
 
 function TimeStack({ concert, userZone, now }) {
