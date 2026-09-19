@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config();
+import { estimateVenueCapacity } from './venueCapacity.js';
 
 const SB_URL = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
 const SB_KEY = process.env.SUPABASE_SECRET_KEY || '';
@@ -255,7 +256,8 @@ async function run() {
   const parsed = allEvents.map((e) => {
     const loc = e.location || {};
     const addr = loc.address || {};
-    const capacity = numOrNull(loc.maximumAttendeeCapacity ?? loc.capacity) || 0;
+    const explicitCap = numOrNull(loc.maximumAttendeeCapacity ?? loc.capacity);
+    const capacity = estimateVenueCapacity(loc.name, explicitCap) || 0;
     
     return {
       id: e.identifier || `${loc.name}-${(e.startDate || '').slice(0, 10)}`,

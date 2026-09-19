@@ -15,6 +15,7 @@ import * as passport from './passport.js';
 import { db } from './firebase.js';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { tryConsumeJambaseCall } from './jambaseBudget.js';
+import { estimateVenueCapacity } from './venueCapacity.js';
 
 const SB_URL = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
 const SB_KEY = process.env.SUPABASE_SECRET_KEY || '';
@@ -302,7 +303,7 @@ function normJambase(events) {
       lat, lng,
       date: (e.startDate || '').slice(0, 10),
       startDate: e.startDate || '',
-      capacity: numOrNull(loc.maximumAttendeeCapacity ?? loc.capacity),
+      capacity: estimateVenueCapacity(loc.name, numOrNull(loc.maximumAttendeeCapacity ?? loc.capacity)),
       setlist,
       songCount: setlist.length,
       tour: e.name || '',
@@ -327,7 +328,7 @@ function normSetlistfm(setlists) {
       lng: numOrNull(coords.long),
       date: dmyToIso(s.eventDate),
       startDate: '',
-      capacity: null, // setlist.fm has no capacity
+      capacity: estimateVenueCapacity(s.venue?.name, null),
       setlist: songs,
       songCount: songs.length,
       tour: s.tour?.name || '',
@@ -457,7 +458,7 @@ router.get('/concerts', async (req, res) => {
       dateTo = addDaysIso(today, -1);
     } else {
       dateFrom = today;
-      if (windowKey === 'tonight') { dateFrom = today; dateTo = today; }
+      if (windowKey === 'tonight') { dateFrom = today; dateTo = addDaysIso(today, 1); }
       else if (windowKey === 'week') dateTo = addDaysIso(today, 7);
       else if (windowKey === 'custom') { dateFrom = customStart || today; dateTo = customEnd || addDaysIso(today, 30); }
       else dateTo = addDaysIso(today, 60); // 'upcoming'

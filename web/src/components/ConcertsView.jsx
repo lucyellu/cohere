@@ -8,6 +8,7 @@ import { claimStamp, optOutConcert, recordConcertAction, personalStats, backfill
 import { readCalendar, addToCalendar, scheduleReminders } from '../calendar.js';
 import ConcertInviteModal from './ConcertInviteModal.jsx';
 import { FRIENDS_EVENT, buildFriendTagMap, friendsOn, refreshFriendTags } from '../friends.js';
+import { estimateVenueCapacity } from '../venueCapacity.js';
 
 
 const VIEW_MODES = [
@@ -30,7 +31,7 @@ const WHEN = [
 
 const SORT_KEYS = ['soon', 'capacity', 'popularity', 'date', 'artist', 'venue', 'city'];
 const USER_ZONE_KEY = 'cohear_user_timezone';
-const DISCOVER_STATE_KEY = 'cohear_discover_state_v4';
+const DISCOVER_STATE_KEY = 'cohear_discover_state_v5';
 const DISCOVER_LAYOUT_KEY = 'cohear_discover_layout_v1';
 const DEFAULT_INSPECTOR_WIDTH = 380;
 // Sections of Discover the reader can fold away to give the results list more room.
@@ -62,20 +63,22 @@ function readDiscoverState() {
     hideEnded: true,
     showMyArtists: false,
     selectedId: null,
-    minCapacity: 10000,
+    minCapacity: 0,
     timeLimitHrs: 0,
     customStart: new Date().toISOString().slice(0, 10),
     customEnd: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
     collapsed: { ...DEFAULT_COLLAPSED },
   };
   try {
-    const parsed = JSON.parse(sessionStorage.getItem(DISCOVER_STATE_KEY) || 'null');
+    const parsed = JSON.parse(sessionStorage.getItem(DISCOVER_STATE_KEY) || sessionStorage.getItem('cohear_discover_state_v4') || 'null');
     if (!parsed) return fallback;
+    const parsedCap = Number(parsed.minCapacity);
+    const minCapacity = parsedCap === 10000 || isNaN(parsedCap) ? 0 : parsedCap;
     return {
       ...fallback,
       ...parsed,
+      minCapacity,
       hideEnded: parsed.hideEnded ?? true,
-      minCapacity: parsed.minCapacity ?? 10000,
       collapsed: { ...DEFAULT_COLLAPSED, ...(parsed.collapsed || null) },
     };
   } catch {
@@ -342,7 +345,8 @@ export default function ConcertsView({ onEnterShow, onSyncLive, settings, onSett
     const graceMs = (settings?.endedGraceHours ?? 2) * 3600_000;
     const base = browse ? concerts : filterWhen(concerts, when);
     const filtered = base.filter((c) => {
-      if (minCapacity > 0 && (c.capacity == null || c.capacity < minCapacity)) return false;
+      const effectiveCap = c.capacity ?? estimateVenueCapacity(c.venue, c.capacity);
+      if (minCapacity > 0 && (effectiveCap == null || effectiveCap < minCapacity)) return false;
       if (timeLimitHrs > 0) {
         const start = showStartMs(c);
         if (!start || start - now > timeLimitHrs * 3600_000) return false;
@@ -932,18 +936,18 @@ function ControlSurface(props) {
   );
 }
 
-const COLS_KEY = 'cohear_discover_cols_v1';
-const DEFAULT_COLS = { artist: 1.05, venue: 0.9, city: 1.05, time: 0.95 };
+const COLS_KEY = 'cohear_discover_cols_v2';
+const DEFAULT_COLS = { artist: 1.0, venue: 0.85, city: 1.0, time: 1.35 };
 
 function readCols() {
   try {
-    const parsed = JSON.parse(localStorage.getItem(COLS_KEY) || 'null');
+    const parsed = JSON.parse(localStorage.getItem(COLS_KEY) || localStorage.getItem('cohear_discover_cols_v1') || 'null');
     if (!parsed) return { ...DEFAULT_COLS };
     return {
       artist: clampFr(parsed.artist, DEFAULT_COLS.artist),
       venue: clampFr(parsed.venue, DEFAULT_COLS.venue),
       city: clampFr(parsed.city, DEFAULT_COLS.city),
-      time: clampFr(parsed.time, DEFAULT_COLS.time),
+      time: Math.max(DEFAULT_COLS.time, clampFr(parsed.time, DEFAULT_COLS.time)),
     };
   } catch {
     return { ...DEFAULT_COLS };
@@ -956,11 +960,11 @@ function clampFr(value, fallback) {
   return Math.max(0.45, Math.min(3, n));
 }
 
-// 56px rank · flexible artist/venue/city/time · 88px seats · 88px live. The
+// 56px rank · flexible artist/venue/city/time · 88px seats · 140px live. The
 // flexible tracks keep a sane min width (so a city never clips to a couple of
 // letters) and otherwise split the leftover space by the user's fr ratios.
 function colsTemplate(c) {
-  return `56px minmax(150px, ${c.artist}fr) minmax(130px, ${c.venue}fr) minmax(160px, ${c.city}fr) minmax(150px, ${c.time}fr) 88px 140px`;
+  return `56px minmax(140px, ${c.artist}fr) minmax(120px, ${c.venue}fr) minmax(140px, ${c.city}fr) minmax(210px, ${c.time}fr) 88px 140px`;
 }
 
 function ConcertTable({ rows, selectedId, onSelect, saved, calendared, onAddCalendar, onInvite, userZone, now, sortKey, dir, onSort, onSyncLive }) {
@@ -1003,7 +1007,7 @@ function ConcertTable({ rows, selectedId, onSelect, saved, calendared, onAddCale
 
   function beginColResize(key, e) {
     const headerWidth = headerRef.current?.getBoundingClientRect().width || 900;
-    const flexWidth = Math.max(200, headerWidth - 232); // minus the three fixed tracks
+    const flexWidth = Math.max(200, headerWidth - 284); // minus the three fixed tracks (56px rank + 88px seats + 140px live)
     const sumFr = cols.artist + cols.venue + cols.city + cols.time;
     dragRef.current = { key, startX: e.clientX, startFr: cols[key], pxPerFr: flexWidth / sumFr, handle: e.currentTarget };
     e.currentTarget.classList.add('dragging');
@@ -1041,7 +1045,10 @@ function ConcertTable({ rows, selectedId, onSelect, saved, calendared, onAddCale
           <SortHeader id="city" label="City" sortKey={sortKey} dir={dir} onSort={onSort} />
           <button type="button" className="cohear-col-resize" aria-label="Resize city column" onPointerDown={(e) => beginColResize('city', e)} />
         </div>
-        <SortHeader id="date" label="Time" sortKey={sortKey} dir={dir} onSort={onSort} />
+        <div className="cohear-col-cell">
+          <SortHeader id="date" label="Time" sortKey={sortKey} dir={dir} onSort={onSort} />
+          <button type="button" className="cohear-col-resize" aria-label="Resize time column" onPointerDown={(e) => beginColResize('time', e)} />
+        </div>
         <SortHeader id="capacity" label="Seats" align="right" sortKey={sortKey} dir={dir} onSort={onSort} />
         <span className="text-right">Live</span>
       </div>
@@ -1077,7 +1084,7 @@ function ConcertTable({ rows, selectedId, onSelect, saved, calendared, onAddCale
                   <span className="min-w-0 truncate text-sm text-zinc-300">{c.venue}</span>
                   <span className="min-w-0 truncate text-sm text-zinc-400">{[c.city, c.country].filter(Boolean).join(', ')}</span>
                   <TimeStack concert={c} userZone={userZone} now={now} />
-                  <span className="text-right text-sm font-semibold tabular-nums text-amber-200">{fmtCapacity(c.capacity)}</span>
+                  <span className="text-right text-sm font-semibold tabular-nums text-amber-200">{fmtCapacity(c.capacity || estimateVenueCapacity(c.venue, c.capacity))}</span>
                 </button>
                 <span className="flex items-center gap-1.5 justify-self-end">
                   {showStartMs(c) && (
@@ -1133,7 +1140,7 @@ function ConcertTable({ rows, selectedId, onSelect, saved, calendared, onAddCale
                     )}
                   </div>
                   <span className="text-[10px] font-semibold tabular-nums text-amber-200/90 rounded bg-amber-400/10 px-1.5 py-0.5">
-                    {fmtCapacity(c.capacity)} seats
+                    {fmtCapacity(c.capacity || estimateVenueCapacity(c.venue, c.capacity))} seats
                   </span>
                 </div>
 
@@ -2060,11 +2067,22 @@ function MetricBlock({ label, value, tone, title }) {
 
 function TimeStack({ concert, userZone, now }) {
   const cd = countdownLabel(concert, now);
+  const vZone = venueTimeZone(concert);
+  const isSameZone = vZone === userZone;
+  const venueTime = formatVenueShowTime(concert);
+  const userTime = formatUserShowTime(concert, userZone);
+
   return (
     <span className="min-w-0 text-xs leading-5">
-      <span className="block truncate font-semibold text-zinc-200">{formatVenueShowTime(concert)}</span>
-      <span className="block truncate text-zinc-500">{formatUserShowTime(concert, userZone)}</span>
-      <span className={`block truncate font-semibold ${countdownClass(cd.tone)}`}>
+      <span className="block font-semibold text-zinc-200" title={venueTime}>
+        {isSameZone ? formatShowTime(concert, vZone) : venueTime}
+      </span>
+      {!isSameZone && (
+        <span className="block text-zinc-400" title={userTime}>
+          {userTime}
+        </span>
+      )}
+      <span className={`block font-semibold ${countdownClass(cd.tone)}`}>
         {cd.text}
       </span>
     </span>
@@ -2164,14 +2182,16 @@ function formatUserShowTime(concert, userZone) {
 function formatShowTime(concert, zone, label) {
   const ms = showStartMs(concert);
   if (!ms) return 'Time TBA';
-  const date = new Intl.DateTimeFormat(undefined, {
+  const date = new Intl.DateTimeFormat('en-US', {
     timeZone: zone,
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
+    hour12: true,
   }).format(new Date(ms));
-  return `${date} ${zoneAbbr(zone, ms)} (${label})`;
+  const abbr = zoneAbbr(zone, ms);
+  return label ? `${date} ${abbr} (${label})` : `${date} ${abbr}`;
 }
 
 function countdownLabel(concert, now) {

@@ -3,6 +3,7 @@
 // shows. The List / Map / Calendar views all render off this same array.
 
 import { readApiKey } from './settings.js';
+import { estimateVenueCapacity } from './venueCapacity.js';
 
 const CACHE_TTL_MS = 8 * 60 * 60 * 1000;
 const memoryCache = new Map();
@@ -19,7 +20,7 @@ function localToday() {
 }
 
 function cacheKey(artist, source, window, customStart, customEnd) {
-  return `cohear_concerts_v8:${localToday()}:${artist || 'browse'}:${source || 'default'}:${window || 'default'}:${customStart || ''}:${customEnd || ''}`;
+  return `cohear_concerts_v9:${localToday()}:${artist || 'browse'}:${source || 'default'}:${window || 'default'}:${customStart || ''}:${customEnd || ''}`;
 }
 
 function readCached(key) {
@@ -38,7 +39,14 @@ function readCached(key) {
 }
 
 export function getCachedConcerts(artist, source = 'live', window = 'week', customStart, customEnd) {
-  return readCached(cacheKey(artist, source, window, customStart, customEnd));
+  const data = readCached(cacheKey(artist, source, window, customStart, customEnd));
+  if (data?.concerts && Array.isArray(data.concerts)) {
+    data.concerts = data.concerts.map((c) => ({
+      ...c,
+      capacity: c.capacity || estimateVenueCapacity(c.venue, c.capacity),
+    }));
+  }
+  return data;
 }
 
 function writeCached(key, value) {
@@ -72,7 +80,13 @@ export async function fetchConcerts(artist, source = 'live', window = 'week', { 
     .then((x) => x.json())
     .then((r) => {
       const fallback = publicFallbackConcerts(artist, window);
-      const concerts = r?.concerts?.length ? r.concerts : fallback;
+      let concerts = r?.concerts?.length ? r.concerts : fallback;
+      if (Array.isArray(concerts)) {
+        concerts = concerts.map((c) => ({
+          ...c,
+          capacity: c.capacity || estimateVenueCapacity(c.venue, c.capacity),
+        }));
+      }
       const value = {
         concerts,
         sources: concerts === fallback ? { jambase: 'demo', setlistfm: 'demo' } : (r?.sources || {}),
@@ -86,7 +100,10 @@ export async function fetchConcerts(artist, source = 'live', window = 'week', { 
       return value;
     })
     .catch(() => {
-      const fallback = publicFallbackConcerts(artist, window);
+      const fallback = publicFallbackConcerts(artist, window).map((c) => ({
+        ...c,
+        capacity: c.capacity || estimateVenueCapacity(c.venue, c.capacity),
+      }));
       const value = { concerts: fallback, sources: { jambase: 'demo', setlistfm: 'demo' }, browse: !artist, window, ok: Boolean(fallback.length), cached: false, fallback: true };
       if (value.ok) writeCached(key, value);
       return value;

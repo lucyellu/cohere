@@ -377,7 +377,7 @@ function formatUserTime(concert) {
 function formatShowTime(concert, zone, label) {
   const ms = showStartMs(concert);
   if (!ms) return 'Time TBA';
-  const date = new Intl.DateTimeFormat(undefined, { timeZone: zone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(ms));
+  const date = new Intl.DateTimeFormat('en-US', { timeZone: zone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(ms));
   return `${date} (${label})`;
 }
 
