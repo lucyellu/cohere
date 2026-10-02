@@ -27,7 +27,18 @@ function scrubSecrets(value) {
   return out;
 }
 
+const BLOCKED_HOSTS = ['api.data.jambase.com', 'jambase.com', 'rapidapi.com'];
+const BLOCKED_SERVICES = new Set(['jambase', 'rapidapi']);
+
 export async function callLive(id, url, options = {}) {
+  // HARD KILL SWITCH: physically prevents any outbound network request to paid/metered services
+  if (
+    process.env.HARD_SWITCH !== 'false' &&
+    (BLOCKED_SERVICES.has(id) || BLOCKED_HOSTS.some((h) => typeof url === 'string' && url.includes(h)))
+  ) {
+    console.warn(`[HARD SWITCH] Blocked outbound live call to ${id} (${url}). Serving mock.`);
+    return serveMock(id);
+  }
   const start = Date.now();
   try {
     const res = await fetch(url, options);

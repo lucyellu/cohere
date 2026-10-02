@@ -167,6 +167,7 @@ export function setOverride(id, useMock) {
 // Effective mode for a service. A service with no key is ALWAYS forced to mock,
 // regardless of toggles — you can't go live without credentials.
 export function isMock(id) {
+  if (process.env.HARD_SWITCH !== 'false' && (id === 'jambase' || id === 'rapidapi')) return true;
   if (!hasKey(id)) return true; // no credentials -> always mock
   if (overrides[id] !== null) return overrides[id]; // runtime toggle wins
   if (SERVICES[id].preferMock) return true; // service prefers mock by default

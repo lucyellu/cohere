@@ -21,9 +21,15 @@ const HOSTS = {
 };
 
 const key = () => process.env.RAPIDAPI_KEY || '';
-export const hasRapid = () => Boolean(key().trim());
+export const hasRapid = () => {
+  if (process.env.HARD_SWITCH !== 'false') return false;
+  return Boolean(key().trim());
+};
 
 async function call(host, path, { method = 'GET', body } = {}) {
+  if (process.env.HARD_SWITCH !== 'false') {
+    return { ok: false, status: 403, data: { error: 'Hard switch active: RapidAPI disabled' } };
+  }
   const headers = { 'x-rapidapi-host': host, 'x-rapidapi-key': key() };
   if (body) headers['Content-Type'] = 'application/json';
   const r = await fetch(`https://${host}${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });

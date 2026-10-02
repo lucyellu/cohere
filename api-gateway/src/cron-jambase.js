@@ -15,9 +15,9 @@ if (!JB_KEY) {
   process.exit(1);
 }
 
-// Trial safety: disabled to prevent overage charges
-if (process.env.DISABLE_JAMBASE === 'true' || Number(process.env.JAMBASE_MONTHLY_CAP) <= 0 || new Date() > new Date('2026-12-31T23:59:59Z')) {
-  console.log('JamBase sync disabled to prevent overage charges.');
+// Hard safety kill-switch: disabled to prevent any overage charges
+if (process.env.HARD_SWITCH !== 'false' || process.env.DISABLE_JAMBASE === 'true' || Number(process.env.JAMBASE_MONTHLY_CAP) <= 0 || new Date() > new Date('2026-12-31T23:59:59Z')) {
+  console.log('HARD SWITCH ACTIVE: JamBase sync permanently disabled to prevent charges.');
   process.exit(0);
 }
 

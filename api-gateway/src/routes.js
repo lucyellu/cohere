@@ -200,6 +200,9 @@ const jbAuth = () => ({
 // is exhausted this returns a synthetic "quota" response instead of ever
 // reaching JamBase, so a hot cache-miss loop can't run up real usage.
 async function jbCallLive(url) {
+  if (process.env.HARD_SWITCH !== 'false') {
+    return { ok: false, status: 403, mode: 'hard-switch', data: { error: 'Hard switch active: JamBase calls blocked' } };
+  }
   const budget = await tryConsumeJambaseCall();
   if (!budget.allowed) {
     return { ok: false, status: 429, mode: 'quota', data: { error: 'jambase monthly quota exhausted', budget } };

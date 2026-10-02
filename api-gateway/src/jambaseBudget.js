@@ -24,8 +24,8 @@ const CAP = Number.isFinite(+process.env.JAMBASE_MONTHLY_CAP) ? +process.env.JAM
 // serves cache/mock when it didn't strictly need to; it never risks an
 // uncounted live call.
 export async function tryConsumeJambaseCall() {
-  if (process.env.DISABLE_JAMBASE === 'true' || CAP <= 0 || !process.env.JAMBASE_API_KEY) {
-    return { allowed: false, calls: null, cap: CAP, month: null, reason: 'disabled' };
+  if (process.env.HARD_SWITCH !== 'false' || process.env.DISABLE_JAMBASE === 'true' || CAP <= 0 || !process.env.JAMBASE_API_KEY) {
+    return { allowed: false, calls: null, cap: CAP, month: null, reason: 'hard-switch-disabled' };
   }
   if (!SB_URL || !SB_KEY) {
     console.warn('[jambaseBudget] Supabase not configured — refusing live JamBase call (fail-closed).');
