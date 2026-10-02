@@ -15,9 +15,9 @@ if (!JB_KEY) {
   process.exit(1);
 }
 
-// Trial safety: extended to end of 2026
-if (new Date() > new Date('2026-12-31T23:59:59Z')) {
-  console.log('Trial safety: cron job disabled after extended period.');
+// Trial safety: disabled to prevent overage charges
+if (process.env.DISABLE_JAMBASE === 'true' || Number(process.env.JAMBASE_MONTHLY_CAP) <= 0 || new Date() > new Date('2026-12-31T23:59:59Z')) {
+  console.log('JamBase sync disabled to prevent overage charges.');
   process.exit(0);
 }
 

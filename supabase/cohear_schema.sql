@@ -164,10 +164,12 @@ begin
     where api_quota.service = p_service and api_quota.month <> cur_month;
 
   select api_quota.calls, api_quota.cap into v_calls, v_cap
-    from api_quota where api_quota.service = p_service;
+    from api_quota where api_quota.service = p_service
+    for update;
 
   if v_calls >= v_cap then
     return query select false, v_calls, v_cap, cur_month;
+    return;
   end if;
 
   update api_quota q set calls = q.calls + 1, updated_at = now()
@@ -175,6 +177,7 @@ begin
     returning q.calls into v_calls;
 
   return query select true, v_calls, v_cap, cur_month;
+  return;
 end;
 $function$;
 

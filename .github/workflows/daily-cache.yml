@@ -1,9 +1,10 @@
 name: Daily JamBase Cache Sync (6:00 AM)
 
+# Scheduled execution disabled to prevent API overage charges.
+# Re-enable or trigger manually via workflow_dispatch only when needed.
 on:
-  schedule:
-    # 13:00 UTC = 6:00 AM PDT (Pacific Daylight Time) / 5:00 AM PST
-    - cron: '0 13 * * *'
+  # schedule:
+  #   - cron: '0 13 * * *'
   workflow_dispatch: # Allows manual trigger from GitHub Actions UI anytime
 
 jobs:

@@ -571,6 +571,9 @@ router.all('/cron/sync-jambase', async (req, res) => {
   if (expected && secret !== expected && !isAdminRequest(req)) {
     return res.status(401).json({ ok: false, error: 'unauthorized' });
   }
+  if (process.env.DISABLE_JAMBASE === 'true' || Number(process.env.JAMBASE_MONTHLY_CAP) <= 0) {
+    return res.status(503).json({ ok: false, error: 'JamBase sync is disabled to prevent overage charges' });
+  }
   console.log('🔄 Triggering background JamBase sync from cron endpoint...');
   try {
     const { spawn } = await import('node:child_process');

@@ -24,6 +24,9 @@ const CAP = Number.isFinite(+process.env.JAMBASE_MONTHLY_CAP) ? +process.env.JAM
 // serves cache/mock when it didn't strictly need to; it never risks an
 // uncounted live call.
 export async function tryConsumeJambaseCall() {
+  if (process.env.DISABLE_JAMBASE === 'true' || CAP <= 0 || !process.env.JAMBASE_API_KEY) {
+    return { allowed: false, calls: null, cap: CAP, month: null, reason: 'disabled' };
+  }
   if (!SB_URL || !SB_KEY) {
     console.warn('[jambaseBudget] Supabase not configured — refusing live JamBase call (fail-closed).');
     return { allowed: false, calls: null, cap: CAP, month: null, reason: 'no-supabase' };
@@ -48,8 +51,9 @@ export async function tryConsumeJambaseCall() {
       console.warn('[jambaseBudget] quota RPC returned no row — refusing live call (fail-closed).');
       return { allowed: false, calls: null, cap: CAP, month: null, reason: 'empty-response' };
     }
-    if (!row.allowed) {
+    if (!row.allowed || rows.some((r) => r.allowed === false)) {
       console.warn(`[jambaseBudget] monthly cap hit: ${row.calls}/${row.cap} calls used in ${row.month}. Blocking further live JamBase calls until next month.`);
+      return { ...row, allowed: false };
     }
     return row;
   } catch (err) {
