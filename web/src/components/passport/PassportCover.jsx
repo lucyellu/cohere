@@ -17,14 +17,14 @@ export default function PassportCover({ className = '' }) {
     <div className={`cohear-cover ${className}`}>
       <div className="cohear-cover__leather" aria-hidden="true" />
       <div className="cohear-cover__tint" aria-hidden="true" />
-      <svg className="cohear-cover__face" viewBox="0 0 352 500" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Cohere passport cover">
+      <svg className="cohear-cover__face" viewBox="0 0 352 500" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Cohear passport cover">
         <Emboss x={176} y={66} size={27} tracking={11} font={SERIF} weight={700}>PASSPORT</Emboss>
 
         <g transform="translate(176 240) scale(0.62)">
           <LyreCrest />
         </g>
 
-        <Emboss x={176} y={412} size={34} tracking={1} font={SERIF} weight={700} italic>Cohere</Emboss>
+        <Emboss x={176} y={412} size={34} tracking={1} font={SERIF} weight={700} italic>Cohear</Emboss>
         <Emboss x={176} y={436} size={9} tracking={4.6} font='ui-sans-serif, system-ui, sans-serif' weight={700} opacity={0.82}>CITIZEN OF LIVE MUSIC</Emboss>
 
         {/* ICAO e-passport chip symbol */}

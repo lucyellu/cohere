@@ -310,10 +310,10 @@ function InviteButton({ event }) {
   const [copied, setCopied] = useState(false);
   async function share() {
     const url = roomUrl(event);
-    const text = `Join me in the crowd for ${event.artist} on Cohere →`;
+    const text = `Join me in the crowd for ${event.artist} on Cohear →`;
     try {
       if (navigator.share) {
-        await navigator.share({ title: 'Cohere', text, url });
+        await navigator.share({ title: 'Cohear', text, url });
       } else {
         await navigator.clipboard.writeText(url);
         setCopied(true);

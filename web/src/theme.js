@@ -1,6 +1,6 @@
-// theme.js — Palette engine and skin manager for Cohere.
+// theme.js — Palette engine and skin manager for Cohear.
 //
-// Bridges Cohere's signature warm terracotta landing page branding
+// Bridges Cohear's signature warm terracotta landing page branding
 // (warm sand/cream paper, dark ink, glowing vermilion/peach accents)
 // into the app's light and dark modes.
 
@@ -11,7 +11,7 @@ export const INVERT_KEY = 'cohere_theme_invert';
 export const SEED_SWATCHES = [
   { label: 'Charcoal', hex: '#71717a' },
   { label: 'Slate', hex: '#5f6b78' },
-  { label: 'Cohere Terracotta', hex: '#e85a2b' },
+  { label: 'Cohear Terracotta', hex: '#e85a2b' },
   { label: 'Warm Ember', hex: '#d9351f' },
   { label: 'Amber Peach', hex: '#f58b4e' },
 ];
@@ -88,7 +88,7 @@ export function applyTheme(seed, invert = false, swap = false) {
 
   if (invert) {
     // ── LIGHT MODE (LANDING PAGE SKIN) ───────────────────────────────────────
-    // Directly based on cohere_landing_page.html: warm sand cream, dark ink,
+    // Directly based on cohear_landing_page.html: warm sand cream, dark ink,
     // crisp terracotta orange gradients, warm frosted surfaces and borders.
     const paper = swap ? seed : '#f8f3e7';
     const paper2 = swap ? seed : '#ede6d6';

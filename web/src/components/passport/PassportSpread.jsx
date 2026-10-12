@@ -138,7 +138,7 @@ export default function PassportSpread({
             <div className="mt-0.5 text-[7px] font-semibold uppercase tracking-[0.2em] opacity-55">Passeport</div>
           </div>
           <div className="text-center leading-none">
-            <div className="text-[21px] font-black tracking-[0.16em]">COHERE</div>
+            <div className="text-[21px] font-black tracking-[0.16em]">COHEAR</div>
             <div className="mt-1 text-[7px] font-bold uppercase tracking-[0.24em] opacity-60">Citizen of Live Music</div>
           </div>
           <ChipIcon className="mt-0.5 h-6 w-6 shrink-0 opacity-70" />
@@ -219,7 +219,7 @@ export default function PassportSpread({
             </NumberedField>
             <div className="grid grid-cols-2 gap-2">
               <KV label="Type" value="P" mono />
-              <KV label="Authority" value="COHERE" mono />
+              <KV label="Authority" value="COHEAR" mono />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <KV label="Passport No" value={passportNo} mono />
@@ -232,7 +232,7 @@ export default function PassportSpread({
         <div className="mt-3 border-t border-black/10 pt-2">
           <div className="text-[8px] font-semibold uppercase tracking-[0.16em] opacity-45">Endorsements</div>
           <div className="mt-1 font-mono text-[9px] leading-relaxed opacity-55">
-            This passport is the property of Cohere. It is not transferable.
+            This passport is the property of Cohear. It is not transferable.
             The bearer is a citizen of live music and is entitled to free
             passage through all concert venues worldwide.
           </div>

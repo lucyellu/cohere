@@ -3,7 +3,7 @@ import { setGuestName, guestName } from '../live/liveApi.js';
 import { readProfile, writeProfile } from '../account.js';
 import { supabase, supabaseEnabled } from '../live/supabase.js';
 
-// First-run welcome. Explains the one idea that makes Cohere click ("a shared
+// First-run welcome. Explains the one idea that makes Cohear click ("a shared
 // clock puts you in the crowd with everyone — and your friends"), captures a
 // name for the passport + crowd, offers account creation, and points at the
 // first action. Shown once (localStorage flag); skippable.

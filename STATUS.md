@@ -1,4 +1,4 @@
-# Cohear (formerly Cohere/Reverb) — Status & Handoff
+# Cohear (formerly Cohear/Reverb) — Status & Handoff
 
 > Living doc for cross-session continuity. Update it as things change.
 > Last updated: 2026-06-17 (big feature session). Hackathon: **Musicathon 2026, June 15–21**.

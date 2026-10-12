@@ -13,7 +13,7 @@ const SHAPES = ['circle', 'oval', 'box'];
 export default function RubberStamp({
   id = 'stamp',
   city = '',
-  subtitle = 'COHERE · BORDER CONTROL',
+  subtitle = 'COHEAR · BORDER CONTROL',
   label = 'ADMITTED',
   date = '',
   ink = '#2f5fb4',

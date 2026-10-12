@@ -3,7 +3,7 @@
 **Current Status**: 80% Complete - Ready for testing and refinement
 
 ## What We're Building
-A DeepSeek-powered AI chatbot for the Cohere concert app that allows users to search for concerts using natural language queries like "biggest concerts tonight for Canadian artists."
+A DeepSeek-powered AI chatbot for the Cohear concert app that allows users to search for concerts using natural language queries like "biggest concerts tonight for Canadian artists."
 
 ## Implementation Summary
 

@@ -103,12 +103,12 @@ function Page({ no, of, title, cover, children }) {
     <div className={`cohear-export__page${cover ? ' cohear-export__page--cover' : ''}`} data-export-page>
       {!cover && (
         <div className="cohear-export__ph">
-          <span>{title || 'Cohere Passport'}</span>
+          <span>{title || 'Cohear Passport'}</span>
           <span>{no} / {of}</span>
         </div>
       )}
       {children}
-      {!cover && <div className="cohear-export__pf">Cohere · Citizen of Live Music</div>}
+      {!cover && <div className="cohear-export__pf">Cohear · Citizen of Live Music</div>}
     </div>
   );
 }
@@ -130,7 +130,7 @@ function IdentityPage({ name, initials, avatar, passportNo, qrValue, profile, me
           <div className="cohear-export__name">{name}</div>
           <div className="cohear-export__meta">
             <span><b>No.</b> {passportNo}</span>
-            <span><b>Authority</b> COHERE</span>
+            <span><b>Authority</b> COHEAR</span>
             {(profile?.homeCountry || profile?.homeCity) && <span><b>Nationality</b> {profile.homeCountry || profile.homeCity}</span>}
             {profile?.homeCity && <span><b>Home</b> {profile.homeCity}</span>}
             <span><b>Member since</b> {memberSince || '—'}</span>

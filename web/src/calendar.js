@@ -54,11 +54,11 @@ export function buildIcs({ id, title, start, end, location, description, url }) 
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Cohere//Concert Passport//EN',
+    'PRODID:-//Cohear//Concert Passport//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     'BEGIN:VEVENT',
-    `UID:${id || stamp}@cohere`,
+    `UID:${id || stamp}@cohear`,
     `DTSTAMP:${stamp}`,
     `DTSTART:${toIcsUtc(start)}`,
     `DTEND:${toIcsUtc(end || start + 2.5 * 3600_000)}`,
@@ -115,10 +115,10 @@ export function addToCalendar(concert, startMs, endMs) {
     start: startMs,
     end: endMs,
     location,
-    description: `Cohere — be in the crowd from anywhere. ${concert.artist || ''} at ${concert.venue || ''}.`.trim(),
+    description: `Cohear — be in the crowd from anywhere. ${concert.artist || ''} at ${concert.venue || ''}.`.trim(),
   });
   const slug = (concert.artist || 'show').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'show';
-  downloadIcs(`cohere-${slug}.ics`, ics);
+  downloadIcs(`cohear-${slug}.ics`, ics);
 
   list.push({ id: concert.id, title, start: startMs });
   writeCalendar(list);
@@ -145,7 +145,7 @@ export function scheduleReminders() {
       scheduled.add(key);
       setTimeout(() => {
         try {
-          new Notification('Cohere — show coming up', {
+          new Notification('Cohear — show coming up', {
             body: lead ? `${ev.title} starts in 1 hour` : `${ev.title} is starting now`,
           });
         } catch {

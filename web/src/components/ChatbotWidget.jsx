@@ -104,7 +104,7 @@ export default function ChatbotWidget({ settings }) {
       const contextMessages = [
         {
           role: 'system',
-          content: `You are a helpful concert assistant for Cohere, a live concert discovery app. Your knowledge base includes:
+          content: `You are a helpful concert assistant for Cohear, a live concert discovery app. Your knowledge base includes:
 - Real-time concert data from Jambase (upcoming shows)
 - Historical concert data from setlist.fm (past shows)
 - The user's search history and preferences

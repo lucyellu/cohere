@@ -166,7 +166,7 @@ export default function App() {
               <button className="flex min-w-0 items-center gap-2.5 text-left group" onClick={() => setView('home')} aria-label="Open Home">
                 <span className="cohear-logo-dot shrink-0 transition-transform duration-300 group-hover:scale-110" />
                 <span className="min-w-0">
-                  <span className="block text-xl font-bold tracking-tight text-white leading-none font-sans">Cohere</span>
+                  <span className="block text-xl font-bold tracking-tight text-white leading-none font-sans">Cohear</span>
                   <span className="block truncate text-[11px] text-zinc-500 mt-1 max-sm:hidden">Discover concerts. Collect memories.</span>
                 </span>
               </button>

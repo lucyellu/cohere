@@ -1,9 +1,9 @@
 ---
 name: verify
-description: Build, launch, and drive the Cohere web app headlessly to verify UI changes at runtime.
+description: Build, launch, and drive the Cohear web app headlessly to verify UI changes at runtime.
 ---
 
-# Verifying the Cohere web app (web/)
+# Verifying the Cohear web app (web/)
 
 ## Build / launch
 

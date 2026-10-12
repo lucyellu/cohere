@@ -1,4 +1,4 @@
-# Render Blueprint for the Cohere API gateway (Express).
+# Render Blueprint for the Cohear API gateway (Express).
 # Deploy: render.com -> New -> Blueprint -> pick this repo. Render reads this
 # file, creates the service, and prompts you to paste each secret below.
 #

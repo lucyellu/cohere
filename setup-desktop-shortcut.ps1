@@ -3,7 +3,7 @@ Add-Type -AssemblyName System.Drawing
 $Dir       = $PSScriptRoot
 $IconPath  = Join-Path $Dir 'cohere.ico'
 $BatPath   = Join-Path $Dir 'launch-musicathon.bat'
-$LinkName  = 'Cohere.lnk'
+$LinkName  = 'Cohear.lnk'
 $LinkPath  = Join-Path ([Environment]::GetFolderPath('Desktop')) $LinkName
 
 # Remove old shortcuts from earlier names.

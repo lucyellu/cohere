@@ -52,7 +52,7 @@ export default function PostageStamp({
   art = null,
   cancelled = false,
   cancelInk = '#41403c',
-  subtitle = 'Cohere Post · Concert Souvenir',
+  subtitle = 'Cohear Post · Concert Souvenir',
   className = '',
   style,
   title,

@@ -1,6 +1,6 @@
 # Tokenomics & Collectibles System Plan
 
-This plan outlines the rules and logic for issuing tickets, generating art, and tracking live engagement to make the Cohere passport feel like a realistic, scarce digital collectible system.
+This plan outlines the rules and logic for issuing tickets, generating art, and tracking live engagement to make the Cohear passport feel like a realistic, scarce digital collectible system.
 
 ## 1. Ticket Stubs: Venue Capacity & Seating
 

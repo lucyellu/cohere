@@ -1817,7 +1817,7 @@ router.post('/pipeline/synthesize', express.json(), async (req, res) => {
 });
 
 // ========================================================================
-// COHERE — live, synchronized "be there from anywhere" experience.
+// COHEAR — live, synchronized "be there from anywhere" experience.
 // ========================================================================
 
 // Lightweight clock-sync endpoint: the client measures round-trip and computes
