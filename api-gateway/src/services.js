@@ -15,7 +15,8 @@ export const SERVICES = {
     category: 'data',
     envKey: 'JAMBASE_API_KEY',
     live: true,
-    preferMock: true, // Default to mock data to prevent billable API calls
+    // The globe picks mock vs live per request via ?source= (curated demo tour
+    // vs real search), so no service-level preferMock here.
     description: 'Tour dates, venues (lat/long), setlists',
   },
   youtube: {

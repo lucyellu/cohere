@@ -1,10 +1,9 @@
 name: Daily JamBase Cache Sync (6:00 AM)
 
-# Scheduled execution disabled to prevent API overage charges.
-# Re-enable or trigger manually via workflow_dispatch only when needed.
 on:
-  # schedule:
-  #   - cron: '0 13 * * *'
+  schedule:
+    # 13:00 UTC = 6:00 AM PDT (Pacific Daylight Time) / 5:00 AM PST
+    - cron: '0 13 * * *'
   workflow_dispatch: # Allows manual trigger from GitHub Actions UI anytime
 
 jobs:
@@ -31,7 +30,8 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           JAMBASE_API_KEY: ${{ secrets.JAMBASE_API_KEY }}
-          JAMBASE_MONTHLY_CAP: ${{ secrets.JAMBASE_MONTHLY_CAP || '900' }}
+          HARD_SWITCH: 'false'
+          JAMBASE_MONTHLY_CAP: ${{ secrets.JAMBASE_MONTHLY_CAP || '1800' }}
           JB_NEAR_DAYS: 7
           JB_FAR_DAYS: 60
           JB_FAR_STEP: 5
